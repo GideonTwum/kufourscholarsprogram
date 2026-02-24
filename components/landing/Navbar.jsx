@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
 const navLinks = [
   { label: "About", href: "#about" },
@@ -62,8 +63,8 @@ export default function Navbar() {
 
         {/* CTA buttons */}
         <div className="hidden items-center gap-3 md:flex">
-          <a
-            href="#"
+          <Link
+            href="/login"
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
               scrolled
                 ? "text-royal hover:text-gold"
@@ -71,13 +72,13 @@ export default function Navbar() {
             }`}
           >
             Login
-          </a>
-          <a
-            href="#"
+          </Link>
+          <Link
+            href="/register"
             className="rounded-lg bg-gold px-5 py-2 text-sm font-semibold text-royal transition-all duration-200 hover:bg-gold-light hover:shadow-lg"
           >
             Apply Now
-          </a>
+          </Link>
         </div>
 
         {/* Mobile menu button */}
@@ -111,18 +112,20 @@ export default function Navbar() {
                 </a>
               ))}
               <div className="mt-3 flex flex-col gap-2 border-t border-gray-100 pt-3">
-                <a
-                  href="#"
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
                   className="rounded-lg px-3 py-2 text-center text-sm font-medium text-royal hover:bg-gray-50"
                 >
                   Login
-                </a>
-                <a
-                  href="#"
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={() => setMobileOpen(false)}
                   className="rounded-lg bg-gold px-3 py-2 text-center text-sm font-semibold text-royal"
                 >
                   Apply Now
-                </a>
+                </Link>
               </div>
             </div>
           </motion.div>

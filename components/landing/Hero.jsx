@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown } from "lucide-react";
+import Link from "next/link";
 
 export default function Hero() {
   return (
@@ -60,8 +61,8 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.45, ease: "easeOut" }}
           className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
-          <a
-            href="#"
+          <Link
+            href="/register"
             className="group flex items-center gap-2 rounded-lg bg-gold px-8 py-3.5 text-sm font-semibold text-royal shadow-lg shadow-gold/20 transition-all duration-200 hover:bg-gold-light hover:shadow-xl hover:shadow-gold/30"
           >
             Apply Now
@@ -69,7 +70,7 @@ export default function Hero() {
               size={16}
               className="transition-transform group-hover:translate-x-1"
             />
-          </a>
+          </Link>
           <a
             href="#about"
             className="rounded-lg border border-white/20 px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:border-white/40 hover:bg-white/5"

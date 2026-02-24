@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 
 const quickLinks = [
@@ -10,8 +11,7 @@ const quickLinks = [
 ];
 
 const programLinks = [
-  { label: "Apply Now", href: "#" },
-  { label: "Scholar Login", href: "#" },
+  { label: "Apply Now", href: "/register" },
   { label: "Mentorship", href: "#highlights" },
   { label: "Community Service", href: "#highlights" },
 ];
@@ -122,7 +122,13 @@ export default function Footer() {
               &copy; 2026 John Agyekum Kufuor Foundation.
               All rights reserved.
             </p>
-            <div className="flex gap-6">
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+              <Link href="/login" className="text-xs text-white/40 hover:text-white/60">
+                Director Login
+              </Link>
+              <Link href="/director-signup" className="text-xs text-white/40 hover:text-white/60">
+                Director Sign Up
+              </Link>
               <a href="#" className="text-xs text-white/40 hover:text-white/60">
                 Privacy Policy
               </a>
