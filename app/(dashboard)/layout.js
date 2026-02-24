@@ -27,6 +27,7 @@ const directorNav = [
   { label: "Messages", href: "/director/messages", icon: MessageCircle },
   { label: "Announcements", href: "/director/announcements", icon: Megaphone },
   { label: "Requests", href: "/director/requests", icon: MessageSquare },
+  { label: "Settings", href: "/director/settings", icon: Settings },
 ];
 
 export default function DashboardLayout({ children }) {

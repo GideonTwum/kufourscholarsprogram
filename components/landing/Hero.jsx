@@ -1,10 +1,80 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
 
-export default function Hero() {
+function Countdown({ deadline }) {
+  const [remaining, setRemaining] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const target = new Date(deadline);
+
+    function tick() {
+      const now = new Date();
+      const diff = target - now;
+      if (diff <= 0) {
+        setRemaining(null);
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+      setRemaining({ days, hours, mins, secs });
+    }
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [deadline]);
+
+  if (!mounted || !remaining) return null;
+
+  const passed = new Date(deadline) < new Date();
+  if (passed) {
+    return (
+      <div className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white/80">
+        <Clock size={16} />
+        Applications closed on {new Date(deadline).toLocaleDateString("en-GB", { dateStyle: "long" })}
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.6 }}
+      className="mt-6 flex flex-wrap items-center justify-center gap-3"
+    >
+      <span className="text-sm font-medium text-white/70">Applications close in</span>
+      <div className="flex gap-2">
+        {[
+          { value: remaining.days, label: "days" },
+          { value: remaining.hours, label: "hrs" },
+          { value: remaining.mins, label: "min" },
+          { value: remaining.secs, label: "sec" },
+        ].map(({ value, label }) => (
+          <div
+            key={label}
+            className="flex min-w-[3rem] flex-col items-center rounded-lg border border-white/30 bg-white/10 px-3 py-2"
+          >
+            <span className="text-lg font-bold text-white tabular-nums">
+              {String(value).padStart(2, "0")}
+            </span>
+            <span className="text-[10px] font-medium uppercase text-white/60">{label}</span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+export default function Hero({ applicationsOpen = false, applicationDeadline = null }) {
   return (
     <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-royal">
       {/* Gradient overlays */}
@@ -29,9 +99,26 @@ export default function Hero() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
+          className="mb-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
         >
-          <span className="mb-6 inline-block rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 text-sm font-medium text-gold">
+          <span className="inline-block rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 text-sm font-medium text-gold">
             The John Agyekum Kufuor Foundation
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold ${
+              applicationsOpen
+                ? "border border-green-400/50 bg-green-500/20 text-green-200"
+                : "border border-white/30 bg-white/10 text-white/90"
+            }`}
+          >
+            {applicationsOpen ? (
+              <>Applications Open</>
+            ) : (
+              <>
+                <XCircle size={14} />
+                Applications Currently Closed
+              </>
+            )}
           </span>
         </motion.div>
 
@@ -55,22 +142,32 @@ export default function Hero() {
           through leadership development, mentorship, and academic excellence.
         </motion.p>
 
+        {applicationsOpen && applicationDeadline && (
+          <Countdown deadline={applicationDeadline} />
+        )}
+
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.45, ease: "easeOut" }}
           className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
-          <Link
-            href="/register"
-            className="group flex items-center gap-2 rounded-lg bg-gold px-8 py-3.5 text-sm font-semibold text-royal shadow-lg shadow-gold/20 transition-all duration-200 hover:bg-gold-light hover:shadow-xl hover:shadow-gold/30"
-          >
-            Apply Now
-            <ArrowRight
-              size={16}
-              className="transition-transform group-hover:translate-x-1"
-            />
-          </Link>
+          {applicationsOpen ? (
+            <Link
+              href="/register"
+              className="group flex items-center gap-2 rounded-lg bg-gold px-8 py-3.5 text-sm font-semibold text-royal shadow-lg shadow-gold/20 transition-all duration-200 hover:bg-gold-light hover:shadow-xl hover:shadow-gold/30"
+            >
+              Apply Now
+              <ArrowRight
+                size={16}
+                className="transition-transform group-hover:translate-x-1"
+              />
+            </Link>
+          ) : (
+            <span className="flex items-center gap-2 rounded-lg border border-white/30 bg-white/5 px-8 py-3.5 text-sm font-semibold text-white/70">
+              Applications Closed
+            </span>
+          )}
           <a
             href="#about"
             className="rounded-lg border border-white/20 px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:border-white/40 hover:bg-white/5"

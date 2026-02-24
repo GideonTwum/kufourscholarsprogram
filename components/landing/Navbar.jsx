@@ -13,7 +13,7 @@ const navLinks = [
   { label: "Contact", href: "#contact" },
 ];
 
-export default function Navbar() {
+export default function Navbar({ applicationsOpen = false }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -73,12 +73,18 @@ export default function Navbar() {
           >
             Login
           </Link>
-          <Link
-            href="/register"
-            className="rounded-lg bg-gold px-5 py-2 text-sm font-semibold text-royal transition-all duration-200 hover:bg-gold-light hover:shadow-lg"
-          >
-            Apply Now
-          </Link>
+          {applicationsOpen ? (
+            <Link
+              href="/register"
+              className="rounded-lg bg-gold px-5 py-2 text-sm font-semibold text-royal transition-all duration-200 hover:bg-gold-light hover:shadow-lg"
+            >
+              Apply Now
+            </Link>
+          ) : (
+            <span className="cursor-not-allowed rounded-lg border border-gray-300 bg-gray-100 px-5 py-2 text-sm font-medium text-gray-400">
+              Applications Closed
+            </span>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -119,13 +125,19 @@ export default function Navbar() {
                 >
                   Login
                 </Link>
-                <Link
-                  href="/register"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg bg-gold px-3 py-2 text-center text-sm font-semibold text-royal"
-                >
-                  Apply Now
-                </Link>
+                {applicationsOpen ? (
+                  <Link
+                    href="/register"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-lg bg-gold px-3 py-2 text-center text-sm font-semibold text-royal"
+                  >
+                    Apply Now
+                  </Link>
+                ) : (
+                  <span className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-500">
+                    Applications Closed
+                  </span>
+                )}
               </div>
             </div>
           </motion.div>
