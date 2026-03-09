@@ -4,16 +4,21 @@ import Link from "next/link";
 import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 
 const quickLinks = [
-  { label: "About", href: "#about" },
-  { label: "Program", href: "#highlights" },
-  { label: "Gallery", href: "#gallery" },
-  { label: "Contact", href: "#contact" },
+  { label: "About", href: "/about" },
+  { label: "Program", href: "/about#program" },
+  { label: "Projects", href: "/projects" },
+  { label: "Alumni", href: "/alumni" },
+  { label: "FAQ", href: "/#faq" },
+  { label: "News", href: "/#news" },
+  { label: "Gallery", href: "/#gallery" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 const programLinks = [
+  { label: "Apply", href: "/apply" },
   { label: "Apply Now", href: "/register" },
-  { label: "Mentorship", href: "#highlights" },
-  { label: "Community Service", href: "#highlights" },
+  { label: "Mentorship", href: "/about#program" },
+  { label: "Community Service", href: "/about#program" },
 ];
 
 const socials = [
@@ -64,12 +69,21 @@ export default function Footer() {
             <ul className="mt-4 space-y-3">
               {quickLinks.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-white/50 transition-colors hover:text-gold"
-                  >
-                    {link.label}
-                  </a>
+                  {link.href.startsWith("/") ? (
+                    <Link
+                      href={link.href}
+                      className="text-sm text-white/50 transition-colors hover:text-gold"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm text-white/50 transition-colors hover:text-gold"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -83,12 +97,21 @@ export default function Footer() {
             <ul className="mt-4 space-y-3">
               {programLinks.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-white/50 transition-colors hover:text-gold"
-                  >
-                    {link.label}
-                  </a>
+                  {link.href.startsWith("/") ? (
+                    <Link
+                      href={link.href}
+                      className="text-sm text-white/50 transition-colors hover:text-gold"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm text-white/50 transition-colors hover:text-gold"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

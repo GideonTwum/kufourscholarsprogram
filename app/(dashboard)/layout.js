@@ -15,15 +15,22 @@ import {
   ChevronRight,
   Users,
   FileText,
+  Newspaper,
   Megaphone,
   MessageSquare,
   Video,
+  Calendar,
+  FolderKanban,
 } from "lucide-react";
 
 const directorNav = [
   { label: "Dashboard", href: "/director", icon: LayoutDashboard },
   { label: "Applications", href: "/director/applications", icon: FileText },
   { label: "Interviews", href: "/director/interviews", icon: Video },
+  { label: "Scholars", href: "/director/scholars", icon: Users },
+  { label: "Events", href: "/director/events", icon: Calendar },
+  { label: "Projects", href: "/director/projects", icon: FolderKanban },
+  { label: "News", href: "/director/news", icon: Newspaper },
   { label: "Messages", href: "/director/messages", icon: MessageCircle },
   { label: "Announcements", href: "/director/announcements", icon: Megaphone },
   { label: "Requests", href: "/director/requests", icon: MessageSquare },

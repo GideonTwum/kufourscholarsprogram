@@ -5,14 +5,17 @@ import { useRef } from "react";
 import { Calendar, ArrowRight, Clock, Tag } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { articles, categoryColors } from "@/lib/news-data";
+import { articles as defaultArticles, categoryColors } from "@/lib/news-data";
+import { getCategoryColor } from "@/lib/news";
 
-export default function News() {
+export default function News({ articles: passedArticles }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
-  const featured = articles.find((a) => a.featured);
-  const rest = articles.filter((a) => !a.featured).slice(0, 3);
+  const articles = passedArticles?.length ? passedArticles : defaultArticles;
+  const featured = articles.find((a) => a.featured) || articles[0];
+  const rest = articles.filter((a) => a?.slug !== featured?.slug).slice(0, 3);
+  const categoryColor = (cat) => categoryColors[cat] || getCategoryColor(cat);
 
   return (
     <section id="news" className="bg-white py-24">
@@ -64,9 +67,9 @@ export default function News() {
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute left-4 top-4">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${categoryColors[featured.category]}`}
-                    >
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${categoryColor(featured.category)}`}
+                  >
                       {featured.category}
                     </span>
                   </div>
@@ -118,7 +121,7 @@ export default function News() {
                   <div className="flex flex-1 flex-col justify-center">
                     <div className="flex items-center gap-3">
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${categoryColors[article.category]}`}
+                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${categoryColor(article.category)}`}
                       >
                         {article.category}
                       </span>

@@ -2,13 +2,13 @@
 
 import { motion, useInView, useMotionValue, useTransform, animate } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
-import { Users, Calendar, Building2, Award } from "lucide-react";
+import { Users, Building2, Award, Heart } from "lucide-react";
 
 const stats = [
-  { icon: Users, value: 200, suffix: "+", label: "Scholars" },
-  { icon: Calendar, value: 10, suffix: "+", label: "Years of Impact" },
-  { icon: Building2, value: 15, suffix: "+", label: "Partner Universities" },
-  { icon: Award, value: 25, suffix: "+", label: "Graduated Cohorts" },
+  { icon: Users, value: 200, suffix: "+", label: "Scholars Trained" },
+  { icon: Building2, value: 15, suffix: "+", label: "Universities Represented" },
+  { icon: Award, value: 50, suffix: "+", label: "Community Projects" },
+  { icon: Heart, value: 5000, suffix: "+", label: "Youth Impacted" },
 ];
 
 function AnimatedCounter({ target, suffix, isInView }) {

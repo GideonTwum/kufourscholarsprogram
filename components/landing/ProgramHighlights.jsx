@@ -7,9 +7,9 @@ import { Crown, Users, GraduationCap, Heart } from "lucide-react";
 const highlights = [
   {
     icon: Crown,
-    title: "Leadership Development",
+    title: "Leadership Training",
     description:
-      "Intensive leadership training with real-world projects, public speaking, and strategic thinking workshops that prepare scholars for executive roles.",
+      "Intensive leadership development with real-world projects, public speaking, and strategic thinking workshops that prepare scholars for executive roles.",
   },
   {
     icon: Users,
@@ -18,16 +18,16 @@ const highlights = [
       "One-on-one mentorship from industry leaders, former presidents, diplomats, and accomplished professionals across diverse sectors.",
   },
   {
-    icon: GraduationCap,
-    title: "Academic Excellence",
-    description:
-      "Access to curated reading materials, research opportunities, and academic support to excel at top universities in Ghana and beyond.",
-  },
-  {
     icon: Heart,
-    title: "Community Service",
+    title: "Community Impact",
     description:
       "Hands-on community engagement projects that instill a deep sense of social responsibility and nation-building commitment.",
+  },
+  {
+    icon: GraduationCap,
+    title: "Scholar Network",
+    description:
+      "Access to a powerful network of alumni, peers, and partners across Ghana and Africa for collaboration and career advancement.",
   },
 ];
 

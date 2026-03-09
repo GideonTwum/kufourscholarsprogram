@@ -1,15 +1,40 @@
-import { articles, categoryColors } from "@/lib/news-data";
+import { createClient } from "@/lib/supabase/server";
+import { articles as fallbackArticles, categoryColors } from "@/lib/news-data";
+import { formatArticle, getCategoryColor } from "@/lib/news";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Clock, ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 
-export function generateStaticParams() {
-  return articles.map((article) => ({ slug: article.slug }));
+export async function generateStaticParams() {
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("news_articles")
+      .select("slug");
+    if (data?.length) return data.map((a) => ({ slug: a.slug }));
+  } catch {}
+  return fallbackArticles.map((a) => ({ slug: a.slug }));
 }
 
-export function generateMetadata({ params }) {
-  const article = articles.find((a) => a.slug === params.slug);
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("news_articles")
+      .select("title, excerpt")
+      .eq("slug", slug)
+      .single();
+    if (data)
+      return {
+        title: `${data.title} | Kufuor Scholars Program`,
+        description: data.excerpt,
+      };
+  } catch {}
+  const article = fallbackArticles.find((a) => a.slug === slug);
   if (!article) return {};
   return {
     title: `${article.title} | Kufuor Scholars Program`,
@@ -17,17 +42,46 @@ export function generateMetadata({ params }) {
   };
 }
 
-export default function ArticlePage({ params }) {
-  const article = articles.find((a) => a.slug === params.slug);
+export default async function ArticlePage({ params }) {
+  const { slug } = await params;
+  let article = null;
+
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("news_articles")
+      .select("*")
+      .eq("slug", slug)
+      .single();
+    if (data) article = formatArticle(data);
+  } catch {}
+
+  if (!article) {
+    article = fallbackArticles.find((a) => a.slug === slug);
+  }
   if (!article) notFound();
 
-  const otherArticles = articles
-    .filter((a) => a.slug !== article.slug)
-    .slice(0, 3);
+  let otherArticles = [];
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("news_articles")
+      .select("*")
+      .neq("slug", slug)
+      .order("published_at", { ascending: false })
+      .limit(3);
+    otherArticles = (data || []).map(formatArticle);
+  } catch {}
+  if (otherArticles.length === 0) {
+    otherArticles = fallbackArticles
+      .filter((a) => a.slug !== slug)
+      .slice(0, 3);
+  }
+
+  const categoryColor = categoryColors[article.category] || getCategoryColor(article.category);
 
   return (
-    <main className="min-h-screen bg-white font-sans">
-      {/* Hero image */}
+    <div className="pt-24">
       <div className="relative h-64 sm:h-80 md:h-96">
         <Image
           src={article.image}
@@ -41,7 +95,7 @@ export default function ArticlePage({ params }) {
         <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10">
           <div className="mx-auto max-w-3xl">
             <span
-              className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${categoryColors[article.category]}`}
+              className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${categoryColor}`}
             >
               {article.category}
             </span>
@@ -58,7 +112,6 @@ export default function ArticlePage({ params }) {
         </div>
       </div>
 
-      {/* Article content */}
       <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="flex items-center gap-4 text-sm text-gray-400">
           <span className="flex items-center gap-1">
@@ -76,14 +129,13 @@ export default function ArticlePage({ params }) {
         </h1>
 
         <div className="mt-8 space-y-6">
-          {article.body.split("\n\n").map((paragraph, i) => (
+          {(article.body || "").split("\n\n").filter(Boolean).map((paragraph, i) => (
             <p key={i} className="text-base leading-relaxed text-gray-600 sm:text-lg">
               {paragraph}
             </p>
           ))}
         </div>
 
-        {/* Back link */}
         <div className="mt-12 border-t border-gray-100 pt-8">
           <Link
             href="/news"
@@ -95,7 +147,6 @@ export default function ArticlePage({ params }) {
         </div>
       </div>
 
-      {/* Related articles */}
       {otherArticles.length > 0 && (
         <div className="bg-gray-50 py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -119,7 +170,7 @@ export default function ArticlePage({ params }) {
                     />
                     <div className="absolute left-3 top-3">
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${categoryColors[related.category]}`}
+                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${categoryColors[related.category] || getCategoryColor(related.category)}`}
                       >
                         {related.category}
                       </span>
@@ -152,6 +203,6 @@ export default function ArticlePage({ params }) {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

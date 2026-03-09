@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
@@ -8,16 +8,19 @@ import Link from "next/link";
 function Countdown({ deadline }) {
   const [remaining, setRemaining] = useState(null);
   const [mounted, setMounted] = useState(false);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
+    mountedRef.current = true;
     setMounted(true);
     const target = new Date(deadline);
 
     function tick() {
+      if (!mountedRef.current) return;
       const now = new Date();
       const diff = target - now;
       if (diff <= 0) {
-        setRemaining(null);
+        if (mountedRef.current) setRemaining(null);
         return;
       }
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -29,17 +32,21 @@ function Countdown({ deadline }) {
 
     tick();
     const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
   }, [deadline]);
 
   if (!mounted || !remaining) return null;
 
   const passed = new Date(deadline) < new Date();
   if (passed) {
+    const closedDate = new Date(deadline).toLocaleDateString("en-GB", { dateStyle: "long" });
     return (
       <div className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white/80">
         <Clock size={16} />
-        Applications closed on {new Date(deadline).toLocaleDateString("en-GB", { dateStyle: "long" })}
+        Applications closed on {closedDate}
       </div>
     );
   }
@@ -168,12 +175,16 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
               Applications Closed
             </span>
           )}
-          <a
-            href="#about"
-            className="rounded-lg border border-white/20 px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:border-white/40 hover:bg-white/5"
+          <Link
+            href="/scholars"
+            className="group flex items-center gap-2 rounded-lg border border-white/20 px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:border-white/40 hover:bg-white/5"
           >
-            Learn More
-          </a>
+            Meet Our Scholars
+            <ArrowRight
+              size={16}
+              className="transition-transform group-hover:translate-x-1"
+            />
+          </Link>
         </motion.div>
       </div>
 
