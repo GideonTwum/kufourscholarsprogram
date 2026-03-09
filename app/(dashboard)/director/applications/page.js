@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 
 const statusConfig = {
-  submitted: {
-    label: "Submitted",
+  stage1_submitted: {
+    label: "Stage 1 Submitted",
     color: "bg-blue-50 text-blue-700",
     icon: FileText,
   },
@@ -24,10 +24,15 @@ const statusConfig = {
     color: "bg-amber-50 text-amber-700",
     icon: Search,
   },
-  shortlisted: {
-    label: "Shortlisted",
+  shortlisted_for_stage2: {
+    label: "Shortlisted for Stage 2",
     color: "bg-purple-50 text-purple-700",
     icon: Users,
+  },
+  stage2_submitted: {
+    label: "Stage 2 Submitted",
+    color: "bg-indigo-50 text-indigo-700",
+    icon: Video,
   },
   interview: {
     label: "Interview",
@@ -52,9 +57,10 @@ const statusConfig = {
 };
 
 const allStatuses = [
-  "submitted",
+  "stage1_submitted",
   "under_review",
-  "shortlisted",
+  "shortlisted_for_stage2",
+  "stage2_submitted",
   "interview",
   "accepted",
   "rejected",

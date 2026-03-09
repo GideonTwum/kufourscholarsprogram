@@ -1,6 +1,6 @@
 "use client";
 
-import { Building, BookOpen, GraduationCap, BarChart3 } from "lucide-react";
+import { Building, BookOpen, GraduationCap, BarChart3, School } from "lucide-react";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/20";
@@ -20,7 +20,21 @@ export default function AcademicInfo({ data, onChange, errors = {} }) {
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-bold text-gray-900">Academic Information</h2>
-        <p className="mt-1 text-sm text-gray-500">Share your academic background. All fields are required.</p>
+        <p className="mt-1 text-sm text-gray-500">Share your academic background. All fields marked with * are required.</p>
+      </div>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">Junior High School Attended</label>
+        <div className="relative">
+          <School size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" value={data.junior_high_school || ""} onChange={(e) => update("junior_high_school", e.target.value)} placeholder="e.g. Prempeh College JHS" className={fieldClass("junior_high_school")} />
+        </div>
+      </div>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">Senior High School Attended</label>
+        <div className="relative">
+          <School size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" value={data.senior_high_school || ""} onChange={(e) => update("senior_high_school", e.target.value)} placeholder="e.g. Prempeh College" className={fieldClass("senior_high_school")} />
+        </div>
       </div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">University / Institution <span className="text-red-500">*</span></label>
@@ -29,6 +43,13 @@ export default function AcademicInfo({ data, onChange, errors = {} }) {
           <input type="text" value={data.university || ""} onChange={(e) => update("university", e.target.value)} placeholder="e.g. University of Ghana" className={fieldClass("university")} />
         </div>
         {errors.university && <p className="mt-1 text-xs text-red-600">{errors.university}</p>}
+      </div>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">Student ID Number</label>
+        <div className="relative">
+          <BookOpen size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" value={data.student_id || ""} onChange={(e) => update("student_id", e.target.value)} placeholder="e.g. 10234567" className={fieldClass("student_id")} />
+        </div>
       </div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">Program / Course <span className="text-red-500">*</span></label>

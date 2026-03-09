@@ -14,6 +14,7 @@ import {
   X,
   ChevronRight,
   Users,
+  UsersRound,
   FileText,
   Newspaper,
   Megaphone,
@@ -27,6 +28,7 @@ const directorNav = [
   { label: "Dashboard", href: "/director", icon: LayoutDashboard },
   { label: "Applications", href: "/director/applications", icon: FileText },
   { label: "Interviews", href: "/director/interviews", icon: Video },
+  { label: "Panel Members", href: "/director/panel", icon: UsersRound },
   { label: "Scholars", href: "/director/scholars", icon: Users },
   { label: "Events", href: "/director/events", icon: Calendar },
   { label: "Projects", href: "/director/projects", icon: FolderKanban },
@@ -35,6 +37,10 @@ const directorNav = [
   { label: "Announcements", href: "/director/announcements", icon: Megaphone },
   { label: "Requests", href: "/director/requests", icon: MessageSquare },
   { label: "Settings", href: "/director/settings", icon: Settings },
+];
+
+const panelNav = [
+  { label: "Interview Applicants", href: "/panel", icon: FileText },
 ];
 
 export default function DashboardLayout({ children }) {
@@ -110,7 +116,7 @@ export default function DashboardLayout({ children }) {
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <div className="space-y-1">
-            {directorNav.map((item) => {
+            {(pathname?.startsWith("/panel") ? panelNav : directorNav).map((item) => {
               const isActive =
                 mounted &&
                 (pathname === item.href ||
@@ -155,9 +161,9 @@ export default function DashboardLayout({ children }) {
               </div>
               <div className="flex-1 overflow-hidden">
                 <p className="truncate text-sm font-medium text-gray-900">
-                  {profile.full_name || "Director"}
+                  {profile.full_name || (pathname?.startsWith("/panel") ? "Panel" : "Director")}
                 </p>
-                <p className="truncate text-xs text-gray-500">Director</p>
+                <p className="truncate text-xs text-gray-500">{pathname?.startsWith("/panel") ? "Panel Member" : "Director"}</p>
               </div>
             </div>
           )}
@@ -181,7 +187,7 @@ export default function DashboardLayout({ children }) {
           </button>
           <div className="flex-1" />
           <span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-dark">
-            Director
+            {pathname?.startsWith("/panel") ? "Panel" : "Director"}
           </span>
         </header>
         <main className="flex-1 p-4 lg:p-8">{children}</main>

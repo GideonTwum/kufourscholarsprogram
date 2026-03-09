@@ -41,6 +41,8 @@ export default function LoginPage() {
 
     if (role === "director") {
       router.push("/director");
+    } else if (role === "panel") {
+      router.push("/panel");
     } else {
       router.push("/applicant");
     }

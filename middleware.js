@@ -1,7 +1,7 @@
 import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse } from "next/server";
 
-const protectedRoutes = ["/applicant", "/director"];
+const protectedRoutes = ["/applicant", "/director", "/panel"];
 const authRoutes = ["/login", "/register", "/director-signup"];
 
 export async function middleware(request) {
@@ -29,13 +29,24 @@ export async function middleware(request) {
     if (pathname.startsWith("/director")) {
       if (role !== "director") {
         const url = request.nextUrl.clone();
-        url.pathname = "/applicant";
+        url.pathname = role === "panel" ? "/panel" : "/applicant";
+        return NextResponse.redirect(url);
+      }
+    } else if (pathname.startsWith("/panel")) {
+      if (role !== "panel") {
+        const url = request.nextUrl.clone();
+        url.pathname = role === "director" ? "/director" : "/applicant";
         return NextResponse.redirect(url);
       }
     } else if (pathname.startsWith("/applicant")) {
       if (role === "director") {
         const url = request.nextUrl.clone();
         url.pathname = "/director";
+        return NextResponse.redirect(url);
+      }
+      if (role === "panel") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/panel";
         return NextResponse.redirect(url);
       }
       if (role !== "applicant" && !pathname.startsWith("/applicant")) {
@@ -58,6 +69,8 @@ export async function middleware(request) {
 
     if (role === "director") {
       url.pathname = "/director";
+    } else if (role === "panel") {
+      url.pathname = "/panel";
     } else {
       url.pathname = "/applicant";
     }

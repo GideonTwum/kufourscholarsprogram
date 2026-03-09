@@ -29,9 +29,25 @@ export async function GET(request) {
     .single();
 
   const isDirector = profile?.role === "director";
+  const isPanel = profile?.role === "panel";
   const isOwner = path.startsWith(`${user.id}/`);
 
-  if (!isDirector && !isOwner) {
+  const allowed =
+    isDirector ||
+    isOwner ||
+    (isPanel &&
+      (await (async () => {
+        const prefix = path.split("/")[0];
+        const { data: app } = await supabase
+          .from("applications")
+          .select("id")
+          .eq("user_id", prefix)
+          .eq("status", "interview")
+          .maybeSingle();
+        return !!app;
+      })()));
+
+  if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

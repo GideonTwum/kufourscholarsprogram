@@ -10,24 +10,34 @@ import {
   Send,
   Loader2,
   CheckCircle2,
-  FileText,
   Eye,
   AlertCircle,
 } from "lucide-react";
 import PersonalInfo from "./steps/PersonalInfo";
 import AcademicInfo from "./steps/AcademicInfo";
-import EssayVideo from "./steps/EssayVideo";
 import Documents from "./steps/Documents";
 import ReviewSubmit from "./steps/ReviewSubmit";
 import { validateStep, validateForSubmit } from "@/lib/application-validation";
 
-const stepLabels = ["Personal", "Academic", "Essay & Video", "Documents", "Review"];
+const stepLabels = ["Personal", "Academic", "Documents", "Review"];
+
+const DOC_FIELDS = [
+  "cv_personal_statement_url",
+  "academic_transcript_url",
+  "leadership_evidence_url",
+  "recommendation_url",
+];
 
 function ApplicationReadOnlyView({ data }) {
   const [docUrls, setDocUrls] = useState({});
 
   useEffect(() => {
-    const paths = { cv_url: data.cv_url, recommendation_url: data.recommendation_url, photo_url: data.photo_url };
+    const paths = {
+      cv_personal_statement_url: data.cv_personal_statement_url || data.cv_url,
+      academic_transcript_url: data.academic_transcript_url,
+      leadership_evidence_url: data.leadership_evidence_url,
+      recommendation_url: data.recommendation_url,
+    };
     const fetchUrls = async () => {
       const urls = {};
       for (const [field, path] of Object.entries(paths)) {
@@ -41,7 +51,7 @@ function ApplicationReadOnlyView({ data }) {
       setDocUrls(urls);
     };
     fetchUrls();
-  }, [data.cv_url, data.recommendation_url, data.photo_url]);
+  }, [data.cv_personal_statement_url, data.cv_url, data.academic_transcript_url, data.leadership_evidence_url, data.recommendation_url]);
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm sm:p-8">
@@ -81,12 +91,9 @@ export default function ApplicationPage() {
         .single();
 
       if (existing) {
-        if (existing.status !== "draft") {
+        const isNonDraft = existing.status !== "draft";
+        if (isNonDraft) {
           setReadOnly(true);
-          setData(existing);
-          setAppId(existing.id);
-          setLoading(false);
-          return;
         }
         setAppId(existing.id);
         setData({
@@ -94,16 +101,29 @@ export default function ApplicationPage() {
           date_of_birth: existing.date_of_birth || "",
           phone: existing.phone || "",
           address: existing.address || "",
+          hometown: existing.hometown || "",
+          region: existing.region || "",
+          country_of_origin: existing.country_of_origin || "",
           nationality: existing.nationality || "",
+          emergency_contact_name: existing.emergency_contact_name || "",
+          emergency_contact_number: existing.emergency_contact_number || "",
+          linkedin_url: existing.linkedin_url || "",
+          instagram_url: existing.instagram_url || "",
+          facebook_url: existing.facebook_url || "",
+          tiktok_url: existing.tiktok_url || "",
+          snapchat_url: existing.snapchat_url || "",
+          twitter_url: existing.twitter_url || "",
+          junior_high_school: existing.junior_high_school || "",
+          senior_high_school: existing.senior_high_school || "",
           university: existing.university || "",
+          student_id: existing.student_id || "",
           program: existing.program || "",
           year_of_study: existing.year_of_study || "",
           gpa: existing.gpa || "",
-          essay: existing.essay || "",
-          video_url: existing.video_url || "",
-          cv_url: existing.cv_url || "",
+          cv_personal_statement_url: existing.cv_personal_statement_url || existing.cv_url || "",
+          academic_transcript_url: existing.academic_transcript_url || "",
+          leadership_evidence_url: existing.leadership_evidence_url || "",
           recommendation_url: existing.recommendation_url || "",
-          photo_url: existing.photo_url || "",
         });
       } else {
         setData({ full_name: profile?.full_name || "" });
@@ -115,7 +135,12 @@ export default function ApplicationPage() {
 
   async function saveDraft() {
     setSaving(true);
-    const payload = { ...data, user_id: userId, status: "draft", updated_at: new Date().toISOString() };
+    const payload = {
+      ...data,
+      user_id: userId,
+      status: "draft",
+      updated_at: new Date().toISOString(),
+    };
     if (appId) {
       await supabase.from("applications").update(payload).eq("id", appId);
     } else {
@@ -139,20 +164,24 @@ export default function ApplicationPage() {
     const allErrors = validateForSubmit(data);
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
-      const personalKeys = ["full_name", "date_of_birth", "phone", "address", "nationality"];
+      const personalKeys = ["full_name", "date_of_birth", "phone", "address", "country_of_origin", "nationality"];
       const academicKeys = ["university", "program", "year_of_study", "gpa"];
-      const essayKeys = ["essay", "video_url"];
-      const docKeys = ["cv_url", "recommendation_url", "photo_url"];
+      const docKeys = DOC_FIELDS;
       const errKeys = Object.keys(allErrors);
       if (errKeys.some((k) => personalKeys.includes(k))) setStep(0);
       else if (errKeys.some((k) => academicKeys.includes(k))) setStep(1);
-      else if (errKeys.some((k) => essayKeys.includes(k))) setStep(2);
-      else if (errKeys.some((k) => docKeys.includes(k))) setStep(3);
+      else if (errKeys.some((k) => docKeys.includes(k))) setStep(2);
       return;
     }
     setSubmitting(true);
     setErrors({});
-    const payload = { ...data, user_id: userId, status: "submitted", submitted_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    const payload = {
+      ...data,
+      user_id: userId,
+      status: "stage1_submitted",
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
     if (appId) {
       await supabase.from("applications").update(payload).eq("id", appId);
     } else {
@@ -170,20 +199,19 @@ export default function ApplicationPage() {
     return (
       <div className="mx-auto max-w-lg rounded-2xl bg-white p-8 text-center shadow-sm">
         <CheckCircle2 size={48} className="mx-auto text-green-600" />
-        <h1 className="mt-4 text-2xl font-bold text-gray-900">Application Submitted!</h1>
+        <h1 className="mt-4 text-2xl font-bold text-gray-900">Stage 1 Submitted!</h1>
         <p className="mt-2 text-sm text-gray-500">Your application is now under review. Track your status from the dashboard.</p>
-        <button onClick={() => router.push("/applicant")} className="mt-6 rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal-light">Go to Dashboard</button>
+        <button onClick={() => router.push("/applicant")} className="mt-6 rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal/90">Go to Dashboard</button>
       </div>
     );
   }
 
-  // Read-only view for submitted applications
   if (readOnly) {
     return (
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-700">
           <Eye size={16} />
-          Your application has been submitted and is under review.
+          Your Stage 1 application has been submitted and is under review.
         </div>
         <ApplicationReadOnlyView data={data} />
       </div>
@@ -193,11 +221,10 @@ export default function ApplicationPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Application</h1>
-        <p className="mt-1 text-sm text-gray-500">Complete all steps to submit your application.</p>
+        <h1 className="text-2xl font-bold text-gray-900">Stage 1: Initial Application</h1>
+        <p className="mt-1 text-sm text-gray-500">Complete all steps to submit your Stage 1 application.</p>
       </div>
 
-      {/* Step indicator */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           {stepLabels.map((label, i) => (
@@ -231,9 +258,8 @@ export default function ApplicationPage() {
       <div className="rounded-2xl bg-white p-6 shadow-sm sm:p-8">
         {step === 0 && <PersonalInfo data={data} onChange={setData} errors={errors} />}
         {step === 1 && <AcademicInfo data={data} onChange={setData} errors={errors} />}
-        {step === 2 && <EssayVideo data={data} onChange={setData} errors={errors} />}
-        {step === 3 && <Documents data={data} onChange={setData} userId={userId} errors={errors} />}
-        {step === 4 && <ReviewSubmit data={data} goToStep={setStep} errors={errors} />}
+        {step === 2 && <Documents data={data} onChange={setData} userId={userId} errors={errors} />}
+        {step === 3 && <ReviewSubmit data={data} goToStep={setStep} errors={errors} />}
       </div>
 
       <div className="mt-6 flex items-center justify-between">
@@ -247,14 +273,14 @@ export default function ApplicationPage() {
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Draft
           </button>
         </div>
-        {step < 4 ? (
-          <button onClick={handleNext} disabled={saving} className="flex items-center gap-1 rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal-light disabled:opacity-50">
+        {step < 3 ? (
+          <button onClick={handleNext} disabled={saving} className="flex items-center gap-1 rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal/90 disabled:opacity-50">
             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
             Next <ChevronRight size={16} />
           </button>
         ) : (
-          <button onClick={handleSubmit} disabled={submitting} className="flex items-center gap-1 rounded-lg bg-gold px-6 py-2.5 text-sm font-semibold text-royal hover:bg-gold-light disabled:opacity-50">
-            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Submit Application
+          <button onClick={handleSubmit} disabled={submitting} className="flex items-center gap-1 rounded-lg bg-gold px-6 py-2.5 text-sm font-semibold text-royal hover:bg-gold/90 disabled:opacity-50">
+            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Submit Stage 1
           </button>
         )}
       </div>

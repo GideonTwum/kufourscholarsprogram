@@ -19,9 +19,10 @@ import {
 } from "lucide-react";
 
 const statusSteps = [
-  { key: "submitted", label: "Submitted", icon: FileText },
+  { key: "stage1_submitted", label: "Stage 1 Submitted", icon: FileText },
   { key: "under_review", label: "Under Review", icon: Search },
-  { key: "shortlisted", label: "Shortlisted", icon: Users },
+  { key: "shortlisted_for_stage2", label: "Shortlisted for Stage 2", icon: Users },
+  { key: "stage2_submitted", label: "Stage 2 Submitted", icon: Video },
   { key: "interview", label: "Interview", icon: Video },
 ];
 
@@ -181,8 +182,15 @@ export default function ApplicantDashboard() {
     );
   }
 
+  const statusOrder = [
+    "stage1_submitted",
+    "under_review",
+    "shortlisted_for_stage2",
+    "stage2_submitted",
+    "interview",
+  ];
   const currentIndex = application
-    ? statusSteps.findIndex((s) => s.key === application.status)
+    ? statusOrder.indexOf(application.status)
     : -1;
 
   return (
@@ -250,6 +258,39 @@ export default function ApplicantDashboard() {
             <p className="mt-1 text-sm text-red-700">
               Unfortunately, your application was not successful this time.
               Thank you for your interest.
+            </p>
+          </div>
+        ) : application.status === "shortlisted_for_stage2" ? (
+          <div className="rounded-lg border-2 border-gold/30 bg-gradient-to-br from-royal/5 to-gold/10 p-6">
+            <div className="mb-4 flex justify-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gold text-royal">
+                <Video size={28} />
+              </div>
+            </div>
+            <h3 className="text-center text-xl font-bold text-gray-900">
+              Congratulations! You&apos;re Shortlisted for Stage 2
+            </h3>
+            <p className="mt-2 text-center text-sm text-gray-700">
+              Submit your poster presentation video. Create a 3-minute video on a community problem, outlining the identified problem, cause, effect, intervention, and expected outcome.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <Link
+                href="/applicant/stage2"
+                className="inline-flex items-center gap-2 rounded-lg bg-gold px-6 py-3 text-sm font-semibold text-royal hover:bg-gold/90"
+              >
+                <Video size={18} />
+                Submit Stage 2 Video
+              </Link>
+            </div>
+          </div>
+        ) : application.status === "stage2_submitted" && !application.interview_slot_id ? (
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-6 text-center">
+            <CheckCircle2 size={40} className="mx-auto text-indigo-600" />
+            <h3 className="mt-3 text-lg font-bold text-gray-900">
+              Stage 2 Submitted
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Your video has been received. We will review it and contact you regarding the interview if you are selected.
             </p>
           </div>
         ) : (

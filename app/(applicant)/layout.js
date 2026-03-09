@@ -7,6 +7,7 @@ import Link from "next/link";
 import {
   LayoutDashboard,
   FileText,
+  Video,
   User,
   MessageCircle,
   Bell,
@@ -19,6 +20,7 @@ import {
 const applicantNav = [
   { label: "Dashboard", href: "/applicant", icon: LayoutDashboard },
   { label: "My Application", href: "/applicant/application", icon: FileText },
+  { label: "Stage 2 Video", href: "/applicant/stage2", icon: Video },
   { label: "My Profile", href: "/applicant/profile", icon: User },
   { label: "Messages", href: "/applicant/messages", icon: MessageCircle },
   { label: "News & Updates", href: "/applicant/news", icon: Bell },
