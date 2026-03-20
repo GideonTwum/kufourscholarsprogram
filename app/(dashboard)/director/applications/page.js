@@ -24,6 +24,11 @@ const statusConfig = {
     color: "bg-amber-50 text-amber-700",
     icon: Search,
   },
+  review_pending: {
+    label: "Undecided (Pending)",
+    color: "bg-slate-50 text-slate-700",
+    icon: Clock,
+  },
   shortlisted_for_stage2: {
     label: "Shortlisted for Stage 2",
     color: "bg-purple-50 text-purple-700",
@@ -59,6 +64,7 @@ const statusConfig = {
 const allStatuses = [
   "stage1_submitted",
   "under_review",
+  "review_pending",
   "shortlisted_for_stage2",
   "stage2_submitted",
   "interview",

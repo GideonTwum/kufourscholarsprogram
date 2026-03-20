@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Calendar,
   MapPin,
+  Clock,
 } from "lucide-react";
 
 const statusSteps = [
@@ -189,9 +190,11 @@ export default function ApplicantDashboard() {
     "stage2_submitted",
     "interview",
   ];
-  const currentIndex = application
-    ? statusOrder.indexOf(application.status)
-    : -1;
+  const statusToProgressIndex = (status) => {
+    if (status === "review_pending") return statusOrder.indexOf("under_review");
+    return statusOrder.indexOf(status);
+  };
+  const currentIndex = application ? statusToProgressIndex(application.status) : -1;
 
   return (
     <div>
@@ -298,6 +301,10 @@ export default function ApplicantDashboard() {
             {statusSteps.map((s, i) => {
               const completed = i < currentIndex;
               const active = i === currentIndex;
+              const pendingUndecided =
+                s.key === "under_review" && application.status === "review_pending";
+              const displayLabel = pendingUndecided ? "Undecided (Pending)" : s.label;
+              const StepIcon = pendingUndecided && active ? Clock : s.icon;
               return (
                 <div key={s.key} className="flex flex-1 items-center">
                   <div className="flex flex-col items-center">
@@ -313,7 +320,7 @@ export default function ApplicantDashboard() {
                       {completed ? (
                         <CheckCircle2 size={18} />
                       ) : (
-                        <s.icon size={18} />
+                        <StepIcon size={18} />
                       )}
                     </div>
                     <span
@@ -321,7 +328,7 @@ export default function ApplicantDashboard() {
                         active ? "text-royal" : "text-gray-400"
                       }`}
                     >
-                      {s.label}
+                      {displayLabel}
                     </span>
                   </div>
                   {i < statusSteps.length - 1 && (

@@ -40,9 +40,9 @@ insert into public.news_articles (slug, category, title, excerpt, body, image, f
 values
   ('applications-open-cohort-2026', 'Admissions', 'Applications Now Open for Cohort 2026',
    'The Kufuor Scholars Program is accepting applications for the 2026 cohort. Eligible candidates are encouraged to apply before the March 31 deadline.',
-   'The John Agyekum Kufuor Foundation is pleased to announce that applications for the Kufuor Scholars Program Cohort 2026 are now open. This year, we are looking for outstanding young Ghanaians who demonstrate exceptional leadership potential, academic excellence, and a commitment to community service.
+   'The John A. Kufuor Foundation is pleased to announce that applications for the Kufuor Scholars Program Cohort 2026 are now open. This year, we are looking for outstanding Africans studying in Ghana who demonstrate exceptional leadership potential, academic excellence, and a commitment to community service.
 
-Eligible candidates must be enrolled in or recently graduated from a recognized university in Ghana. The application process includes submission of academic transcripts, a personal essay, a curriculum vitae, and two recommendation letters.
+Eligible candidates must be African nationals (not limited to Ghanaian citizens), aged 25 or under, and currently enrolled in a recognized university in Ghana. The application process includes submission of academic transcripts, a personal essay, a curriculum vitae, and two recommendation letters.
 
 The deadline for applications is March 31, 2026. Shortlisted candidates will be invited for interviews in April, with final selections announced in May. The program commences in September 2026.
 

@@ -14,22 +14,22 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Kufuor Scholars Program | Grooming Future Leaders of Africa",
   description:
-    "The Kufuor Scholars Program, an initiative of the John Agyekum Kufuor Foundation, identifies and nurtures exceptional young Ghanaians with leadership potential through a transformational 3-year program.",
+    "The Kufuor Scholars Program, an initiative of the John A. Kufuor Foundation, identifies and nurtures exceptional Africans studying in Ghana with leadership potential through a transformational 3-year program.",
   keywords: [
     "Kufuor Scholars",
-    "John Agyekum Kufuor Foundation",
+    "John A. Kufuor Foundation",
     "Leadership Development",
-    "Ghana Scholarship",
+    "Study in Ghana",
     "African Leaders",
     "Youth Development",
     "Mentorship Program",
   ],
-  authors: [{ name: "John Agyekum Kufuor Foundation" }],
+  authors: [{ name: "John A. Kufuor Foundation" }],
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://scholars.kufuorfoundation.org"),
   openGraph: {
     title: "Kufuor Scholars Program | Grooming Future Leaders of Africa",
     description:
-      "A transformational 3-year program nurturing exceptional young Ghanaians through leadership development, mentorship, and academic excellence.",
+      "A transformational 3-year program nurturing Africans studying in Ghana through leadership development, mentorship, and academic excellence.",
     url: "/",
     siteName: "Kufuor Scholars Program",
     locale: "en_GH",
@@ -40,7 +40,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "Kufuor Scholars Program | Grooming Future Leaders of Africa",
     description:
-      "A transformational 3-year program nurturing exceptional young Ghanaians through leadership development, mentorship, and academic excellence.",
+      "A transformational 3-year program nurturing Africans studying in Ghana through leadership development, mentorship, and academic excellence.",
   },
   alternates: {
     canonical: "/",

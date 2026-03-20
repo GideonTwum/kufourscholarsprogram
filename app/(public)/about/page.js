@@ -5,7 +5,7 @@ import { Shield, Flag, Eye, Scale, Target, Award, Crown, Users, GraduationCap, H
 export const metadata = {
   title: "About Us | Kufuor Scholars Program",
   description:
-    "The Kufuor Scholars Program identifies and nurtures exceptional young Ghanaians with leadership potential. Mission, vision, program pillars, and outcomes.",
+    "The Kufuor Scholars Program nurtures exceptional Africans studying in Ghana. Mission, vision, program pillars, and outcomes.",
 };
 
 const values = [
@@ -71,9 +71,9 @@ export default function AboutPage() {
               Identifying and Nurturing Exceptional Leaders
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-gray-600">
-              The Kufuor Scholars Program, an initiative of the John Agyekum
-              Kufuor Foundation, identifies and nurtures exceptional young
-              Ghanaians with leadership potential. Through a rigorous 3-year
+              The Kufuor Scholars Program, an initiative of the John A.
+              Kufuor Foundation, identifies and nurtures exceptional Africans
+              studying in Ghana with leadership potential. Through a rigorous 3-year
               program, scholars are equipped with the skills, knowledge, and
               networks needed to drive positive change across Africa.
             </p>
@@ -123,10 +123,10 @@ export default function AboutPage() {
             Founded on Presidential Excellence
           </h2>
           <p className="mt-6 max-w-3xl text-lg leading-relaxed text-gray-600">
-            The program is built on the legacy of His Excellency John Agyekum
+            The program is built on the legacy of His Excellency John A.
             Kufuor, former President of Ghana (2001–2009). President Kufuor&apos;s
             leadership exemplified integrity, vision, and a deep commitment to
-            Ghana&apos;s development. The John Agyekum Kufuor Foundation continues
+            Ghana&apos;s development. The John A. Kufuor Foundation continues
             this legacy by investing in young people who will carry forward
             these values.
           </p>

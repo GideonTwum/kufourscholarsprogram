@@ -6,6 +6,7 @@ import About from "@/components/landing/About";
 import ProgramHighlights from "@/components/landing/ProgramHighlights";
 import Stats from "@/components/landing/Stats";
 import ScholarSpotlight from "@/components/landing/ScholarSpotlight";
+import ScholarVideos from "@/components/landing/ScholarVideos";
 import Gallery from "@/components/landing/Gallery";
 import Testimonials from "@/components/landing/Testimonials";
 import News from "@/components/landing/News";
@@ -19,6 +20,7 @@ export default async function Home() {
   let featuredScholars = [];
   let upcomingEvents = [];
   let newsArticles = [];
+  let scholarVideos = [];
 
   try {
     const supabase = await createClient();
@@ -62,6 +64,14 @@ export default async function Home() {
       .order("published_at", { ascending: false })
       .limit(4);
     newsArticles = (news || []).map(formatArticle);
+
+    const { data: sv } = await supabase
+      .from("scholar_videos")
+      .select("*")
+      .eq("is_published", true)
+      .order("display_order", { ascending: true })
+      .limit(6);
+    scholarVideos = sv || [];
   } catch {}
 
   if (newsArticles.length === 0) newsArticles = fallbackArticles.slice(0, 4);
@@ -73,6 +83,7 @@ export default async function Home() {
       <ProgramHighlights />
       <Stats />
       <ScholarSpotlight scholars={featuredScholars} />
+      <ScholarVideos videos={scholarVideos} />
       <Gallery />
       <Testimonials />
       <News articles={newsArticles} />

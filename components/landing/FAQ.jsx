@@ -9,11 +9,11 @@ import Link from "next/link";
 const faqs = [
   {
     q: "What is the Kufuor Scholars Program?",
-    a: "A 3-year leadership development initiative that identifies and nurtures exceptional young Ghanaians through mentorship, training, and community impact projects.",
+    a: "A 3-year leadership development initiative that identifies and nurtures exceptional Africans studying in Ghana through mentorship, training, and community impact projects.",
   },
   {
     q: "Who can apply?",
-    a: "Ghanaian citizens aged 18–35 who are enrolled in or recently graduated from a tertiary institution in Ghana, with demonstrated leadership potential and community involvement.",
+    a: "African nationals (not limited to Ghanaian citizens), aged 25 or under, who are currently enrolled in a tertiary institution in Ghana, with demonstrated leadership potential and community involvement.",
   },
   {
     q: "Is there an application fee?",

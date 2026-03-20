@@ -145,7 +145,7 @@ export default function ApplicantProfilePage() {
               </div>
               <div>
                 <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500"><Globe size={12} /> Nationality</label>
-                {editing ? <input type="text" value={form.nationality || ""} onChange={(e) => setForm((p) => ({ ...p, nationality: e.target.value }))} placeholder="e.g. Ghanaian" className={inputClass} /> : <p className="text-sm text-gray-900">{profile.nationality || "\u2014"}</p>}
+                {editing ? <input type="text" value={form.nationality || ""} onChange={(e) => setForm((p) => ({ ...p, nationality: e.target.value }))} placeholder="e.g. Nigerian, Ghanaian" className={inputClass} /> : <p className="text-sm text-gray-900">{profile.nationality || "\u2014"}</p>}
               </div>
             </div>
           </div>

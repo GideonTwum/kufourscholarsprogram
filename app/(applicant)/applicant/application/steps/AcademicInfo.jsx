@@ -1,6 +1,20 @@
 "use client";
 
 import { Building, BookOpen, GraduationCap, BarChart3, School } from "lucide-react";
+import { GRADE_TYPES } from "@/lib/application-validation";
+
+function gradePlaceholder(type) {
+  switch (type) {
+    case "CWA":
+      return "e.g. 72.5 (Cumulative Weighted Average)";
+    case "CGPA":
+      return "e.g. 3.45 / 4.0";
+    case "GPA":
+      return "e.g. 3.85 / 4.0";
+    default:
+      return "Select grade type above, then enter your figure";
+  }
+}
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/20";
@@ -20,7 +34,9 @@ export default function AcademicInfo({ data, onChange, errors = {} }) {
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-bold text-gray-900">Academic Information</h2>
-        <p className="mt-1 text-sm text-gray-500">Share your academic background. All fields marked with * are required.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Share your academic background. You must be <strong>currently enrolled</strong> at the institution below. Fields marked * are required.
+        </p>
       </div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">Junior High School Attended</label>
@@ -75,12 +91,58 @@ export default function AcademicInfo({ data, onChange, errors = {} }) {
         {errors.year_of_study && <p className="mt-1 text-xs text-red-600">{errors.year_of_study}</p>}
       </div>
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Current GPA / Grade <span className="text-red-500">*</span></label>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">Grade type <span className="text-red-500">*</span></label>
+        <div className="relative">
+          <BarChart3 size={18} className="absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
+          <select
+            value={data.grade_type || ""}
+            onChange={(e) => update("grade_type", e.target.value)}
+            className={`w-full appearance-none rounded-lg border py-2.5 pl-10 pr-4 text-sm outline-none ${errors.grade_type ? inputErrorClass : inputClass}`}
+          >
+            <option value="">Select CWA, CGPA, or GPA</option>
+            {GRADE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+                {t === "CWA" ? " — Cumulative Weighted Average" : t === "CGPA" ? " — Cumulative GPA" : " — Grade Point Average"}
+              </option>
+            ))}
+          </select>
+        </div>
+        {errors.grade_type && <p className="mt-1 text-xs text-red-600">{errors.grade_type}</p>}
+      </div>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Current {data.grade_type || "CWA / CGPA / GPA"} <span className="text-red-500">*</span>
+        </label>
         <div className="relative">
           <BarChart3 size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" value={data.gpa || ""} onChange={(e) => update("gpa", e.target.value)} placeholder="e.g. 3.85 / 4.0 or First Class" className={fieldClass("gpa")} />
+          <input
+            type="text"
+            value={data.gpa || ""}
+            onChange={(e) => update("gpa", e.target.value)}
+            placeholder={gradePlaceholder(data.grade_type)}
+            className={fieldClass("gpa")}
+          />
         </div>
         {errors.gpa && <p className="mt-1 text-xs text-red-600">{errors.gpa}</p>}
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={!!data.confirms_ghana_enrollment}
+            onChange={(e) => update("confirms_ghana_enrollment", e.target.checked)}
+            className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-royal focus:ring-gold"
+          />
+          <span className="text-sm text-gray-700">
+            I confirm I am <strong>currently enrolled</strong> at the tertiary institution above, and it is{" "}
+            <strong>located in Ghana</strong>. I understand that applications outside these criteria cannot be accepted.
+          </span>
+        </label>
+        {errors.confirms_ghana_enrollment && (
+          <p className="mt-2 text-xs text-red-600">{errors.confirms_ghana_enrollment}</p>
+        )}
       </div>
     </div>
   );

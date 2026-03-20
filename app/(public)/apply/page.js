@@ -16,9 +16,9 @@ export const metadata = {
 };
 
 const eligibility = [
-  "Ghanaian citizen",
-  "Aged 18–35 at time of application",
-  "Currently enrolled in or recently graduated from a tertiary institution in Ghana",
+  "Citizen of an African country — not limited to Ghanaian nationals",
+  "Aged 25 or under at time of application",
+  "Currently enrolled in a recognized tertiary institution in Ghana",
   "Demonstrated leadership potential and community involvement",
   "Strong academic record",
   "Commitment to the 3-year program",
@@ -105,8 +105,9 @@ export default async function ApplyPage() {
             Eligibility Requirements
           </h2>
           <p className="mt-4 max-w-2xl text-lg text-gray-600">
-            To be considered for the Kufuor Scholars Program, you must meet the
-            following criteria:
+            The program is open to <strong>all African nationals</strong> (not
+            only Ghanaian citizens) who are <strong>currently enrolled</strong>{" "}
+            at a tertiary institution in Ghana and meet the age limit below.
           </p>
           <ul className="mt-8 grid gap-4 sm:grid-cols-2">
             {eligibility.map((item) => (

@@ -13,7 +13,7 @@ const faqs = [
     questions: [
       {
         q: "What is the Kufuor Scholars Program?",
-        a: "The Kufuor Scholars Program is a 3-year leadership development initiative of the John Agyekum Kufuor Foundation. It identifies and nurtures exceptional young Ghanaians through mentorship, training, community impact projects, and access to a powerful network of leaders.",
+        a: "The Kufuor Scholars Program is a 3-year leadership development initiative of the John A. Kufuor Foundation. It is open to all Africans studying in Ghana and nurtures exceptional scholars through mentorship, training, community impact projects, and access to a powerful network of leaders.",
       },
       {
         q: "How long does the program last?",
@@ -30,7 +30,7 @@ const faqs = [
     questions: [
       {
         q: "Who can apply?",
-        a: "Ghanaian citizens aged 18–35 who are currently enrolled in or have recently graduated from a tertiary institution in Ghana. Applicants must demonstrate leadership potential, community involvement, and a strong academic record.",
+        a: "African nationals (not limited to Ghanaian citizens), aged 25 or under, who are currently enrolled in a tertiary institution in Ghana. Applicants must demonstrate leadership potential, community involvement, and a strong academic record.",
       },
       {
         q: "When do applications open?",
@@ -59,7 +59,7 @@ const faqs = [
       },
       {
         q: "Do I need to be in Accra to participate?",
-        a: "The program includes both in-person and virtual components. Scholars from across Ghana are welcome. Travel support may be provided for key events when possible.",
+        a: "The program includes both in-person and virtual components. Scholars at institutions across Ghana are welcome regardless of nationality. Travel support may be provided for key events when possible.",
       },
     ],
   },

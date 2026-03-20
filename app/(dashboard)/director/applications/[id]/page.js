@@ -19,17 +19,41 @@ import {
   ExternalLink,
   ChevronDown,
   ClipboardList,
+  Clock,
 } from "lucide-react";
+import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 
 const statusFlow = [
   { key: "stage1_submitted", label: "Stage 1 Submitted", color: "bg-blue-100 text-blue-700" },
   { key: "under_review", label: "Under Review", color: "bg-amber-100 text-amber-700" },
+  { key: "review_pending", label: "Undecided (Pending)", color: "bg-slate-100 text-slate-700" },
   { key: "shortlisted_for_stage2", label: "Shortlisted for Stage 2", color: "bg-purple-100 text-purple-700" },
   { key: "stage2_submitted", label: "Stage 2 Submitted", color: "bg-indigo-100 text-indigo-700" },
   { key: "interview", label: "Interview", color: "bg-indigo-100 text-indigo-700" },
   { key: "accepted", label: "Accepted", color: "bg-green-100 text-green-700" },
   { key: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
 ];
+
+/** First milestones shown in the progress row (pending maps onto “Under Review” step). */
+const workflowTimeline = [
+  { key: "stage1_submitted", label: "Stage 1 Submitted" },
+  {
+    key: "under_review",
+    label: "Under Review",
+    pendingKey: "review_pending",
+    pendingLabel: "Undecided (Pending)",
+  },
+  { key: "shortlisted_for_stage2", label: "Shortlisted for Stage 2" },
+  { key: "stage2_submitted", label: "Stage 2 Submitted" },
+  { key: "interview", label: "Interview" },
+];
+
+function workflowProgressIndex(status) {
+  if (status === "review_pending") return 1;
+  if (status === "accepted" || status === "rejected") return workflowTimeline.length + 1;
+  const i = workflowTimeline.findIndex((t) => t.key === status);
+  return i >= 0 ? i : 0;
+}
 
 const INTERVIEW_CRITERIA = [
   { key: "appearance_personality", label: "Appearance / Personality", weight: 5 },
@@ -188,7 +212,6 @@ export default function ApplicationReviewPage() {
   const docFields = [
     { label: "CV / Personal Statement", field: "cv_personal_statement_url" },
     { label: "Academic transcript", field: "academic_transcript_url" },
-    { label: "Evidence of leadership", field: "leadership_evidence_url" },
     { label: "Recommendation letter", field: "recommendation_url" },
   ];
 
@@ -196,7 +219,6 @@ export default function ApplicationReviewPage() {
   const effectiveDocPaths = {
     cv_personal_statement_url: application?.cv_personal_statement_url || application?.cv_url,
     academic_transcript_url: application?.academic_transcript_url,
-    leadership_evidence_url: application?.leadership_evidence_url,
     recommendation_url: application?.recommendation_url,
   };
 
@@ -204,13 +226,9 @@ export default function ApplicationReviewPage() {
 
   useEffect(() => {
     if (!application) return;
-    const paths = {
-      ...effectiveDocPaths,
-      photo_url: application.photo_url,
-    };
     const fetchSignedUrls = async () => {
       const urls = {};
-      for (const [field, path] of Object.entries(paths)) {
+      for (const [field, path] of Object.entries(effectiveDocPaths)) {
         if (!path) continue;
         try {
           const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
@@ -218,10 +236,42 @@ export default function ApplicationReviewPage() {
           if (data.url) urls[field] = data.url;
         } catch (_) {}
       }
+      const photo = application.photo_url;
+      if (photo) {
+        if (/^https?:\/\//i.test(photo)) {
+          urls.photo_url = photo;
+        } else {
+          try {
+            const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(photo)}`);
+            const data = await res.json();
+            if (data.url) urls.photo_url = data.url;
+          } catch (_) {}
+        }
+      }
+      const leads = getLeadershipEvidencePaths(application);
+      urls.leadership = [];
+      for (const path of leads) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const data = await res.json();
+          urls.leadership.push(data.url || null);
+        } catch (_) {
+          urls.leadership.push(null);
+        }
+      }
       setDocUrls(urls);
     };
     fetchSignedUrls();
-  }, [application?.id, application?.cv_personal_statement_url, application?.cv_url, application?.academic_transcript_url, application?.leadership_evidence_url, application?.recommendation_url, application?.photo_url]);
+  }, [
+    application?.id,
+    application?.cv_personal_statement_url,
+    application?.cv_url,
+    application?.academic_transcript_url,
+    application?.leadership_evidence_url,
+    application?.leadership_evidence_urls,
+    application?.recommendation_url,
+    application?.photo_url,
+  ]);
 
   const weightedTotal =
     INTERVIEW_CRITERIA.reduce((sum, c) => {
@@ -275,8 +325,7 @@ export default function ApplicationReviewPage() {
     );
   }
 
-  const statusOrder = statusFlow.map((s) => s.key);
-  const currentStatusIndex = statusOrder.indexOf(application.status);
+  const currentStatusIndex = workflowProgressIndex(application.status);
   const isTerminal = application.status === "accepted" || application.status === "rejected";
 
   return (
@@ -307,18 +356,24 @@ export default function ApplicationReviewPage() {
       {/* Status progress */}
       <div className="mb-8 rounded-xl bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          {statusFlow.slice(0, 5).map((s, i) => {
+          {workflowTimeline.map((step, i) => {
             const completed = i < currentStatusIndex;
-            const active = s.key === application.status;
+            const active =
+              application.status === step.key ||
+              (step.pendingKey && application.status === step.pendingKey);
+            const stepLabel =
+              application.status === step.pendingKey ? step.pendingLabel : step.label;
             return (
-              <div key={s.key} className="flex items-center">
+              <div key={step.key} className="flex items-center">
                 <div className="flex flex-col items-center">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${completed ? "bg-royal text-white" : active ? "bg-gold text-royal ring-4 ring-gold/20" : "bg-gray-100 text-gray-400"}`}>
                     {completed ? <CheckCircle2 size={14} /> : i + 1}
                   </div>
-                  <span className="mt-1 text-[10px] font-medium text-gray-500 max-w-[72px] text-center">{s.label}</span>
+                  <span className="mt-1 text-[10px] font-medium text-gray-500 max-w-[80px] text-center">{stepLabel}</span>
                 </div>
-                {i < 4 && <div className={`mx-1 h-0.5 w-4 ${completed ? "bg-royal" : "bg-gray-200"}`} />}
+                {i < workflowTimeline.length - 1 && (
+                  <div className={`mx-1 h-0.5 w-4 ${completed ? "bg-royal" : "bg-gray-200"}`} />
+                )}
               </div>
             );
           })}
@@ -371,8 +426,22 @@ export default function ApplicationReviewPage() {
               <Field label="Address" value={application.address} />
               <Field label="Hometown & Region" value={[application.hometown, application.region].filter(Boolean).join(", ")} />
               <Field label="Country of Origin" value={application.country_of_origin} />
-              <Field label="Emergency Contact" value={application.emergency_contact_name} />
-              <Field label="Emergency Contact Number" value={application.emergency_contact_number} />
+              <Field
+                label="Emergency contact 1"
+                value={
+                  application.emergency_contact_name
+                    ? `${application.emergency_contact_name} — ${application.emergency_contact_number || ""}`
+                    : null
+                }
+              />
+              <Field
+                label="Emergency contact 2"
+                value={
+                  application.emergency_contact_2_name
+                    ? `${application.emergency_contact_2_name} — ${application.emergency_contact_2_number || ""}`
+                    : null
+                }
+              />
               <Field label="LinkedIn" value={application.linkedin_url} />
               <Field label="Instagram" value={application.instagram_url} />
               <Field label="Facebook" value={application.facebook_url} />
@@ -387,7 +456,8 @@ export default function ApplicationReviewPage() {
               <Field label="University" value={application.university} />
               <Field label="Program" value={application.program} />
               <Field label="Year of Study" value={application.year_of_study} />
-              <Field label="GPA / Grade" value={application.gpa} />
+              <Field label="Grade type (CWA / CGPA / GPA)" value={application.grade_type} />
+              <Field label="Grade value" value={application.gpa} />
               <Field label="Junior High School" value={application.junior_high_school} />
               <Field label="Senior High School" value={application.senior_high_school} />
               <Field label="Student ID Number" value={application.student_id} />
@@ -397,6 +467,16 @@ export default function ApplicationReviewPage() {
           <div className="lg:col-span-2">
             <Section title="Stage 1 Documents" icon={FileText}>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {application.photo_url && (
+                  <DocCard
+                    key="photo"
+                    label="Passport / profile photo"
+                    field="photo_url"
+                    application={application}
+                    docUrls={docUrls}
+                    icon={ImageIcon}
+                  />
+                )}
                 {docFields.map((doc) => (
                   <DocCard
                     key={doc.field}
@@ -407,12 +487,28 @@ export default function ApplicationReviewPage() {
                     icon={FileText}
                   />
                 ))}
+                {getLeadershipEvidencePaths(application).map((path, i) => (
+                  <div key={`lead-${i}-${path}`} className="rounded-lg border border-gray-100 p-4">
+                    <FileText size={20} className="mb-2 text-gray-400" />
+                    <p className="text-sm font-medium text-gray-900">Leadership evidence {i + 1}</p>
+                    {!path ? (
+                      <p className="mt-1 text-xs text-gray-400">Not uploaded</p>
+                    ) : docUrls.leadership?.[i] ? (
+                      <a
+                        href={docUrls.leadership[i]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs text-royal hover:text-gold"
+                      >
+                        <ExternalLink size={12} />
+                        View Document
+                      </a>
+                    ) : (
+                      <p className="mt-1 text-xs text-amber-600">Loading…</p>
+                    )}
+                  </div>
+                ))}
               </div>
-              {application.photo_url && (
-                <div className="mt-4">
-                  <DocCard label="Passport Photo" field="photo_url" application={application} docUrls={docUrls} icon={ImageIcon} />
-                </div>
-              )}
             </Section>
           </div>
         </div>
@@ -437,7 +533,9 @@ export default function ApplicationReviewPage() {
             </a>
           ) : (
             <p className="text-sm text-gray-400">
-              {["shortlisted_for_stage2", "stage1_submitted", "under_review"].includes(application.status)
+              {["shortlisted_for_stage2", "stage1_submitted", "under_review", "review_pending"].includes(
+                application.status
+              )
                 ? "Applicant has not yet submitted Stage 2 video."
                 : "No video provided."}
             </p>
@@ -552,7 +650,7 @@ export default function ApplicationReviewPage() {
 
         {!isTerminal && (
           <div className="flex flex-wrap gap-3">
-            {application.status === "stage1_submitted" && (
+            {["stage1_submitted", "review_pending"].includes(application.status) && (
               <button
                 onClick={() => updateStatus("under_review")}
                 disabled={updating}
@@ -563,14 +661,32 @@ export default function ApplicationReviewPage() {
               </button>
             )}
             {application.status === "under_review" && (
-              <button
-                onClick={() => updateStatus("shortlisted_for_stage2")}
-                disabled={updating}
-                className="flex items-center gap-1 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
-              >
-                <Users size={14} />
-                Shortlist for Stage 2
-              </button>
+              <>
+                <button
+                  onClick={() => updateStatus("rejected")}
+                  disabled={updating}
+                  className="flex items-center gap-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                >
+                  <XCircle size={14} />
+                  Rejected
+                </button>
+                <button
+                  onClick={() => updateStatus("review_pending")}
+                  disabled={updating}
+                  className="flex items-center gap-1 rounded-lg bg-slate-500 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-600 disabled:opacity-50"
+                >
+                  <Clock size={14} />
+                  Undecided (Pending)
+                </button>
+                <button
+                  onClick={() => updateStatus("shortlisted_for_stage2")}
+                  disabled={updating}
+                  className="flex items-center gap-1 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
+                >
+                  <Users size={14} />
+                  Shortlisted for Stage 2
+                </button>
+              </>
             )}
             {application.status === "shortlisted_for_stage2" && (
               <p className="text-sm text-gray-500">Waiting for applicant to submit Stage 2 video.</p>

@@ -16,6 +16,7 @@ import {
   ClipboardList,
   CheckCircle2,
 } from "lucide-react";
+import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 
 const INTERVIEW_CRITERIA = [
   { key: "appearance_personality", label: "Appearance / Personality", weight: 5 },
@@ -96,7 +97,6 @@ export default function PanelApplicantDetailPage() {
   const docFields = [
     { label: "CV / Personal Statement", field: "cv_personal_statement_url" },
     { label: "Academic transcript", field: "academic_transcript_url" },
-    { label: "Evidence of leadership", field: "leadership_evidence_url" },
     { label: "Recommendation letter", field: "recommendation_url" },
   ];
 
@@ -145,16 +145,14 @@ export default function PanelApplicantDetailPage() {
 
   useEffect(() => {
     if (!application) return;
-    const paths = {
-      cv_personal_statement_url: application.cv_personal_statement_url || application.cv_url,
-      academic_transcript_url: application.academic_transcript_url,
-      leadership_evidence_url: application.leadership_evidence_url,
-      recommendation_url: application.recommendation_url,
-      photo_url: application.photo_url,
-    };
     const fetchUrls = async () => {
       const urls = {};
-      for (const [field, path] of Object.entries(paths)) {
+      const pdfFields = {
+        cv_personal_statement_url: application.cv_personal_statement_url || application.cv_url,
+        academic_transcript_url: application.academic_transcript_url,
+        recommendation_url: application.recommendation_url,
+      };
+      for (const [field, path] of Object.entries(pdfFields)) {
         if (!path) continue;
         try {
           const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
@@ -162,10 +160,41 @@ export default function PanelApplicantDetailPage() {
           if (data.url) urls[field] = data.url;
         } catch (_) {}
       }
+      const photo = application.photo_url;
+      if (photo) {
+        if (/^https?:\/\//i.test(photo)) urls.photo_url = photo;
+        else {
+          try {
+            const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(photo)}`);
+            const data = await res.json();
+            if (data.url) urls.photo_url = data.url;
+          } catch (_) {}
+        }
+      }
+      const leads = getLeadershipEvidencePaths(application);
+      urls.leadership = [];
+      for (const path of leads) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const data = await res.json();
+          urls.leadership.push(data.url || null);
+        } catch (_) {
+          urls.leadership.push(null);
+        }
+      }
       setDocUrls(urls);
     };
     fetchUrls();
-  }, [application?.id, application?.cv_personal_statement_url, application?.cv_url, application?.academic_transcript_url, application?.leadership_evidence_url, application?.recommendation_url, application?.photo_url]);
+  }, [
+    application?.id,
+    application?.cv_personal_statement_url,
+    application?.cv_url,
+    application?.academic_transcript_url,
+    application?.leadership_evidence_url,
+    application?.leadership_evidence_urls,
+    application?.recommendation_url,
+    application?.photo_url,
+  ]);
 
   const weightedTotal = INTERVIEW_CRITERIA.reduce((sum, c) => {
     const s = scores[c.key];
@@ -267,21 +296,35 @@ export default function PanelApplicantDetailPage() {
               <Field label="University" value={application.university} />
               <Field label="Program" value={application.program} />
               <Field label="Year of Study" value={application.year_of_study} />
-              <Field label="GPA" value={application.gpa} />
+              <Field label="Grade type" value={application.grade_type} />
+              <Field label="Grade (CWA/CGPA/GPA)" value={application.gpa} />
             </dl>
           </Section>
 
           <Section title="Stage 1 Documents" icon={FileText}>
             <div className="grid gap-4 sm:grid-cols-2">
+              {application.photo_url && (
+                <DocCard label="Passport / profile photo" field="photo_url" application={application} docUrls={docUrls} icon={ImageIcon} />
+              )}
               {docFields.map((doc) => (
                 <DocCard key={doc.field} label={doc.label} field={doc.field} application={appWithCv} docUrls={docUrls} icon={FileText} />
               ))}
+              {getLeadershipEvidencePaths(application).map((path, i) => (
+                <div key={`lead-${i}`} className="rounded-lg border border-gray-100 p-4">
+                  <FileText size={20} className="mb-2 text-gray-400" />
+                  <p className="text-sm font-medium text-gray-900">Leadership evidence {i + 1}</p>
+                  {!path ? (
+                    <p className="mt-1 text-xs text-gray-400">Not uploaded</p>
+                  ) : docUrls.leadership?.[i] ? (
+                    <a href={docUrls.leadership[i]} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-royal hover:text-gold">
+                      <ExternalLink size={12} /> View Document
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-xs text-amber-600">Loading…</p>
+                  )}
+                </div>
+              ))}
             </div>
-            {application.photo_url && (
-              <div className="mt-4">
-                <DocCard label="Passport Photo" field="photo_url" application={application} docUrls={docUrls} icon={ImageIcon} />
-              </div>
-            )}
           </Section>
 
           <div className="lg:col-span-2">

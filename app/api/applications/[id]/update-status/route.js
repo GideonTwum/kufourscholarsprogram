@@ -28,6 +28,7 @@ export async function POST(request, { params }) {
   const validStatuses = [
     "stage1_submitted",
     "under_review",
+    "review_pending",
     "shortlisted_for_stage2",
     "stage2_submitted",
     "interview",

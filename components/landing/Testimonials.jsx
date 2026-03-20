@@ -64,7 +64,7 @@ export default function Testimonials() {
             Testimonials
           </span>
           <h2 className="mt-3 text-3xl font-bold text-royal sm:text-4xl">
-            Hear From Our Scholars
+            Testimonials from Scholars, Alumni, and Associate
           </h2>
         </motion.div>
 

@@ -12,6 +12,7 @@ import {
   Instagram,
   Linkedin,
 } from "lucide-react";
+import TiktokIcon from "@/components/icons/TiktokIcon";
 
 const contactInfo = [
   {
@@ -40,6 +41,7 @@ const socials = [
   { icon: Facebook, href: "#", label: "Facebook" },
   { icon: Twitter, href: "#", label: "Twitter" },
   { icon: Instagram, href: "#", label: "Instagram" },
+  { icon: TiktokIcon, href: "#", label: "TikTok" },
   { icon: Linkedin, href: "#", label: "LinkedIn" },
 ];
 
@@ -106,7 +108,7 @@ export default function Contact() {
               allowFullScreen=""
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="John Agyekum Kufuor Foundation Location"
+              title="John A. Kufuor Foundation Location"
               className="h-64 w-full sm:h-80"
             />
           </div>

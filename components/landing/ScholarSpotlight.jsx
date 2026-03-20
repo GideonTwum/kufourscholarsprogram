@@ -44,7 +44,7 @@ export default function ScholarSpotlight({ scholars: fetchedScholars = [] }) {
             Meet Our Scholars
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
-            Exceptional young leaders shaping the future of Ghana and Africa.
+            Exceptional young leaders shaping the future of Africa.
           </p>
         </motion.div>
 

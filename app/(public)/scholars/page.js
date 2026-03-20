@@ -5,7 +5,7 @@ import ScholarsDirectory from "./ScholarsDirectory";
 export const metadata = {
   title: "Meet Our Scholars | Kufuor Scholars Program",
   description:
-    "Exceptional young leaders shaping the future of Ghana and Africa through the Kufuor Scholars Program.",
+    "Exceptional young leaders from across Africa studying in Ghana through the Kufuor Scholars Program.",
 };
 
 export default async function ScholarsPage({ searchParams }) {
@@ -56,8 +56,8 @@ export default async function ScholarsPage({ searchParams }) {
           Meet Our Scholars
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-gray-600">
-          Exceptional young leaders from across Ghana, united by a commitment
-          to excellence and service.
+          Exceptional young leaders from across Africa, united by their studies
+          in Ghana and a commitment to excellence and service.
         </p>
 
         <ScholarsDirectory

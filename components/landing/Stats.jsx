@@ -58,7 +58,7 @@ export default function Stats() {
             Our Impact in Numbers
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-white/60">
-            Over a decade of transforming lives and building leaders across Ghana.
+            Over a decade of transforming lives and building leaders in Ghana and across Africa.
           </p>
         </motion.div>
 

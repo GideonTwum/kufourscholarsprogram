@@ -109,7 +109,7 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
           className="mb-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
         >
           <span className="inline-block rounded-full border border-gold/30 bg-gold/10 px-4 py-1.5 text-sm font-medium text-gold">
-            The John Agyekum Kufuor Foundation
+            The John A. Kufuor Foundation
           </span>
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold ${
@@ -145,7 +145,7 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
           transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
           className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/70 sm:text-xl"
         >
-          A transformational 3-year program nurturing exceptional young Ghanaians
+          A transformational 3-year program nurturing Africans studying in Ghana
           through leadership development, mentorship, and academic excellence.
         </motion.p>
 

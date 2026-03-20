@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+import { Facebook, Twitter, Instagram, Youtube, Linkedin } from "lucide-react";
+import TiktokIcon from "@/components/icons/TiktokIcon";
 
 const quickLinks = [
   { label: "About", href: "/about" },
   { label: "Program", href: "/about#program" },
+  { label: "Teams & Mentors", href: "/teams" },
   { label: "Projects", href: "/projects" },
   { label: "Alumni", href: "/alumni" },
   { label: "FAQ", href: "/#faq" },
@@ -25,6 +27,8 @@ const socials = [
   { icon: Facebook, href: "#", label: "Facebook" },
   { icon: Twitter, href: "#", label: "Twitter" },
   { icon: Instagram, href: "#", label: "Instagram" },
+  { icon: Youtube, href: "#", label: "YouTube" },
+  { icon: TiktokIcon, href: "#", label: "TikTok" },
   { icon: Linkedin, href: "#", label: "LinkedIn" },
 ];
 
@@ -44,7 +48,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/50">
-              An initiative of the John Agyekum Kufuor Foundation, grooming
+              An initiative of the John A. Kufuor Foundation, grooming
               the next generation of African leaders.
             </p>
             <div className="mt-6 flex gap-3">
@@ -142,8 +146,7 @@ export default function Footer() {
         <div className="mt-12 border-t border-white/10 pt-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <p className="text-xs text-white/40">
-              &copy; 2026 John Agyekum Kufuor Foundation.
-              All rights reserved.
+              &copy; 2026 John A. Kufuor Foundation. All rights reserved.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
               <Link href="/login" className="text-xs text-white/40 hover:text-white/60">

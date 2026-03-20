@@ -17,30 +17,57 @@ import PersonalInfo from "./steps/PersonalInfo";
 import AcademicInfo from "./steps/AcademicInfo";
 import Documents from "./steps/Documents";
 import ReviewSubmit from "./steps/ReviewSubmit";
-import { validateStep, validateForSubmit } from "@/lib/application-validation";
+import {
+  validateStep,
+  validateForSubmit,
+  STEP_VALIDATION_FIELDS,
+  getLeadershipEvidencePaths,
+} from "@/lib/application-validation";
 
 const stepLabels = ["Personal", "Academic", "Documents", "Review"];
 
 const DOC_FIELDS = [
   "cv_personal_statement_url",
   "academic_transcript_url",
-  "leadership_evidence_url",
+  "leadership_evidence_urls",
   "recommendation_url",
+  "photo_url",
 ];
 
-function ApplicationReadOnlyView({ data }) {
+function normalizeLeadershipFromExisting(existing) {
+  const raw = existing.leadership_evidence_urls;
+  if (Array.isArray(raw) && raw.length) return raw.filter((x) => typeof x === "string" && x);
+  const leg = (existing.leadership_evidence_url || "").trim();
+  return leg ? [leg] : [];
+}
+
+function buildApplicationPayload(data, userId, status, submittedAt = null) {
+  const leadership = Array.isArray(data.leadership_evidence_urls)
+    ? data.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
+    : [];
+  return {
+    ...data,
+    leadership_evidence_urls: leadership,
+    leadership_evidence_url: leadership[0] || null,
+    user_id: userId,
+    status,
+    updated_at: new Date().toISOString(),
+    ...(submittedAt ? { submitted_at: submittedAt } : {}),
+  };
+}
+
+function useApplicationDocUrls(data) {
   const [docUrls, setDocUrls] = useState({});
 
   useEffect(() => {
-    const paths = {
-      cv_personal_statement_url: data.cv_personal_statement_url || data.cv_url,
-      academic_transcript_url: data.academic_transcript_url,
-      leadership_evidence_url: data.leadership_evidence_url,
-      recommendation_url: data.recommendation_url,
-    };
-    const fetchUrls = async () => {
+    async function fetchUrls() {
       const urls = {};
-      for (const [field, path] of Object.entries(paths)) {
+      const pdfFields = {
+        cv_personal_statement_url: data.cv_personal_statement_url || data.cv_url,
+        academic_transcript_url: data.academic_transcript_url,
+        recommendation_url: data.recommendation_url,
+      };
+      for (const [field, path] of Object.entries(pdfFields)) {
         if (!path) continue;
         try {
           const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
@@ -48,11 +75,46 @@ function ApplicationReadOnlyView({ data }) {
           if (json.url) urls[field] = json.url;
         } catch (_) {}
       }
+      const leadership = getLeadershipEvidencePaths(data);
+      urls.leadership = [];
+      for (const path of leadership) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const json = await res.json();
+          urls.leadership.push(json.url || null);
+        } catch (_) {
+          urls.leadership.push(null);
+        }
+      }
+      const p = data.photo_url;
+      if (p) {
+        if (/^https?:\/\//i.test(p)) urls.photo_url = p;
+        else {
+          try {
+            const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(p)}`);
+            const json = await res.json();
+            if (json.url) urls.photo_url = json.url;
+          } catch (_) {}
+        }
+      }
       setDocUrls(urls);
-    };
-    fetchUrls();
-  }, [data.cv_personal_statement_url, data.cv_url, data.academic_transcript_url, data.leadership_evidence_url, data.recommendation_url]);
+    }
+    if (data && Object.keys(data).length) fetchUrls();
+  }, [
+    data?.cv_personal_statement_url,
+    data?.cv_url,
+    data?.academic_transcript_url,
+    data?.leadership_evidence_url,
+    data?.leadership_evidence_urls,
+    data?.recommendation_url,
+    data?.photo_url,
+  ]);
 
+  return docUrls;
+}
+
+function ApplicationReadOnlyView({ data }) {
+  const docUrls = useApplicationDocUrls(data);
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm sm:p-8">
       <ReviewSubmit data={data} goToStep={() => {}} readOnly docUrls={docUrls} />
@@ -73,6 +135,7 @@ export default function ApplicationPage() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
+  const docUrls = useApplicationDocUrls(data);
 
   useEffect(() => {
     async function load() {
@@ -107,6 +170,8 @@ export default function ApplicationPage() {
           nationality: existing.nationality || "",
           emergency_contact_name: existing.emergency_contact_name || "",
           emergency_contact_number: existing.emergency_contact_number || "",
+          emergency_contact_2_name: existing.emergency_contact_2_name || "",
+          emergency_contact_2_number: existing.emergency_contact_2_number || "",
           linkedin_url: existing.linkedin_url || "",
           instagram_url: existing.instagram_url || "",
           facebook_url: existing.facebook_url || "",
@@ -119,11 +184,14 @@ export default function ApplicationPage() {
           student_id: existing.student_id || "",
           program: existing.program || "",
           year_of_study: existing.year_of_study || "",
+          grade_type: existing.grade_type || "",
           gpa: existing.gpa || "",
+          confirms_ghana_enrollment: !!existing.confirms_ghana_enrollment,
           cv_personal_statement_url: existing.cv_personal_statement_url || existing.cv_url || "",
           academic_transcript_url: existing.academic_transcript_url || "",
-          leadership_evidence_url: existing.leadership_evidence_url || "",
+          leadership_evidence_urls: normalizeLeadershipFromExisting(existing),
           recommendation_url: existing.recommendation_url || "",
+          photo_url: existing.photo_url || "",
         });
       } else {
         setData({ full_name: profile?.full_name || "" });
@@ -133,20 +201,61 @@ export default function ApplicationPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (readOnly || submitted || loading) return;
+    const timer = setTimeout(() => {
+      const stepErrors = validateStep(step, data);
+      const filtered = {};
+      for (const [key, msg] of Object.entries(stepErrors)) {
+        const v = data[key];
+        const isEmpty =
+          v == null ||
+          (typeof v === "string" && !v.trim()) ||
+          v === false ||
+          (Array.isArray(v) && v.length === 0) ||
+          (typeof v === "boolean" && key !== "confirms_ghana_enrollment" && !v);
+        const isRequiredMsg = /is required|required\.|at least one/i.test(String(msg));
+        if (isEmpty && isRequiredMsg) continue;
+        if (key === "confirms_ghana_enrollment" && !data.confirms_ghana_enrollment) {
+          const academicStarted =
+            !!data.university?.trim() &&
+            !!data.program?.trim() &&
+            !!data.year_of_study &&
+            !!data.grade_type &&
+            !!data.gpa?.trim();
+          if (!academicStarted) continue;
+        }
+        filtered[key] = msg;
+      }
+      setErrors((prev) => {
+        const next = { ...prev };
+        for (const k of STEP_VALIDATION_FIELDS[step] || []) {
+          delete next[k];
+        }
+        return { ...next, ...filtered };
+      });
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [data, step, readOnly, submitted, loading]);
+
+  async function syncProfilePhoto(photoUrl) {
+    if (!photoUrl?.trim() || !userId) return;
+    await supabase
+      .from("profiles")
+      .update({ photo_url: photoUrl.trim(), updated_at: new Date().toISOString() })
+      .eq("id", userId);
+  }
+
   async function saveDraft() {
     setSaving(true);
-    const payload = {
-      ...data,
-      user_id: userId,
-      status: "draft",
-      updated_at: new Date().toISOString(),
-    };
+    const payload = buildApplicationPayload(data, userId, "draft");
     if (appId) {
       await supabase.from("applications").update(payload).eq("id", appId);
     } else {
       const { data: created } = await supabase.from("applications").insert(payload).select("id").single();
       if (created) setAppId(created.id);
     }
+    if (payload.photo_url) await syncProfilePhoto(payload.photo_url);
     setSaving(false);
   }
 
@@ -164,8 +273,20 @@ export default function ApplicationPage() {
     const allErrors = validateForSubmit(data);
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
-      const personalKeys = ["full_name", "date_of_birth", "phone", "address", "country_of_origin", "nationality"];
-      const academicKeys = ["university", "program", "year_of_study", "gpa"];
+      const personalKeys = [
+        "full_name",
+        "date_of_birth",
+        "phone",
+        "address",
+        "country_of_origin",
+        "nationality",
+        "emergency_contact_name",
+        "emergency_contact_number",
+        "emergency_contact_2_name",
+        "emergency_contact_2_number",
+        "linkedin_url",
+      ];
+      const academicKeys = ["university", "program", "year_of_study", "grade_type", "gpa", "confirms_ghana_enrollment"];
       const docKeys = DOC_FIELDS;
       const errKeys = Object.keys(allErrors);
       if (errKeys.some((k) => personalKeys.includes(k))) setStep(0);
@@ -175,18 +296,14 @@ export default function ApplicationPage() {
     }
     setSubmitting(true);
     setErrors({});
-    const payload = {
-      ...data,
-      user_id: userId,
-      status: "stage1_submitted",
-      submitted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const submittedAt = new Date().toISOString();
+    const payload = buildApplicationPayload(data, userId, "stage1_submitted", submittedAt);
     if (appId) {
       await supabase.from("applications").update(payload).eq("id", appId);
     } else {
       await supabase.from("applications").insert(payload);
     }
+    if (payload.photo_url) await syncProfilePhoto(payload.photo_url);
     setSubmitted(true);
     setSubmitting(false);
   }
@@ -259,7 +376,7 @@ export default function ApplicationPage() {
         {step === 0 && <PersonalInfo data={data} onChange={setData} errors={errors} />}
         {step === 1 && <AcademicInfo data={data} onChange={setData} errors={errors} />}
         {step === 2 && <Documents data={data} onChange={setData} userId={userId} errors={errors} />}
-        {step === 3 && <ReviewSubmit data={data} goToStep={setStep} errors={errors} />}
+        {step === 3 && <ReviewSubmit data={data} goToStep={setStep} errors={errors} docUrls={docUrls} />}
       </div>
 
       <div className="mt-6 flex items-center justify-between">

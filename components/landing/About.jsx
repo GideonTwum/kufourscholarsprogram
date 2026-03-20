@@ -34,14 +34,14 @@ export default function About() {
               Building Tomorrow&apos;s Leaders Today
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-gray-600">
-              The Kufuor Scholars Program, an initiative of the John Agyekum
-              Kufuor Foundation, identifies and nurtures exceptional young
-              Ghanaians with leadership potential. Through a rigorous 3-year
+              The Kufuor Scholars Program, an initiative of the John A.
+              Kufuor Foundation, identifies and nurtures exceptional Africans
+              studying in Ghana with leadership potential. Through a rigorous 3-year
               program, scholars are equipped with the skills, knowledge, and
               networks needed to drive positive change across Africa.
             </p>
             <p className="mt-4 text-lg leading-relaxed text-gray-600">
-              Founded on the legacy of President John Agyekum Kufuor, the
+              Founded on the legacy of President John A. Kufuor, the
               program embodies the belief that investing in young leaders is
               the most impactful way to shape Africa&apos;s future.
             </p>

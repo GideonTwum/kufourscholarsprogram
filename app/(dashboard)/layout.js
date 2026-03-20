@@ -20,6 +20,7 @@ import {
   Megaphone,
   MessageSquare,
   Video,
+  Youtube,
   Calendar,
   FolderKanban,
 } from "lucide-react";
@@ -31,6 +32,8 @@ const directorNav = [
   { label: "Panel Members", href: "/director/panel", icon: UsersRound },
   { label: "Scholars", href: "/director/scholars", icon: Users },
   { label: "Events", href: "/director/events", icon: Calendar },
+  { label: "Teams & Mentors", href: "/director/teams", icon: UsersRound },
+  { label: "Scholar Videos", href: "/director/scholar-videos", icon: Youtube },
   { label: "Projects", href: "/director/projects", icon: FolderKanban },
   { label: "News", href: "/director/news", icon: Newspaper },
   { label: "Messages", href: "/director/messages", icon: MessageCircle },
