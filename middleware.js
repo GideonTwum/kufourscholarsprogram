@@ -2,7 +2,13 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse } from "next/server";
 
 const protectedRoutes = ["/applicant", "/director", "/panel"];
-const authRoutes = ["/login", "/register", "/director-signup"];
+const authRoutes = [
+  "/login",
+  "/director-login",
+  "/register",
+  "/applicant-register",
+  "/director-signup",
+];
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -14,7 +20,9 @@ export async function middleware(request) {
   if (isProtected) {
     if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = "/login";
+      url.pathname = pathname.startsWith("/director")
+        ? "/director-login"
+        : "/login";
       return NextResponse.redirect(url);
     }
 
@@ -66,6 +74,28 @@ export async function middleware(request) {
 
     const role = profile?.role || "applicant";
     const url = request.nextUrl.clone();
+
+    if (pathname.startsWith("/director-login")) {
+      if (role === "director") {
+        url.pathname = "/director";
+      } else if (role === "panel") {
+        url.pathname = "/panel";
+      } else {
+        url.pathname = "/applicant";
+      }
+      return NextResponse.redirect(url);
+    }
+
+    if (pathname === "/login" || pathname.startsWith("/login/")) {
+      if (role === "director") {
+        url.pathname = "/director";
+      } else if (role === "panel") {
+        url.pathname = "/panel";
+      } else {
+        url.pathname = "/applicant";
+      }
+      return NextResponse.redirect(url);
+    }
 
     if (role === "director") {
       url.pathname = "/director";

@@ -190,7 +190,7 @@ export default async function ApplyPage() {
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               {applicationsOpen ? (
                 <Link
-                  href="/register"
+                  href="/applicant-register"
                   className="inline-flex items-center gap-2 rounded-lg bg-gold px-8 py-3 text-sm font-semibold text-royal transition-colors hover:bg-gold-light"
                 >
                   Start Application

@@ -82,7 +82,7 @@ export default function DashboardLayout({ children }) {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push("/login");
+    router.push(pathname?.startsWith("/director") ? "/director-login" : "/login");
     router.refresh();
   }
 

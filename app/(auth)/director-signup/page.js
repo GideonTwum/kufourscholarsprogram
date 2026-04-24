@@ -68,7 +68,7 @@ export default function DirectorSignupPage() {
     }
 
     await supabase.auth.signOut();
-    router.push("/login");
+    router.push("/director-login");
     router.refresh();
   }
 
@@ -194,10 +194,10 @@ export default function DirectorSignupPage() {
       <p className="mt-6 text-center text-sm text-gray-500">
         Already have an account?{" "}
         <Link
-          href="/login"
+          href="/director-login"
           className="font-semibold text-royal hover:text-gold"
         >
-          Sign In
+          Director Sign In
         </Link>
       </p>
     </div>

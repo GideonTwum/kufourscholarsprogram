@@ -54,7 +54,7 @@ export default async function DirectorDashboard() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/director-login");
 
   const { data: profile } = await supabase
     .from("profiles")

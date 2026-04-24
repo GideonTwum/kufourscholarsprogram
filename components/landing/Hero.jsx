@@ -161,7 +161,7 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
         >
           {applicationsOpen ? (
             <Link
-              href="/register"
+              href="/applicant-register"
               className="group flex items-center gap-2 rounded-lg bg-gold px-8 py-3.5 text-sm font-semibold text-royal shadow-lg shadow-gold/20 transition-all duration-200 hover:bg-gold-light hover:shadow-xl hover:shadow-gold/30"
             >
               Apply Now

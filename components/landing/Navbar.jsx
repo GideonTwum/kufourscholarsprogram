@@ -113,7 +113,7 @@ export default function Navbar({ applicationsOpen = false }) {
           </Link>
           {applicationsOpen ? (
             <Link
-              href="/register"
+              href="/applicant-register"
               className="rounded-lg bg-gold px-5 py-2 text-sm font-semibold text-royal transition-all duration-200 hover:bg-gold-light hover:shadow-lg"
             >
               Apply Now
@@ -176,7 +176,7 @@ export default function Navbar({ applicationsOpen = false }) {
                 </Link>
                 {applicationsOpen ? (
                   <Link
-                    href="/register"
+                    href="/applicant-register"
                     onClick={() => setMobileOpen(false)}
                     className="rounded-lg bg-gold px-3 py-2 text-center text-sm font-semibold text-royal"
                   >

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 
-export default function LoginPage() {
+export default function DirectorLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -39,39 +39,36 @@ export default function LoginPage() {
 
     const role = profile?.role || "applicant";
 
-    if (role === "director") {
+    if (role !== "director") {
       await supabase.auth.signOut();
       setError(
-        "Director sign-in is not available on this page. Use the \"Director Login\" link in the website footer.",
+        "This sign-in is for program directors only. Applicants and interview panel should use Login in the site header (applicant sign in).",
       );
       setLoading(false);
       return;
     }
 
-    if (role === "panel") {
-      router.push("/panel");
-    } else {
-      router.push("/applicant");
-    }
+    router.push("/director");
     router.refresh();
   }
 
   return (
     <div className="rounded-2xl bg-white p-8 shadow-xl">
       <div className="text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-royal/10">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gold/20">
           <LogIn size={24} className="text-royal" />
         </div>
-        <h1 className="mt-4 text-2xl font-bold text-royal">Applicant Sign In</h1>
+        <h1 className="mt-4 text-2xl font-bold text-royal">Director Sign In</h1>
         <p className="mt-2 text-sm text-gray-500">
-          Sign in to continue your application and scholar portal
+          Access the director portal to manage applications and program
+          operations
         </p>
       </div>
 
       <form onSubmit={handleLogin} className="mt-8 space-y-5">
         {error && (
           <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-            <AlertCircle size={16} />
+            <AlertCircle size={16} className="shrink-0" />
             {error}
           </div>
         )}
@@ -90,7 +87,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="you@example.com"
+              autoComplete="email"
               className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/20"
             />
           </div>
@@ -110,7 +107,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="Enter your password"
+              autoComplete="current-password"
               className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-10 text-sm text-gray-900 outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/20"
             />
             <button
@@ -128,18 +125,17 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full rounded-lg bg-royal py-2.5 text-sm font-semibold text-white transition-colors hover:bg-royal-light disabled:opacity-50"
         >
-          {loading ? "Signing in..." : "Sign In"}
+          {loading ? "Signing in..." : "Sign In to Director Portal"}
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
-        New to the program?{" "}
-        <Link
-          href="/applicant-register"
-          className="font-semibold text-gold-dark hover:text-gold"
-        >
-          Create an account
+      <p className="mt-4 text-center text-sm text-gray-500">
+        New director accounts: use <span className="font-medium text-gray-700">Director Sign Up</span>{" "}
+        in the site footer. Applying to the program?{" "}
+        <Link href="/login" className="font-semibold text-royal hover:text-gold">
+          Applicant sign in
         </Link>
+        .
       </p>
     </div>
   );

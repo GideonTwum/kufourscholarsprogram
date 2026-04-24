@@ -18,7 +18,7 @@ const quickLinks = [
 
 const programLinks = [
   { label: "Apply", href: "/apply" },
-  { label: "Apply Now", href: "/register" },
+  { label: "Apply Now", href: "/applicant-register" },
   { label: "Mentorship", href: "/about#program" },
   { label: "Community Service", href: "/about#program" },
 ];
@@ -149,7 +149,7 @@ export default function Footer() {
               &copy; 2026 John A. Kufuor Foundation. All rights reserved.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
-              <Link href="/login" className="text-xs text-white/40 hover:text-white/60">
+              <Link href="/director-login" className="text-xs text-white/40 hover:text-white/60">
                 Director Login
               </Link>
               <Link href="/director-signup" className="text-xs text-white/40 hover:text-white/60">

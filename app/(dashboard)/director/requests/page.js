@@ -25,7 +25,7 @@ export default async function DirectorRequestsPage({ searchParams }) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/director-login");
 
   const params = await searchParams;
   const statusFilter = params?.status || "";
