@@ -16,6 +16,7 @@ import {
   X,
   ChevronRight,
 } from "lucide-react";
+import NotificationsBell from "@/components/applicant/NotificationsBell";
 
 const applicantNav = [
   { label: "Dashboard", href: "/applicant", icon: LayoutDashboard },
@@ -162,7 +163,7 @@ export default function ApplicantLayout({ children }) {
           >
             <Menu size={22} />
           </button>
-          <div className="flex-1" />
+          <NotificationsBell />
           <span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-dark">
             Applicant
           </span>

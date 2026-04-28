@@ -19,7 +19,7 @@ export default function PanelDashboardPage() {
       const { data: apps } = await supabase
         .from("applications")
         .select("*, profiles!inner(full_name, email)")
-        .eq("status", "interview")
+        .eq("status", "called_for_interview")
         .order("submitted_at", { ascending: false });
 
       setApplications(apps || []);

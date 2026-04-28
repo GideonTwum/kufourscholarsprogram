@@ -106,7 +106,7 @@ export default function PanelApplicantDetailPage() {
         .from("applications")
         .select("*, profiles(full_name, email)")
         .eq("id", id)
-        .eq("status", "interview")
+        .eq("status", "called_for_interview")
         .single();
 
       if (!app) {

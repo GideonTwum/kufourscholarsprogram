@@ -18,10 +18,11 @@ import {
 } from "lucide-react";
 
 const statusSteps = [
-  { key: "pending", label: "Pending", icon: Search },
-  { key: "shortlisted_for_stage2", label: "Shortlisted (Stage 2)", icon: Users },
-  { key: "stage2_submitted", label: "Stage 2 Submitted", icon: Video },
-  { key: "interview", label: "Interview", icon: Video },
+  { key: "stage_1_submitted", label: "Pending", icon: Search },
+  { key: "stage_1_approved", label: "Stage 1 ✓", icon: Users },
+  { key: "stage_2_submitted", label: "Stage 2 in review", icon: Video },
+  { key: "stage_2_approved", label: "Stage 2 ✓", icon: Video },
+  { key: "called_for_interview", label: "Interview", icon: Video },
 ];
 
 function InterviewScheduledCard({ slot, onFirstView }) {
@@ -132,7 +133,10 @@ export default function ApplicantDashboard() {
         .single();
 
       let applicationData = app;
-      if (app?.interview_slot_id && app?.status === "interview") {
+      if (
+        app?.interview_slot_id &&
+        (app?.status === "called_for_interview" || app?.status === "interview")
+      ) {
         const { data: slot } = await supabase
           .from("interview_slots")
           .select("batch_name, interview_date, interview_time, location, congratulations_message")
@@ -172,7 +176,13 @@ export default function ApplicantDashboard() {
     );
   }
 
-  const statusOrder = ["pending", "shortlisted_for_stage2", "stage2_submitted", "interview"];
+  const statusOrder = [
+    "stage_1_submitted",
+    "stage_1_approved",
+    "stage_2_submitted",
+    "stage_2_approved",
+    "called_for_interview",
+  ];
   const statusToProgressIndex = (status) => statusOrder.indexOf(status);
   const currentIndex = application ? statusToProgressIndex(application.status) : -1;
 
@@ -220,7 +230,45 @@ export default function ApplicantDashboard() {
               Program!
             </p>
           </div>
-        ) : application.status === "interview" &&
+        ) : application.status === "called_for_interview" &&
+          application.interview_date &&
+          !application.interview_slot_id ? (
+          <div className="rounded-xl border-2 border-gold/30 bg-gradient-to-br from-royal/5 to-gold/10 p-6 text-center">
+            <div className="mb-4 flex justify-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-royal text-gold">
+                <Video size={28} />
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900">You&apos;re Invited for an Interview</h3>
+            <div className="mt-6 space-y-3 rounded-lg bg-white/80 p-4 text-left text-sm">
+              <p>
+                <span className="font-medium text-gray-500">Date: </span>
+                <span className="text-gray-900">
+                  {new Date(application.interview_date).toLocaleDateString("en-GB", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </p>
+              <p>
+                <span className="font-medium text-gray-500">Time: </span>
+                <span className="text-gray-900">{application.interview_time}</span>
+              </p>
+              <p>
+                <span className="font-medium text-gray-500">Location / link: </span>
+                <span className="text-gray-900">{application.interview_location}</span>
+              </p>
+              {application.interview_instructions ? (
+                <p>
+                  <span className="font-medium text-gray-500">Instructions: </span>
+                  <span className="text-gray-900">{application.interview_instructions}</span>
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : (application.status === "called_for_interview" || application.status === "interview") &&
           application.interview_slot_id &&
           application.interview_slot_data ? (
           <InterviewScheduledCard
@@ -248,7 +296,7 @@ export default function ApplicantDashboard() {
               </p>
             ) : null}
           </div>
-        ) : application.status === "shortlisted_for_stage2" ? (
+        ) : application.status === "stage_1_approved" ? (
           <div className="rounded-lg border-2 border-gold/30 bg-gradient-to-br from-royal/5 to-gold/10 p-6">
             <div className="mb-4 flex justify-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gold text-royal">
@@ -271,14 +319,22 @@ export default function ApplicantDashboard() {
               </Link>
             </div>
           </div>
-        ) : application.status === "stage2_submitted" && !application.interview_slot_id ? (
+        ) : application.status === "stage_2_submitted" ? (
           <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-6 text-center">
             <CheckCircle2 size={40} className="mx-auto text-indigo-600" />
             <h3 className="mt-3 text-lg font-bold text-gray-900">
               Stage 2 Submitted
             </h3>
             <p className="mt-1 text-sm text-gray-600">
-              Your video has been received. We will review it and contact you regarding the interview if you are selected.
+              Your video has been received. We will review it and notify you of the outcome.
+            </p>
+          </div>
+        ) : application.status === "stage_2_approved" ? (
+          <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-6 text-center">
+            <Video size={40} className="mx-auto text-amber-600" />
+            <h3 className="mt-3 text-lg font-bold text-gray-900">Stage 2 approved</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              The committee has approved your Stage 2 submission. You will receive interview details here and by email when scheduled.
             </p>
           </div>
         ) : (

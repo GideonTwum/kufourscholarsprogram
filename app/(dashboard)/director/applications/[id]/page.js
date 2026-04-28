@@ -23,23 +23,26 @@ import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 
 const statusFlow = [
   { key: "draft", label: "Draft", color: "bg-gray-100 text-gray-600" },
-  { key: "pending", label: "Pending", color: "bg-amber-100 text-amber-700" },
-  { key: "shortlisted_for_stage2", label: "Shortlisted (Stage 2)", color: "bg-purple-100 text-purple-700" },
-  { key: "stage2_submitted", label: "Stage 2 Submitted", color: "bg-indigo-100 text-indigo-700" },
-  { key: "interview", label: "Interview", color: "bg-indigo-100 text-indigo-700" },
+  { key: "stage_1_submitted", label: "Stage 1 submitted", color: "bg-amber-100 text-amber-700" },
+  { key: "stage_1_approved", label: "Stage 1 approved", color: "bg-purple-100 text-purple-700" },
+  { key: "stage_2_submitted", label: "Stage 2 submitted", color: "bg-indigo-100 text-indigo-700" },
+  { key: "stage_2_approved", label: "Stage 2 approved", color: "bg-indigo-100 text-indigo-700" },
+  { key: "called_for_interview", label: "Called for interview", color: "bg-indigo-100 text-indigo-700" },
   { key: "accepted", label: "Accepted", color: "bg-green-100 text-green-700" },
   { key: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
 ];
 
 const workflowTimeline = [
-  { key: "pending", label: "Pending" },
-  { key: "shortlisted_for_stage2", label: "Shortlisted (Stage 2)" },
-  { key: "stage2_submitted", label: "Stage 2 Submitted" },
-  { key: "interview", label: "Interview" },
+  { key: "stage_1_submitted", label: "Stage 1 review" },
+  { key: "stage_1_approved", label: "Stage 1 ✓" },
+  { key: "stage_2_submitted", label: "Stage 2 submitted" },
+  { key: "stage_2_approved", label: "Stage 2 ✓" },
+  { key: "called_for_interview", label: "Interview" },
 ];
 
 function workflowProgressIndex(status) {
   if (status === "accepted" || status === "rejected") return workflowTimeline.length + 1;
+  if (status === "draft") return -1;
   const i = workflowTimeline.findIndex((t) => t.key === status);
   return i >= 0 ? i : 0;
 }
@@ -138,6 +141,13 @@ export default function ApplicationReviewPage() {
   const [scores, setScores] = useState({});
   const [evalNotes, setEvalNotes] = useState("");
   const [savingEval, setSavingEval] = useState(false);
+  const [showInterviewModal, setShowInterviewModal] = useState(false);
+  const [interviewDraft, setInterviewDraft] = useState({
+    interview_date: "",
+    interview_time: "",
+    interview_location: "",
+    interview_instructions: "",
+  });
 
   useEffect(() => {
     async function load() {
@@ -186,6 +196,13 @@ export default function ApplicationReviewPage() {
     if (newStatus === "rejected" && extra.rejection_reason) {
       body.rejection_reason = extra.rejection_reason;
     }
+    if (newStatus === "called_for_interview") {
+      body.interview =
+        extra.interview ||
+        (interviewDraft.interview_date && interviewDraft.interview_time && interviewDraft.interview_location
+          ? interviewDraft
+          : null);
+    }
 
     const res = await fetch(`/api/applications/${id}/update-status`, {
       method: "POST",
@@ -201,9 +218,20 @@ export default function ApplicationReviewPage() {
         ...(newStatus === "rejected" && extra.rejection_reason
           ? { rejection_reason: extra.rejection_reason }
           : {}),
+        ...(newStatus === "called_for_interview" && body.interview
+          ? {
+              interview_date: body.interview.interview_date,
+              interview_time: body.interview.interview_time,
+              interview_location: body.interview.interview_location,
+              interview_instructions: body.interview.interview_instructions,
+            }
+          : {}),
       }));
       if (newStatus === "accepted") {
         setProfile((prev) => ({ ...prev, role: "scholar", class_name: selectedClass }));
+      }
+      if (newStatus === "called_for_interview") {
+        setShowInterviewModal(false);
       }
       setShowAcceptModal(false);
       setShowRejectModal(false);
@@ -406,8 +434,9 @@ export default function ApplicationReviewPage() {
         >
           Stage 2 Details
         </button>
-        {(application.status === "interview" || evaluation) && (
+        {(application.status === "called_for_interview" || evaluation) && (
           <button
+            type="button"
             onClick={() => setActiveTab("interview")}
             className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === "interview" ? "border-royal text-royal" : "border-transparent text-gray-500 hover:text-gray-700"}`}
           >
@@ -535,16 +564,17 @@ export default function ApplicationReviewPage() {
             </a>
           ) : (
             <p className="text-sm text-gray-400">
-              {["shortlisted_for_stage2", "pending"].includes(
-                application.status
-              )
+              {["stage_1_approved", "stage_1_submitted"].includes(application.status)
                 ? "Applicant has not yet submitted Stage 2 video."
                 : "No video provided."}
             </p>
           )}
-          {application.stage2_submitted_at && (
+          {(application.stage_2_submitted_at || application.stage2_submitted_at) && (
             <p className="mt-2 text-xs text-gray-500">
-              Submitted: {new Date(application.stage2_submitted_at).toLocaleString()}
+              Submitted:{" "}
+              {new Date(
+                application.stage_2_submitted_at || application.stage2_submitted_at,
+              ).toLocaleString()}
             </p>
           )}
         </div>
@@ -611,7 +641,7 @@ export default function ApplicationReviewPage() {
               {savingEval ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
               Save Evaluation
             </button>
-            {application.status === "interview" && (
+            {application.status === "called_for_interview" && (
               <>
                 <button
                   onClick={() => setShowAcceptModal(true)}
@@ -653,16 +683,16 @@ export default function ApplicationReviewPage() {
 
         {!isTerminal && (
           <div className="flex flex-wrap gap-3">
-            {application.status === "pending" && (
+            {application.status === "stage_1_submitted" && (
               <>
                 <button
                   type="button"
-                  onClick={() => updateStatus("shortlisted_for_stage2")}
+                  onClick={() => updateStatus("stage_1_approved")}
                   disabled={updating}
                   className="flex items-center gap-1 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
                 >
                   <Users size={14} />
-                  Shortlisted (Stage 2)
+                  Approve Stage 1
                 </button>
                 <button
                   type="button"
@@ -671,26 +701,121 @@ export default function ApplicationReviewPage() {
                   className="flex items-center gap-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
                 >
                   <XCircle size={14} />
-                  Rejected
+                  Reject
                 </button>
               </>
             )}
-            {application.status === "shortlisted_for_stage2" && (
+            {application.status === "stage_1_approved" && (
               <p className="text-sm text-gray-500">Waiting for applicant to submit Stage 2 video.</p>
             )}
-            {application.status === "stage2_submitted" && (
+            {application.status === "stage_2_submitted" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => updateStatus("stage_2_approved")}
+                  disabled={updating}
+                  className="flex items-center gap-1 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
+                >
+                  <Users size={14} />
+                  Approve Stage 2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRejectModal(true)}
+                  disabled={updating}
+                  className="flex items-center gap-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                >
+                  <XCircle size={14} />
+                  Reject
+                </button>
+              </>
+            )}
+            {application.status === "stage_2_approved" && (
               <button
-                onClick={() => updateStatus("interview")}
+                type="button"
+                onClick={() => setShowInterviewModal(true)}
                 disabled={updating}
                 className="flex items-center gap-1 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
               >
                 <Video size={14} />
-                Move to Interview
+                Call for interview…
               </button>
             )}
           </div>
         )}
       </div>
+
+      {showInterviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900">Schedule interview</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              We will notify the applicant by email with these details.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Date</label>
+                <input
+                  type="date"
+                  value={interviewDraft.interview_date}
+                  onChange={(e) => setInterviewDraft((d) => ({ ...d, interview_date: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Time</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 10:00 GMT"
+                  value={interviewDraft.interview_time}
+                  onChange={(e) => setInterviewDraft((d) => ({ ...d, interview_time: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+                />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-medium text-gray-500">Location or meeting link</label>
+              <input
+                type="text"
+                value={interviewDraft.interview_location}
+                onChange={(e) => setInterviewDraft((d) => ({ ...d, interview_location: e.target.value }))}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+              />
+            </div>
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-medium text-gray-500">Instructions (optional)</label>
+              <textarea
+                rows={3}
+                value={interviewDraft.interview_instructions}
+                onChange={(e) => setInterviewDraft((d) => ({ ...d, interview_instructions: e.target.value }))}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+              />
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowInterviewModal(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  updating ||
+                  !interviewDraft.interview_date?.trim() ||
+                  !interviewDraft.interview_time?.trim() ||
+                  !interviewDraft.interview_location?.trim()
+                }
+                onClick={() => updateStatus("called_for_interview")}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {updating ? "Saving…" : "Send invitation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reject modal */}
       {showRejectModal && (

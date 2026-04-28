@@ -14,6 +14,16 @@ import {
 export default function DirectorPanelPage() {
   const supabase = createClient();
   const [panelMembers, setPanelMembers] = useState([]);
+  const [roster, setRoster] = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(true);
+  const [selectedRosterIds, setSelectedRosterIds] = useState([]);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingBulk, setSendingBulk] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState({ error: "", success: "" });
+  const [rosterForm, setRosterForm] = useState({ full_name: "", email: "", phone: "", role: "" });
+  const [addingRoster, setAddingRoster] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +32,78 @@ export default function DirectorPanelPage() {
 
   useEffect(() => {
     loadPanelMembers();
+    loadRoster();
   }, []);
+
+  async function loadRoster() {
+    setRosterLoading(true);
+    const res = await fetch("/api/director/panel-members");
+    const data = await res.json();
+    if (res.ok) setRoster(data.panel_members || []);
+    setRosterLoading(false);
+  }
+
+  async function addToRoster(e) {
+    e.preventDefault();
+    setBulkMsg({ error: "", success: "" });
+    setAddingRoster(true);
+    const res = await fetch("/api/director/panel-members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rosterForm),
+    });
+    const data = await res.json();
+    setAddingRoster(false);
+    if (!res.ok) {
+      setBulkMsg({ success: "", error: data.error || "Failed to add contact" });
+      return;
+    }
+    setBulkMsg({ error: "", success: "Contact added." });
+    setRosterForm({ full_name: "", email: "", phone: "", role: "" });
+    loadRoster();
+  }
+
+  async function removeRoster(id) {
+    if (!confirm("Remove this roster entry?")) return;
+    await fetch(`/api/director/panel-members?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    loadRoster();
+    setSelectedRosterIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  async function sendRosterEmails(e) {
+    e.preventDefault();
+    setBulkMsg({ error: "", success: "" });
+    if (!emailSubject.trim() || !emailBody.trim() || selectedRosterIds.length === 0) {
+      setBulkMsg({
+        success: "",
+        error: "Select recipients and enter subject and message.",
+      });
+      return;
+    }
+    setSendingBulk(true);
+    const res = await fetch("/api/director/email-panel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        panel_member_ids: selectedRosterIds,
+        subject: emailSubject.trim(),
+        message: emailBody.trim(),
+      }),
+    });
+    const data = await res.json();
+    setSendingBulk(false);
+    if (!res.ok) {
+      setBulkMsg({ success: "", error: data.error || "Send failed." });
+      return;
+    }
+    setBulkMsg({ error: "", success: `Sent to ${data.recipients ?? selectedRosterIds.length} recipient(s).` });
+  }
+
+  function toggleRoster(id) {
+    setSelectedRosterIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   async function loadPanelMembers() {
     const { data } = await supabase
@@ -177,6 +258,133 @@ export default function DirectorPanelPage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="mt-12 border-t border-gray-100 pt-10">
+        <h2 className="mb-2 text-xl font-bold text-gray-900">Panel roster & email</h2>
+        <p className="mb-6 text-sm text-gray-500">
+          Contacts for briefing emails (separate from panel portal accounts above). Select recipients and send from the platform.
+        </p>
+
+        {bulkMsg.error && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle size={16} /> {bulkMsg.error}
+          </div>
+        )}
+        {bulkMsg.success && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            <CheckCircle2 size={16} /> {bulkMsg.success}
+          </div>
+        )}
+
+        <form onSubmit={addToRoster} className="mb-10 grid gap-3 rounded-xl border border-gray-100 bg-white p-6 shadow-sm md:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Full name</label>
+            <input
+              value={rosterForm.full_name}
+              onChange={(e) => setRosterForm((f) => ({ ...f, full_name: e.target.value }))}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Email</label>
+            <input
+              type="email"
+              value={rosterForm.email}
+              onChange={(e) => setRosterForm((f) => ({ ...f, email: e.target.value }))}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Phone</label>
+            <input
+              value={rosterForm.phone}
+              onChange={(e) => setRosterForm((f) => ({ ...f, phone: e.target.value }))}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex items-end gap-2">
+            <button
+              type="submit"
+              disabled={addingRoster}
+              className="w-full rounded-lg bg-royal px-4 py-2 text-sm font-semibold text-white hover:bg-royal/90 disabled:opacity-50 md:w-auto"
+            >
+              {addingRoster ? "Adding…" : "Add"}
+            </button>
+          </div>
+        </form>
+
+        {rosterLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-royal" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {roster.map((row) => (
+              <label
+                key={row.id}
+                className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedRosterIds.includes(row.id)}
+                  onChange={() => toggleRoster(row.id)}
+                  className="rounded border-gray-300"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">{row.full_name}</p>
+                  <p className="text-xs text-gray-500">{row.email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    removeRoster(row.id);
+                  }}
+                  className="text-xs font-medium text-red-600 hover:underline"
+                >
+                  Remove
+                </button>
+              </label>
+            ))}
+            {roster.length === 0 && (
+              <p className="rounded-lg border border-dashed border-gray-200 bg-white py-10 text-center text-sm text-gray-500">
+                No roster contacts yet. Add emails above.
+              </p>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={sendRosterEmails} className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h3 className="font-bold text-gray-900">Send email</h3>
+          <div className="mt-4">
+            <label className="mb-1 block text-xs font-medium text-gray-500">Subject</label>
+            <input
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="mb-1 block text-xs font-medium text-gray-500">Message</label>
+            <textarea
+              rows={6}
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={sendingBulk || selectedRosterIds.length === 0}
+            className="mt-6 flex items-center gap-2 rounded-lg bg-gold px-6 py-2.5 text-sm font-semibold text-royal hover:bg-gold/90 disabled:opacity-50"
+          >
+            {sendingBulk ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+            Send email
+          </button>
+        </form>
       </div>
     </div>
   );

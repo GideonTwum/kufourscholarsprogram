@@ -60,7 +60,7 @@ export async function POST(request) {
       .from("applications")
       .update({ interview_slot_id: slot.id, updated_at: new Date().toISOString() })
       .in("id", application_ids)
-      .eq("status", "interview");
+      .in("status", ["called_for_interview", "interview"]);
 
     if (updateError) {
       return NextResponse.json(

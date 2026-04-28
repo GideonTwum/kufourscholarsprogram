@@ -105,9 +105,10 @@ export async function POST(request) {
   }
 
   const row = buildRow(applicationData, user.id, {
-    status: "pending",
+    status: "stage_1_submitted",
     rejection_reason: null,
     submitted_at,
+    stage_1_submitted_at: submitted_at,
   });
 
   if (appId) {

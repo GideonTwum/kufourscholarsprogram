@@ -37,7 +37,7 @@ export default function DirectorInterviewsPage() {
       const { data: apps } = await supabase
         .from("applications")
         .select("*, profiles!inner(full_name, email)")
-        .eq("status", "interview")
+        .in("status", ["called_for_interview", "interview"])
         .order("submitted_at", { ascending: false });
 
       const { data: slotsData } = await supabase
@@ -103,7 +103,7 @@ export default function DirectorInterviewsPage() {
     const { data: apps } = await supabase
       .from("applications")
       .select("*, profiles!inner(full_name, email)")
-      .eq("status", "interview")
+      .in("status", ["called_for_interview", "interview"])
       .order("submitted_at", { ascending: false });
 
     const { data: slotsData } = await supabase

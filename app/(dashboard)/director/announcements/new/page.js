@@ -9,11 +9,15 @@ import {
 } from "lucide-react";
 
 const audiences = [
-  { value: "all", label: "All Applicants", icon: Globe },
-  { value: "submitted", label: "Submitted Only", icon: FileText },
-  { value: "pending", label: "Pending", icon: Search },
-  { value: "shortlisted", label: "Shortlisted Only", icon: Users },
-  { value: "interview", label: "Interview Stage", icon: Video },
+  { value: "all", label: "All applicants", icon: Globe },
+  { value: "draft", label: "Draft applications", icon: FileText },
+  { value: "stage_1_submitted", label: "Stage 1 under review", icon: Search },
+  { value: "stage_1_approved", label: "Stage 1 approved (Stage 2)", icon: Users },
+  { value: "stage_2_submitted", label: "Stage 2 submitted", icon: Users },
+  { value: "stage_2_approved", label: "Stage 2 approved", icon: Users },
+  { value: "called_for_interview", label: "Called for interview", icon: Video },
+  { value: "accepted", label: "Accepted", icon: Video },
+  { value: "rejected", label: "Rejected", icon: Video },
 ];
 
 export default function NewAnnouncementPage() {

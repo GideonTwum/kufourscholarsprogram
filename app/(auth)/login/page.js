@@ -39,6 +39,16 @@ export default function LoginPage() {
 
     const role = profile?.role || "applicant";
 
+    const needsVerify =
+      (role === "applicant" || !profile) && data.user.email_confirmed_at == null;
+
+    if (needsVerify) {
+      router.push("/applicant/verify-email");
+      router.refresh();
+      setLoading(false);
+      return;
+    }
+
     if (role === "director") {
       await supabase.auth.signOut();
       setError(

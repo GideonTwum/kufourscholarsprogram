@@ -42,7 +42,7 @@ export async function GET(request) {
           .from("applications")
           .select("id")
           .eq("user_id", prefix)
-          .eq("status", "interview")
+          .in("status", ["called_for_interview", "interview"])
           .maybeSingle();
         return !!app;
       })()));

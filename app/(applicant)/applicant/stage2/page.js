@@ -42,7 +42,7 @@ export default function Stage2Page() {
         return;
       }
 
-      if (app.status !== "shortlisted_for_stage2") {
+      if (app.status !== "stage_1_approved") {
         setApplication(app);
         setLoading(false);
         return;
@@ -50,7 +50,10 @@ export default function Stage2Page() {
 
       setApplication(app);
       setVideoUrl(app.video_youtube_url || "");
-      setSubmitted(!!app.video_youtube_url && app.status === "stage2_submitted");
+      setSubmitted(
+        !!app.video_youtube_url &&
+          (app.status === "stage_2_submitted" || app.status === "stage_2_approved" || app.status === "called_for_interview" || app.status === "accepted" || app.status === "rejected"),
+      );
       setLoading(false);
     }
     load();
@@ -66,13 +69,14 @@ export default function Stage2Page() {
     setError(null);
     setSubmitting(true);
 
+    const submittedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("applications")
       .update({
         video_youtube_url: videoUrl.trim(),
-        status: "stage2_submitted",
-        stage2_submitted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        status: "stage_2_submitted",
+        stage_2_submitted_at: submittedAt,
+        updated_at: submittedAt,
       })
       .eq("id", application.id);
 
@@ -103,7 +107,7 @@ export default function Stage2Page() {
     );
   }
 
-  if (application.status !== "shortlisted_for_stage2" && !submitted) {
+  if (application.status !== "stage_1_approved" && !submitted) {
     return (
       <div className="mx-auto max-w-lg rounded-2xl bg-white p-8 text-center shadow-sm">
         <Video size={48} className="mx-auto text-gray-300" />

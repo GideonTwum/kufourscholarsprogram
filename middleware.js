@@ -9,6 +9,11 @@ const authRoutes = [
   "/applicant-register",
 ];
 
+function applicantNeedsEmailVerification(user) {
+  if (!user?.email) return false;
+  return user.email_confirmed_at == null;
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const { supabase, user, supabaseResponse } = await updateSession(request);
@@ -29,6 +34,9 @@ export async function middleware(request) {
   }
 
   const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r));
+  const verifyEmailPath =
+    pathname === "/applicant/verify-email" || pathname.startsWith("/applicant/verify-email/");
+
   const isProtected =
     !isAuthRoute && !isDirectorSignup && protectedRoutes.some((r) => pathname.startsWith(r));
 
@@ -48,6 +56,17 @@ export async function middleware(request) {
       .single();
 
     const role = profile?.role;
+
+    if (
+      pathname.startsWith("/applicant") &&
+      !verifyEmailPath &&
+      (role === "applicant" || !role) &&
+      applicantNeedsEmailVerification(user)
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/applicant/verify-email";
+      return NextResponse.redirect(url);
+    }
 
     if (pathname.startsWith("/director")) {
       if (role !== "director") {

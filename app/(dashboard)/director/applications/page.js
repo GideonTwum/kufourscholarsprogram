@@ -14,22 +14,27 @@ import {
 } from "lucide-react";
 
 const statusConfig = {
-  pending: {
-    label: "Pending",
+  stage_1_submitted: {
+    label: "Stage 1 review",
     color: "bg-amber-50 text-amber-700",
     icon: Search,
   },
-  shortlisted_for_stage2: {
-    label: "Shortlisted (Stage 2)",
+  stage_1_approved: {
+    label: "Stage 1 ✓",
     color: "bg-purple-50 text-purple-700",
     icon: Users,
   },
-  stage2_submitted: {
-    label: "Stage 2 Submitted",
+  stage_2_submitted: {
+    label: "Stage 2 review",
     color: "bg-indigo-50 text-indigo-700",
     icon: Video,
   },
-  interview: {
+  stage_2_approved: {
+    label: "Stage 2 ✓",
+    color: "bg-indigo-50 text-indigo-700",
+    icon: Video,
+  },
+  called_for_interview: {
     label: "Interview",
     color: "bg-indigo-50 text-indigo-700",
     icon: Video,
@@ -52,10 +57,11 @@ const statusConfig = {
 };
 
 const allStatuses = [
-  "pending",
-  "shortlisted_for_stage2",
-  "stage2_submitted",
-  "interview",
+  "stage_1_submitted",
+  "stage_1_approved",
+  "stage_2_submitted",
+  "stage_2_approved",
+  "called_for_interview",
   "accepted",
   "rejected",
 ];

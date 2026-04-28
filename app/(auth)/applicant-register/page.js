@@ -35,6 +35,11 @@ export default function ApplicantRegisterPage() {
       return;
     }
 
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback?next=/applicant`
+        : undefined;
+
     const { error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -43,6 +48,7 @@ export default function ApplicantRegisterPage() {
           full_name: fullName,
           role: "applicant",
         },
+        emailRedirectTo: redirectUrl,
       },
     });
 
@@ -52,8 +58,8 @@ export default function ApplicantRegisterPage() {
       return;
     }
 
-    await supabase.auth.signOut();
-    router.push("/login");
+    router.push("/applicant/verify-email?registered=1");
+    router.refresh();
   }
 
   return (
