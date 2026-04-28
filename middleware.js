@@ -14,6 +14,15 @@ function applicantNeedsEmailVerification(user) {
   return user.email_confirmed_at == null;
 }
 
+/** DB role when readable; else JWT user_metadata.role (set at director/panel signup). */
+function roleFromSession(user, profileRow) {
+  const fromDb = profileRow?.role;
+  if (typeof fromDb === "string" && fromDb) return fromDb;
+  const meta = user?.user_metadata?.role;
+  if (typeof meta === "string" && meta) return meta;
+  return undefined;
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const { supabase, user, supabaseResponse } = await updateSession(request);
@@ -26,7 +35,7 @@ export async function middleware(request) {
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    if (signupProfile?.role === "director") {
+    if (roleFromSession(user, signupProfile) === "director") {
       const url = request.nextUrl.clone();
       url.pathname = "/director";
       return NextResponse.redirect(url);
@@ -53,14 +62,14 @@ export async function middleware(request) {
       .from("profiles")
       .select("role")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    const role = profile?.role;
+    const role = roleFromSession(user, profile);
 
     if (
       pathname.startsWith("/applicant") &&
       !verifyEmailPath &&
-      (role === "applicant" || !role) &&
+      (role === "applicant" || role == null) &&
       applicantNeedsEmailVerification(user)
     ) {
       const url = request.nextUrl.clone();
@@ -104,9 +113,9 @@ export async function middleware(request) {
       .from("profiles")
       .select("role")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    const role = profile?.role || "applicant";
+    const role = roleFromSession(user, profile) ?? "applicant";
     const url = request.nextUrl.clone();
 
     if (pathname.startsWith("/director-login")) {

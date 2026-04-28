@@ -35,9 +35,15 @@ export default function DirectorLoginPage() {
       .from("profiles")
       .select("role")
       .eq("id", data.user.id)
-      .single();
+      .maybeSingle();
 
-    const role = profile?.role || "applicant";
+    // Prefer DB role; fallback to JWT user_metadata from signup (e.g. createUser adds role).
+    // If profiles RLS errors (e.g. recursion) or the row is missing, metadata still allows director login.
+    const metaRole =
+      typeof data.user?.user_metadata?.role === "string"
+        ? data.user.user_metadata.role
+        : null;
+    const role = profile?.role || metaRole || "applicant";
 
     if (role !== "director") {
       await supabase.auth.signOut();
