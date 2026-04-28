@@ -26,7 +26,14 @@ export default function DirectorLoginPage() {
     });
 
     if (authError) {
-      setError(authError.message);
+      const msg = authError.message || "";
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        setError(
+          "Cannot reach Supabase from this browser. Confirm your Supabase project is not paused (Dashboard → Restore), NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local match Dashboard → Settings → API, restart dev server, and try again.",
+        );
+      } else {
+        setError(msg);
+      }
       setLoading(false);
       return;
     }
