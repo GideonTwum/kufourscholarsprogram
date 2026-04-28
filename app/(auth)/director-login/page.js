@@ -130,8 +130,12 @@ export default function DirectorLoginPage() {
       </form>
 
       <p className="mt-4 text-center text-sm text-gray-500">
-        New director accounts: use <span className="font-medium text-gray-700">Director Sign Up</span>{" "}
-        in the site footer. Applying to the program?{" "}
+        New director?{" "}
+        <Link href="/director/signup" className="font-semibold text-royal hover:text-gold">
+          Create an account
+        </Link>
+        {" "}
+        (authorized code required). Applying to the program?{" "}
         <Link href="/login" className="font-semibold text-royal hover:text-gold">
           Applicant sign in
         </Link>

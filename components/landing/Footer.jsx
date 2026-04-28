@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { Facebook, Twitter, Instagram, Youtube, Linkedin } from "lucide-react";
 import TiktokIcon from "@/components/icons/TiktokIcon";
+import { getSocialLinks } from "@/lib/social-links";
 
 const quickLinks = [
   { label: "About", href: "/about" },
   { label: "Program", href: "/about#program" },
-  { label: "Teams & Mentors", href: "/teams" },
+  { label: "Mentors & Team", href: "/teams" },
   { label: "Projects", href: "/projects" },
   { label: "Alumni", href: "/alumni" },
   { label: "FAQ", href: "/#faq" },
-  { label: "News", href: "/#news" },
+  { label: "News", href: "/news" },
   { label: "Gallery", href: "/#gallery" },
   { label: "Contact", href: "/#contact" },
 ];
@@ -23,16 +24,16 @@ const programLinks = [
   { label: "Community Service", href: "/about#program" },
 ];
 
-const socials = [
-  { icon: Facebook, href: "#", label: "Facebook" },
-  { icon: Twitter, href: "#", label: "Twitter" },
-  { icon: Instagram, href: "#", label: "Instagram" },
-  { icon: Youtube, href: "#", label: "YouTube" },
-  { icon: TiktokIcon, href: "#", label: "TikTok" },
-  { icon: Linkedin, href: "#", label: "LinkedIn" },
-];
-
 export default function Footer() {
+  const socialUrls = getSocialLinks();
+  const socials = [
+    { icon: Facebook, href: socialUrls.facebook, label: "Facebook" },
+    { icon: Twitter, href: socialUrls.twitter, label: "X (Twitter)" },
+    { icon: Instagram, href: socialUrls.instagram, label: "Instagram" },
+    { icon: Youtube, href: socialUrls.youtube, label: "YouTube" },
+    { icon: TiktokIcon, href: socialUrls.tiktok, label: "TikTok" },
+    { icon: Linkedin, href: socialUrls.linkedin, label: "LinkedIn" },
+  ];
   return (
     <footer className="bg-royal-dark">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -48,7 +49,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/50">
-              An initiative of the John A. Kufuor Foundation, grooming
+              An initiative of The John A. Kufuor Foundation, grooming
               the next generation of African leaders.
             </p>
             <div className="mt-6 flex gap-3">
@@ -152,7 +153,7 @@ export default function Footer() {
               <Link href="/director-login" className="text-xs text-white/40 hover:text-white/60">
                 Director Login
               </Link>
-              <Link href="/director-signup" className="text-xs text-white/40 hover:text-white/60">
+              <Link href="/director/signup" className="text-xs text-white/40 hover:text-white/60">
                 Director Sign Up
               </Link>
               <a href="#" className="text-xs text-white/40 hover:text-white/60">

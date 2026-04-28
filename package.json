@@ -10,6 +10,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.97.0",
+    "bcrypt": "^6.0.0",
     "canvas-confetti": "^1.9.3",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",

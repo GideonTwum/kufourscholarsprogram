@@ -7,15 +7,30 @@ const authRoutes = [
   "/director-login",
   "/register",
   "/applicant-register",
-  "/director-signup",
 ];
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const { supabase, user, supabaseResponse } = await updateSession(request);
 
+  const isDirectorSignup =
+    pathname === "/director/signup" || pathname.startsWith("/director/signup/");
+  if (user && isDirectorSignup) {
+    const { data: signupProfile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (signupProfile?.role === "director") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/director";
+      return NextResponse.redirect(url);
+    }
+  }
+
   const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r));
-  const isProtected = !isAuthRoute && protectedRoutes.some((r) => pathname.startsWith(r));
+  const isProtected =
+    !isAuthRoute && !isDirectorSignup && protectedRoutes.some((r) => pathname.startsWith(r));
 
   if (isProtected) {
     if (!user) {

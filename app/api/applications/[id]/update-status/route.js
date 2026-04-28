@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { sendTransactionalEmail, rejectionEmailHtml, acceptanceEmailHtml } from "@/lib/email/notify";
 
 export async function POST(request, { params }) {
   const supabase = await createClient();
@@ -23,12 +24,10 @@ export async function POST(request, { params }) {
 
   const { id } = await params;
   const body = await request.json();
-  const { status, director_notes, class_name } = body;
+  const { status, director_notes, class_name, rejection_reason } = body;
 
   const validStatuses = [
-    "stage1_submitted",
-    "under_review",
-    "review_pending",
+    "pending",
     "shortlisted_for_stage2",
     "stage2_submitted",
     "interview",
@@ -48,6 +47,12 @@ export async function POST(request, { params }) {
   if (director_notes !== undefined) {
     updatePayload.director_notes = director_notes;
   }
+  if (status === "rejected" && rejection_reason !== undefined) {
+    updatePayload.rejection_reason = rejection_reason || null;
+  }
+  if (status === "accepted" || status === "shortlisted_for_stage2") {
+    updatePayload.rejection_reason = null;
+  }
 
   const { error: appError } = await supabase
     .from("applications")
@@ -56,6 +61,42 @@ export async function POST(request, { params }) {
 
   if (appError) {
     return NextResponse.json({ error: appError.message }, { status: 500 });
+  }
+
+  const { data: appRow } = await supabase
+    .from("applications")
+    .select("full_name, user_id")
+    .eq("id", id)
+    .single();
+
+  let applicantEmail = null;
+  let profName = null;
+  if (appRow?.user_id) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", appRow.user_id)
+      .single();
+    applicantEmail = prof?.email ?? null;
+    profName = prof?.full_name ?? null;
+  }
+  const nm = appRow?.full_name || profName || "Applicant";
+
+  if (status === "rejected" && applicantEmail) {
+    await sendTransactionalEmail({
+      to: applicantEmail,
+      subject: "Kufuor Scholars Program — application update",
+      html: rejectionEmailHtml(nm, rejection_reason),
+      text: `Your application update. ${rejection_reason || ""}`,
+    });
+  }
+  if (status === "accepted" && applicantEmail) {
+    await sendTransactionalEmail({
+      to: applicantEmail,
+      subject: "Congratulations — Kufuor Scholars Program",
+      html: acceptanceEmailHtml(nm),
+      text: `Congratulations ${nm}, your application has been accepted.`,
+    });
   }
 
   // On acceptance: promote applicant to scholar and assign class

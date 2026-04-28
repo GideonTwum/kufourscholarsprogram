@@ -30,6 +30,10 @@ export default function DirectorScholarsPage() {
     projects_summary: "",
     achievements: "",
     linkedin_url: "",
+    occupation: "",
+    email: "",
+    school: "",
+    photo_url: "",
     is_featured: false,
     is_alumni: false,
   });
@@ -62,6 +66,10 @@ export default function DirectorScholarsPage() {
         projects_summary: scholar.projects_summary || "",
         achievements: scholar.achievements || "",
         linkedin_url: scholar.linkedin_url || "",
+        occupation: scholar.occupation || "",
+        email: scholar.email || "",
+        school: scholar.school || "",
+        photo_url: scholar.photo_url || "",
         is_featured: scholar.is_featured || false,
         is_alumni: scholar.is_alumni || false,
       });
@@ -79,6 +87,10 @@ export default function DirectorScholarsPage() {
         projects_summary: "",
         achievements: "",
         linkedin_url: "",
+        occupation: "",
+        email: "",
+        school: "",
+        photo_url: "",
         is_featured: false,
         is_alumni: false,
       });
@@ -180,6 +192,47 @@ export default function DirectorScholarsPage() {
                   value={form.university}
                   onChange={(e) => setForm((f) => ({ ...f, university: e.target.value }))}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">School / Institution</label>
+                <input
+                  type="text"
+                  value={form.school}
+                  onChange={(e) => setForm((f) => ({ ...f, school: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Occupation</label>
+                <input
+                  type="text"
+                  value={form.occupation}
+                  onChange={(e) => setForm((f) => ({ ...f, occupation: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Public email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Photo URL</label>
+                <input
+                  type="url"
+                  value={form.photo_url}
+                  onChange={(e) => setForm((f) => ({ ...f, photo_url: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="https://…"
                 />
               </div>
             </div>

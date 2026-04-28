@@ -13,43 +13,32 @@ import {
   ImageIcon,
   CheckCircle2,
   XCircle,
-  Search,
   Users,
   Loader2,
   ExternalLink,
   ChevronDown,
   ClipboardList,
-  Clock,
 } from "lucide-react";
 import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 
 const statusFlow = [
-  { key: "stage1_submitted", label: "Stage 1 Submitted", color: "bg-blue-100 text-blue-700" },
-  { key: "under_review", label: "Under Review", color: "bg-amber-100 text-amber-700" },
-  { key: "review_pending", label: "Undecided (Pending)", color: "bg-slate-100 text-slate-700" },
-  { key: "shortlisted_for_stage2", label: "Shortlisted for Stage 2", color: "bg-purple-100 text-purple-700" },
+  { key: "draft", label: "Draft", color: "bg-gray-100 text-gray-600" },
+  { key: "pending", label: "Pending", color: "bg-amber-100 text-amber-700" },
+  { key: "shortlisted_for_stage2", label: "Shortlisted (Stage 2)", color: "bg-purple-100 text-purple-700" },
   { key: "stage2_submitted", label: "Stage 2 Submitted", color: "bg-indigo-100 text-indigo-700" },
   { key: "interview", label: "Interview", color: "bg-indigo-100 text-indigo-700" },
   { key: "accepted", label: "Accepted", color: "bg-green-100 text-green-700" },
   { key: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
 ];
 
-/** First milestones shown in the progress row (pending maps onto “Under Review” step). */
 const workflowTimeline = [
-  { key: "stage1_submitted", label: "Stage 1 Submitted" },
-  {
-    key: "under_review",
-    label: "Under Review",
-    pendingKey: "review_pending",
-    pendingLabel: "Undecided (Pending)",
-  },
-  { key: "shortlisted_for_stage2", label: "Shortlisted for Stage 2" },
+  { key: "pending", label: "Pending" },
+  { key: "shortlisted_for_stage2", label: "Shortlisted (Stage 2)" },
   { key: "stage2_submitted", label: "Stage 2 Submitted" },
   { key: "interview", label: "Interview" },
 ];
 
 function workflowProgressIndex(status) {
-  if (status === "review_pending") return 1;
   if (status === "accepted" || status === "rejected") return workflowTimeline.length + 1;
   const i = workflowTimeline.findIndex((t) => t.key === status);
   return i >= 0 ? i : 0;
@@ -142,6 +131,8 @@ export default function ApplicationReviewPage() {
   const [notes, setNotes] = useState("");
   const [selectedClass, setSelectedClass] = useState("Class of 2029");
   const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReasonDraft, setRejectReasonDraft] = useState("");
   const [activeTab, setActiveTab] = useState("stage1");
   const [evaluation, setEvaluation] = useState(null);
   const [scores, setScores] = useState({});
@@ -186,11 +177,14 @@ export default function ApplicationReviewPage() {
     load();
   }, [id]);
 
-  async function updateStatus(newStatus) {
+  async function updateStatus(newStatus, extra = {}) {
     setUpdating(true);
     const body = { status: newStatus, director_notes: notes };
     if (newStatus === "accepted") {
       body.class_name = selectedClass;
+    }
+    if (newStatus === "rejected" && extra.rejection_reason) {
+      body.rejection_reason = extra.rejection_reason;
     }
 
     const res = await fetch(`/api/applications/${id}/update-status`, {
@@ -200,11 +194,20 @@ export default function ApplicationReviewPage() {
     });
 
     if (res.ok) {
-      setApplication((prev) => ({ ...prev, status: newStatus, director_notes: notes }));
+      setApplication((prev) => ({
+        ...prev,
+        status: newStatus,
+        director_notes: notes,
+        ...(newStatus === "rejected" && extra.rejection_reason
+          ? { rejection_reason: extra.rejection_reason }
+          : {}),
+      }));
       if (newStatus === "accepted") {
         setProfile((prev) => ({ ...prev, role: "scholar", class_name: selectedClass }));
       }
       setShowAcceptModal(false);
+      setShowRejectModal(false);
+      setRejectReasonDraft("");
     }
     setUpdating(false);
   }
@@ -358,18 +361,14 @@ export default function ApplicationReviewPage() {
         <div className="flex flex-wrap items-center gap-2">
           {workflowTimeline.map((step, i) => {
             const completed = i < currentStatusIndex;
-            const active =
-              application.status === step.key ||
-              (step.pendingKey && application.status === step.pendingKey);
-            const stepLabel =
-              application.status === step.pendingKey ? step.pendingLabel : step.label;
+            const active = application.status === step.key;
             return (
               <div key={step.key} className="flex items-center">
                 <div className="flex flex-col items-center">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${completed ? "bg-royal text-white" : active ? "bg-gold text-royal ring-4 ring-gold/20" : "bg-gray-100 text-gray-400"}`}>
                     {completed ? <CheckCircle2 size={14} /> : i + 1}
                   </div>
-                  <span className="mt-1 text-[10px] font-medium text-gray-500 max-w-[80px] text-center">{stepLabel}</span>
+                  <span className="mt-1 text-[10px] font-medium text-gray-500 max-w-[80px] text-center">{step.label}</span>
                 </div>
                 {i < workflowTimeline.length - 1 && (
                   <div className={`mx-1 h-0.5 w-4 ${completed ? "bg-royal" : "bg-gray-200"}`} />
@@ -384,8 +383,11 @@ export default function ApplicationReviewPage() {
           </div>
         )}
         {application.status === "rejected" && (
-          <div className="mt-4 rounded-lg bg-red-50 p-3 text-center text-sm font-semibold text-red-700">
-            Application Rejected
+          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-semibold">Application Rejected</p>
+            {application.rejection_reason ? (
+              <p className="mt-2 text-left text-red-900">{application.rejection_reason}</p>
+            ) : null}
           </div>
         )}
       </div>
@@ -533,7 +535,7 @@ export default function ApplicationReviewPage() {
             </a>
           ) : (
             <p className="text-sm text-gray-400">
-              {["shortlisted_for_stage2", "stage1_submitted", "under_review", "review_pending"].includes(
+              {["shortlisted_for_stage2", "pending"].includes(
                 application.status
               )
                 ? "Applicant has not yet submitted Stage 2 video."
@@ -620,7 +622,8 @@ export default function ApplicationReviewPage() {
                   Accept
                 </button>
                 <button
-                  onClick={() => updateStatus("rejected")}
+                  type="button"
+                  onClick={() => setShowRejectModal(true)}
                   disabled={updating}
                   className="flex items-center gap-1 rounded-lg bg-red-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
                 >
@@ -650,41 +653,25 @@ export default function ApplicationReviewPage() {
 
         {!isTerminal && (
           <div className="flex flex-wrap gap-3">
-            {["stage1_submitted", "review_pending"].includes(application.status) && (
-              <button
-                onClick={() => updateStatus("under_review")}
-                disabled={updating}
-                className="flex items-center gap-1 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
-              >
-                <Search size={14} />
-                Mark Under Review
-              </button>
-            )}
-            {application.status === "under_review" && (
+            {application.status === "pending" && (
               <>
                 <button
-                  onClick={() => updateStatus("rejected")}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-                >
-                  <XCircle size={14} />
-                  Rejected
-                </button>
-                <button
-                  onClick={() => updateStatus("review_pending")}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-slate-500 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-600 disabled:opacity-50"
-                >
-                  <Clock size={14} />
-                  Undecided (Pending)
-                </button>
-                <button
+                  type="button"
                   onClick={() => updateStatus("shortlisted_for_stage2")}
                   disabled={updating}
                   className="flex items-center gap-1 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
                 >
                   <Users size={14} />
-                  Shortlisted for Stage 2
+                  Shortlisted (Stage 2)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRejectModal(true)}
+                  disabled={updating}
+                  className="flex items-center gap-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                >
+                  <XCircle size={14} />
+                  Rejected
                 </button>
               </>
             )}
@@ -704,6 +691,45 @@ export default function ApplicationReviewPage() {
           </div>
         )}
       </div>
+
+      {/* Reject modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900">Reject application</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Provide a reason for the applicant (shown in their portal).
+            </p>
+            <textarea
+              value={rejectReasonDraft}
+              onChange={(e) => setRejectReasonDraft(e.target.value)}
+              rows={4}
+              className="mt-4 w-full rounded-lg border border-gray-200 p-3 text-sm text-gray-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+              placeholder="Rejection reason"
+            />
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectReasonDraft("");
+                }}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updating || !rejectReasonDraft.trim()}
+                onClick={() => updateStatus("rejected", { rejection_reason: rejectReasonDraft.trim() })}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {updating ? "Saving…" : "Confirm rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Accept modal */}
       {showAcceptModal && (

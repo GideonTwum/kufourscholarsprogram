@@ -11,8 +11,10 @@ import {
   Twitter,
   Instagram,
   Linkedin,
+  Youtube,
 } from "lucide-react";
 import TiktokIcon from "@/components/icons/TiktokIcon";
+import { getSocialLinks } from "@/lib/social-links";
 
 const contactInfo = [
   {
@@ -37,15 +39,16 @@ const contactInfo = [
   },
 ];
 
-const socials = [
-  { icon: Facebook, href: "#", label: "Facebook" },
-  { icon: Twitter, href: "#", label: "Twitter" },
-  { icon: Instagram, href: "#", label: "Instagram" },
-  { icon: TiktokIcon, href: "#", label: "TikTok" },
-  { icon: Linkedin, href: "#", label: "LinkedIn" },
-];
-
 export default function Contact() {
+  const socialUrls = getSocialLinks();
+  const socials = [
+    { icon: Facebook, href: socialUrls.facebook, label: "Facebook" },
+    { icon: Twitter, href: socialUrls.twitter, label: "X (Twitter)" },
+    { icon: Instagram, href: socialUrls.instagram, label: "Instagram" },
+    { icon: Youtube, href: socialUrls.youtube, label: "YouTube" },
+    { icon: TiktokIcon, href: socialUrls.tiktok, label: "TikTok" },
+    { icon: Linkedin, href: socialUrls.linkedin, label: "LinkedIn" },
+  ];
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 

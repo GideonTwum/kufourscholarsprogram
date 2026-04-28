@@ -12,17 +12,14 @@ import {
   Video,
   XCircle,
   Loader2,
-  Bell,
   AlertCircle,
   Calendar,
   MapPin,
-  Clock,
 } from "lucide-react";
 
 const statusSteps = [
-  { key: "stage1_submitted", label: "Stage 1 Submitted", icon: FileText },
-  { key: "under_review", label: "Under Review", icon: Search },
-  { key: "shortlisted_for_stage2", label: "Shortlisted for Stage 2", icon: Users },
+  { key: "pending", label: "Pending", icon: Search },
+  { key: "shortlisted_for_stage2", label: "Shortlisted (Stage 2)", icon: Users },
   { key: "stage2_submitted", label: "Stage 2 Submitted", icon: Video },
   { key: "interview", label: "Interview", icon: Video },
 ];
@@ -106,7 +103,6 @@ export default function ApplicantDashboard() {
   const supabase = createClient();
   const [profile, setProfile] = useState(null);
   const [application, setApplication] = useState(null);
-  const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const hasFiredConfetti = useRef(false);
@@ -148,13 +144,6 @@ export default function ApplicantDashboard() {
       }
       setApplication(applicationData);
 
-      const { data: news } = await supabase
-        .from("announcements")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      setAnnouncements(news || []);
-
       setLoading(false);
     }
     load();
@@ -183,17 +172,8 @@ export default function ApplicantDashboard() {
     );
   }
 
-  const statusOrder = [
-    "stage1_submitted",
-    "under_review",
-    "shortlisted_for_stage2",
-    "stage2_submitted",
-    "interview",
-  ];
-  const statusToProgressIndex = (status) => {
-    if (status === "review_pending") return statusOrder.indexOf("under_review");
-    return statusOrder.indexOf(status);
-  };
+  const statusOrder = ["pending", "shortlisted_for_stage2", "stage2_submitted", "interview"];
+  const statusToProgressIndex = (status) => statusOrder.indexOf(status);
   const currentIndex = application ? statusToProgressIndex(application.status) : -1;
 
   return (
@@ -262,6 +242,11 @@ export default function ApplicantDashboard() {
               Unfortunately, your application was not successful this time.
               Thank you for your interest.
             </p>
+            {application.rejection_reason ? (
+              <p className="mt-4 rounded-lg bg-white/80 p-3 text-left text-sm text-red-900">
+                {application.rejection_reason}
+              </p>
+            ) : null}
           </div>
         ) : application.status === "shortlisted_for_stage2" ? (
           <div className="rounded-lg border-2 border-gold/30 bg-gradient-to-br from-royal/5 to-gold/10 p-6">
@@ -301,10 +286,7 @@ export default function ApplicantDashboard() {
             {statusSteps.map((s, i) => {
               const completed = i < currentIndex;
               const active = i === currentIndex;
-              const pendingUndecided =
-                s.key === "under_review" && application.status === "review_pending";
-              const displayLabel = pendingUndecided ? "Undecided (Pending)" : s.label;
-              const StepIcon = pendingUndecided && active ? Clock : s.icon;
+              const StepIcon = s.icon;
               return (
                 <div key={s.key} className="flex flex-1 items-center">
                   <div className="flex flex-col items-center">
@@ -328,7 +310,7 @@ export default function ApplicantDashboard() {
                         active ? "text-royal" : "text-gray-400"
                       }`}
                     >
-                      {displayLabel}
+                      {s.label}
                     </span>
                   </div>
                   {i < statusSteps.length - 1 && (
@@ -345,47 +327,6 @@ export default function ApplicantDashboard() {
         )}
       </div>
 
-      {/* Latest announcements */}
-      <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold text-gray-900">Latest Announcements</h2>
-          <Link
-            href="/applicant/news"
-            className="text-xs font-medium text-royal hover:text-gold"
-          >
-            View All
-          </Link>
-        </div>
-        {announcements.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/50 py-8 text-center">
-            <Bell size={24} className="mx-auto text-gray-300" />
-            <p className="mt-2 text-sm text-gray-500">No announcements yet.</p>
-            <p className="mt-0.5 text-xs text-gray-400">Check back later for updates from the program.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {announcements.map((ann) => (
-              <div
-                key={ann.id}
-                className="rounded-lg border border-gray-50 bg-gray-50/50 p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <Bell size={16} className="mt-0.5 text-gold" />
-                  <div>
-                    <p className="font-semibold text-gray-900">{ann.title}</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-gray-600">
-                      {ann.body}
-                    </p>
-                    <p className="mt-2 text-[10px] text-gray-400">
-                      {new Date(ann.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

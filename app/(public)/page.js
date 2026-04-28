@@ -1,6 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { articles as fallbackArticles } from "@/lib/news-data";
-import { formatArticle } from "@/lib/news";
 import Hero from "@/components/landing/Hero";
 import About from "@/components/landing/About";
 import ProgramHighlights from "@/components/landing/ProgramHighlights";
@@ -9,8 +7,8 @@ import ScholarSpotlight from "@/components/landing/ScholarSpotlight";
 import ScholarVideos from "@/components/landing/ScholarVideos";
 import Gallery from "@/components/landing/Gallery";
 import Testimonials from "@/components/landing/Testimonials";
-import News from "@/components/landing/News";
 import FAQ from "@/components/landing/FAQ";
+import YoutubeSpotlights from "@/components/landing/YoutubeSpotlights";
 import Events from "@/components/landing/Events";
 import Contact from "@/components/landing/Contact";
 
@@ -19,8 +17,8 @@ export default async function Home() {
   let applicationDeadline = null;
   let featuredScholars = [];
   let upcomingEvents = [];
-  let newsArticles = [];
   let scholarVideos = [];
+  let youtubeSpotlights = [];
 
   try {
     const supabase = await createClient();
@@ -58,12 +56,13 @@ export default async function Home() {
       .limit(3);
     upcomingEvents = events || [];
 
-    const { data: news } = await supabase
-      .from("news_articles")
+    const { data: spot } = await supabase
+      .from("youtube_spotlights")
       .select("*")
-      .order("published_at", { ascending: false })
-      .limit(4);
-    newsArticles = (news || []).map(formatArticle);
+      .eq("is_published", true)
+      .order("display_order", { ascending: true })
+      .limit(6);
+    youtubeSpotlights = spot || [];
 
     const { data: sv } = await supabase
       .from("scholar_videos")
@@ -74,8 +73,6 @@ export default async function Home() {
     scholarVideos = sv || [];
   } catch {}
 
-  if (newsArticles.length === 0) newsArticles = fallbackArticles.slice(0, 4);
-
   return (
     <main>
       <Hero applicationsOpen={applicationsOpen} applicationDeadline={applicationDeadline} />
@@ -84,9 +81,9 @@ export default async function Home() {
       <Stats />
       <ScholarSpotlight scholars={featuredScholars} />
       <ScholarVideos videos={scholarVideos} />
+      <YoutubeSpotlights videos={youtubeSpotlights} />
       <Gallery />
       <Testimonials />
-      <News articles={newsArticles} />
       <Events events={upcomingEvents} />
       <FAQ />
       <Contact />

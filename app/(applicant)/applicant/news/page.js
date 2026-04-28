@@ -7,7 +7,8 @@ import { Bell, Loader2, Users, Search, Video, FileText, Globe } from "lucide-rea
 const audienceLabels = {
   all: { label: "Everyone", icon: Globe, color: "bg-blue-50 text-blue-700" },
   submitted: { label: "Submitted", icon: FileText, color: "bg-gray-50 text-gray-600" },
-  under_review: { label: "Under Review", icon: Search, color: "bg-yellow-50 text-yellow-700" },
+  pending: { label: "Pending", icon: Search, color: "bg-yellow-50 text-yellow-700" },
+  under_review: { label: "Pending", icon: Search, color: "bg-yellow-50 text-yellow-700" },
   shortlisted: { label: "Shortlisted", icon: Users, color: "bg-green-50 text-green-700" },
   interview: { label: "Interview", icon: Video, color: "bg-purple-50 text-purple-700" },
 };

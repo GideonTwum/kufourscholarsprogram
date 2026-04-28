@@ -11,7 +11,7 @@ import {
 const audiences = [
   { value: "all", label: "All Applicants", icon: Globe },
   { value: "submitted", label: "Submitted Only", icon: FileText },
-  { value: "under_review", label: "Under Review", icon: Search },
+  { value: "pending", label: "Pending", icon: Search },
   { value: "shortlisted", label: "Shortlisted Only", icon: Users },
   { value: "interview", label: "Interview Stage", icon: Video },
 ];

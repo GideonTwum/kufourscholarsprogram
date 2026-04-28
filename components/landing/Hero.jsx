@@ -145,8 +145,7 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
           transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
           className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/70 sm:text-xl"
         >
-          A transformational 3-year program nurturing Africans studying in Ghana
-          through leadership development, mentorship, and academic excellence.
+          Africans studying in Ghana — leadership development, mentorship, and academic excellence through a transformational multi-year fellowship.
         </motion.p>
 
         {applicationsOpen && applicationDeadline && (
@@ -185,6 +184,15 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
               className="transition-transform group-hover:translate-x-1"
             />
           </Link>
+          {applicationsOpen ? (
+            <Link
+              href="/apply"
+              className="group flex items-center gap-2 rounded-lg border border-gold/40 bg-white/10 px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/15"
+            >
+              New to the program? Apply now
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+            </Link>
+          ) : null}
         </motion.div>
       </div>
 

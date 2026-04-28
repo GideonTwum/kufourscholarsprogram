@@ -34,7 +34,7 @@ export default function About() {
               Building Tomorrow&apos;s Leaders Today
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-gray-600">
-              The Kufuor Scholars Program, an initiative of the John A.
+              The Kufuor Scholars Program, an initiative of The John A.
               Kufuor Foundation, identifies and nurtures exceptional Africans
               studying in Ghana with leadership potential. Through a rigorous 3-year
               program, scholars are equipped with the skills, knowledge, and

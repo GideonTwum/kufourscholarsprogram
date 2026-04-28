@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Eye,
   AlertCircle,
+  XCircle,
 } from "lucide-react";
 import PersonalInfo from "./steps/PersonalInfo";
 import AcademicInfo from "./steps/AcademicInfo";
@@ -131,6 +132,8 @@ export default function ApplicationPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitOutcome, setSubmitOutcome] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState(null);
   const [readOnly, setReadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
@@ -296,15 +299,35 @@ export default function ApplicationPage() {
     }
     setSubmitting(true);
     setErrors({});
-    const submittedAt = new Date().toISOString();
-    const payload = buildApplicationPayload(data, userId, "stage1_submitted", submittedAt);
-    if (appId) {
-      await supabase.from("applications").update(payload).eq("id", appId);
-    } else {
-      await supabase.from("applications").insert(payload);
+    const payload = buildApplicationPayload(data, userId, "draft");
+    try {
+      const res = await fetch("/api/applications/submit-stage1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          application_id: appId,
+          data: payload,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setErrors({ _submit: json.error || "Submission failed" });
+        setSubmitting(false);
+        return;
+      }
+      if (payload.photo_url) await syncProfilePhoto(payload.photo_url);
+      if (json.outcome === "rejected") {
+        setSubmitOutcome("rejected");
+        setRejectionReason(json.rejection_reason || null);
+        if (json.application_id) setAppId(json.application_id);
+      } else {
+        setSubmitOutcome("pending");
+        if (json.application_id) setAppId(json.application_id);
+      }
+      setSubmitted(true);
+    } catch {
+      setErrors({ _submit: "Network error. Please try again." });
     }
-    if (payload.photo_url) await syncProfilePhoto(payload.photo_url);
-    setSubmitted(true);
     setSubmitting(false);
   }
 
@@ -313,11 +336,34 @@ export default function ApplicationPage() {
   }
 
   if (submitted) {
+    if (submitOutcome === "rejected") {
+      return (
+        <div className="mx-auto max-w-lg rounded-2xl bg-white p-8 text-center shadow-sm">
+          <XCircle size={48} className="mx-auto text-red-500" />
+          <h1 className="mt-4 text-2xl font-bold text-gray-900">Application not eligible</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Your submission did not meet the published eligibility requirements.
+          </p>
+          {rejectionReason && (
+            <p className="mt-4 rounded-lg bg-red-50 p-4 text-left text-sm text-red-800">{rejectionReason}</p>
+          )}
+          <button
+            type="button"
+            onClick={() => router.push("/applicant")}
+            className="mt-6 rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal/90"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="mx-auto max-w-lg rounded-2xl bg-white p-8 text-center shadow-sm">
         <CheckCircle2 size={48} className="mx-auto text-green-600" />
-        <h1 className="mt-4 text-2xl font-bold text-gray-900">Stage 1 Submitted!</h1>
-        <p className="mt-2 text-sm text-gray-500">Your application is now under review. Track your status from the dashboard.</p>
+        <h1 className="mt-4 text-2xl font-bold text-gray-900">Stage 1 Submitted</h1>
+        <p className="mt-2 text-sm text-gray-500">
+          Your application status is <strong>Pending</strong> while we review your file. Check your email and the dashboard for updates.
+        </p>
         <button onClick={() => router.push("/applicant")} className="mt-6 rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal/90">Go to Dashboard</button>
       </div>
     );
@@ -328,7 +374,7 @@ export default function ApplicationPage() {
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 flex items-center gap-2 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-700">
           <Eye size={16} />
-          Your Stage 1 application has been submitted and is under review.
+          Your Stage 1 application has been submitted — status <strong>Pending</strong>.
         </div>
         <ApplicationReadOnlyView data={data} />
       </div>
@@ -340,6 +386,23 @@ export default function ApplicationPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Stage 1: Initial Application</h1>
         <p className="mt-1 text-sm text-gray-500">Complete all steps to submit your Stage 1 application.</p>
+        {process.env.NEXT_PUBLIC_APPLICATION_GUIDE_VIDEO_ID ? (
+          <div className="mt-4 aspect-video overflow-hidden rounded-xl border border-gray-200 bg-black/5">
+            <iframe
+              title="Application guide"
+              className="h-full min-h-[200px] w-full"
+              src={`https://www.youtube.com/embed/${process.env.NEXT_PUBLIC_APPLICATION_GUIDE_VIDEO_ID}`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : null}
+        <Link
+          href="/apply"
+          className="mt-4 inline-flex rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-royal hover:bg-gold/20"
+        >
+          New to the program? Apply now
+        </Link>
       </div>
 
       <div className="mb-8">

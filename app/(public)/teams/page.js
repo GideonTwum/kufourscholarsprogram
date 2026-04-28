@@ -4,9 +4,9 @@ import { Users, UserCircle } from "lucide-react";
 import MentorAvatar from "@/components/mentor/MentorAvatar";
 
 export const metadata = {
-  title: "Teams & Mentors | Kufuor Scholars Program",
+  title: "Mentors & Team | Kufuor Scholars Program",
   description:
-    "Meet the leadership teams and mentors guiding the next generation of African leaders through the Kufuor Scholars Program.",
+    "Meet the mentors and team guiding the next generation of African leaders through the Kufuor Scholars Program.",
 };
 
 export default async function TeamsPage() {
@@ -49,7 +49,7 @@ export default async function TeamsPage() {
             ← Back to Home
           </Link>
           <h1 className="text-4xl font-bold text-white sm:text-5xl">
-            Teams & Mentors
+            Mentors & Team
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-white/70">
             The people behind the Kufuor Scholars Program — leadership teams and mentors guiding exceptional young leaders.
