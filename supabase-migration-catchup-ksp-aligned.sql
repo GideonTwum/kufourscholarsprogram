@@ -25,6 +25,19 @@ as $$
   );
 $$;
 
+create or replace function public.is_panel()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'panel'
+  );
+$$;
+
 -- ═══════════════════════════════════════════════════════════════
 -- B) profiles: roles + SELECT/UPDATE policies using is_director()
 -- ═══════════════════════════════════════════════════════════════
@@ -48,9 +61,7 @@ create policy "Authenticated can read director profiles" on public.profiles
 drop policy if exists "Panel can read applicant profiles" on public.profiles;
 create policy "Panel can read applicant profiles" on public.profiles
   for select using (
-    exists (
-      select 1 from public.profiles p where p.id = auth.uid() and p.role = 'panel'
-    )
+    public.is_panel()
     and (
       id = auth.uid()
       or id in (select user_id from public.applications where status = 'called_for_interview')
@@ -88,7 +99,7 @@ drop policy if exists "Panel can read interview applicant uploads" on storage.ob
 create policy "Panel can read interview applicant uploads" on storage.objects
   for select using (
     bucket_id = 'applications'
-    and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'panel')
+    and public.is_panel()
     and (storage.foldername(name))[1] in (
       select user_id::text from public.applications where status = 'called_for_interview'
     )
@@ -352,16 +363,14 @@ drop policy if exists "Panel can read interview applications" on public.applicat
 create policy "Panel can read interview applications" on public.applications
   for select using (
     status = 'called_for_interview'
-    and exists (
-      select 1 from public.profiles p where p.id = auth.uid() and p.role = 'panel'
-    )
+    and public.is_panel()
   );
 
 drop policy if exists "Panel can insert own evaluations" on public.interview_evaluations;
 create policy "Panel can insert own evaluations" on public.interview_evaluations
   for insert with check (
     evaluator_id = auth.uid()
-    and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'panel')
+    and public.is_panel()
     and exists (
       select 1 from public.applications a
       where a.id = application_id and a.status = 'called_for_interview'
@@ -371,10 +380,19 @@ create policy "Panel can insert own evaluations" on public.interview_evaluations
 drop policy if exists "Panel can read evaluations for interview apps" on public.interview_evaluations;
 create policy "Panel can read evaluations for interview apps" on public.interview_evaluations
   for select using (
-    exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'panel')
+    public.is_panel()
     and exists (
       select 1 from public.applications a where a.id = application_id and a.status = 'called_for_interview'
     )
   );
+
+-- ═══════════════════════════════════════════════════════════════
+-- K) site_settings: director UPDATE must not subquery profiles via RLS
+--     (was: exists(select from profiles) → infinite recursion with panel policy)
+-- ═══════════════════════════════════════════════════════════════
+drop policy if exists "Directors can update site settings" on public.site_settings;
+create policy "Directors can update site settings" on public.site_settings
+  for all using (public.is_director())
+  with check (public.is_director());
 
 commit;

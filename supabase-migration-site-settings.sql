@@ -11,18 +11,29 @@ create table if not exists public.site_settings (
 
 alter table public.site_settings enable row level security;
 
+-- Required by director policy below (no-op replace if migrations already ran)
+create or replace function public.is_director()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'director'
+  );
+$$;
+
 -- Everyone can read (for homepage, etc.)
 create policy "Anyone can read site settings" on public.site_settings
   for select using (true);
 
--- Only directors can update
+-- Only directors can update (uses security definer — must not EXISTS-select profiles
+-- under profiles RLS or you get infinite recursion with panel-read policies.)
 create policy "Directors can update site settings" on public.site_settings
-  for all using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'director'
-    )
-  );
+  for all using (public.is_director())
+  with check (public.is_director());
 
 -- Insert defaults
 insert into public.site_settings (key, value)
