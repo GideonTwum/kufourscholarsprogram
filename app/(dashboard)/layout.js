@@ -23,6 +23,7 @@ import {
   Youtube,
   Calendar,
   FolderKanban,
+  Mail,
 } from "lucide-react";
 
 const directorNav = [
@@ -40,6 +41,7 @@ const directorNav = [
   { label: "Announcements", href: "/director/announcements", icon: Megaphone },
   { label: "Requests", href: "/director/requests", icon: MessageSquare },
   { label: "Settings", href: "/director/settings", icon: Settings },
+  { label: "Email test", href: "/director/email-tests", icon: Mail },
 ];
 
 const panelNav = [
