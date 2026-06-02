@@ -23,19 +23,34 @@ function roleFromSession(user, profileRow) {
   return undefined;
 }
 
+async function fetchProfileRole(supabase, userId) {
+  if (!supabase || !userId) return undefined;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  return profile?.role;
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-  const { supabase, user, supabaseResponse } = await updateSession(request);
+
+  let supabase;
+  let user;
+  let supabaseResponse;
+  try {
+    ({ supabase, user, supabaseResponse } = await updateSession(request));
+  } catch (err) {
+    console.error("[middleware] session update failed:", err?.message ?? err);
+    return NextResponse.next({ request });
+  }
 
   const isDirectorSignup =
     pathname === "/director/signup" || pathname.startsWith("/director/signup/");
-  if (user && isDirectorSignup) {
-    const { data: signupProfile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (roleFromSession(user, signupProfile) === "director") {
+  if (user && isDirectorSignup && supabase) {
+    const role = roleFromSession(user, { role: await fetchProfileRole(supabase, user.id) });
+    if (role === "director") {
       const url = request.nextUrl.clone();
       url.pathname = "/director";
       return NextResponse.redirect(url);
@@ -52,19 +67,13 @@ export async function middleware(request) {
   if (isProtected) {
     if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = pathname.startsWith("/director")
-        ? "/director-login"
-        : "/login";
+      url.pathname = pathname.startsWith("/director") ? "/director-login" : "/login";
       return NextResponse.redirect(url);
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const role = roleFromSession(user, profile);
+    const role = roleFromSession(user, {
+      role: supabase ? await fetchProfileRole(supabase, user.id) : undefined,
+    });
 
     if (
       pathname.startsWith("/applicant") &&
@@ -100,54 +109,30 @@ export async function middleware(request) {
         url.pathname = "/panel";
         return NextResponse.redirect(url);
       }
-      if (role !== "applicant" && !pathname.startsWith("/applicant")) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/applicant";
-        return NextResponse.redirect(url);
-      }
     }
   }
 
   if (isAuthRoute && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const role = roleFromSession(user, profile) ?? "applicant";
+    const role =
+      roleFromSession(user, {
+        role: supabase ? await fetchProfileRole(supabase, user.id) : undefined,
+      }) ?? "applicant";
     const url = request.nextUrl.clone();
 
     if (pathname.startsWith("/director-login")) {
-      if (role === "director") {
-        url.pathname = "/director";
-      } else if (role === "panel") {
-        url.pathname = "/panel";
-      } else {
-        url.pathname = "/applicant";
-      }
+      url.pathname =
+        role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
       return NextResponse.redirect(url);
     }
 
     if (pathname === "/login" || pathname.startsWith("/login/")) {
-      if (role === "director") {
-        url.pathname = "/director";
-      } else if (role === "panel") {
-        url.pathname = "/panel";
-      } else {
-        url.pathname = "/applicant";
-      }
+      url.pathname =
+        role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
       return NextResponse.redirect(url);
     }
 
-    if (role === "director") {
-      url.pathname = "/director";
-    } else if (role === "panel") {
-      url.pathname = "/panel";
-    } else {
-      url.pathname = "/applicant";
-    }
-
+    url.pathname =
+      role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
     return NextResponse.redirect(url);
   }
 

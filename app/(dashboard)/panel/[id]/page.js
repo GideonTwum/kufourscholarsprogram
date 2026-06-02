@@ -17,6 +17,11 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { getLeadershipEvidencePaths } from "@/lib/application-validation";
+import {
+  getApplicantDisplayName,
+  getApplicantDisplayEmail,
+  getApplicantInitials,
+} from "@/lib/panel-applications";
 
 const INTERVIEW_CRITERIA = [
   { key: "appearance_personality", label: "Appearance / Personality", weight: 5 },
@@ -93,6 +98,7 @@ export default function PanelApplicantDetailPage() {
   const [savingEval, setSavingEval] = useState(false);
   const [activeTab, setActiveTab] = useState("scoring");
   const [docUrls, setDocUrls] = useState({});
+  const [loadError, setLoadError] = useState(null);
 
   const docFields = [
     { label: "CV / Personal Statement", field: "cv_personal_statement_url" },
@@ -102,12 +108,35 @@ export default function PanelApplicantDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: app } = await supabase
+      setLoadError(null);
+      let app = null;
+
+      const { data: directApp, error: directError } = await supabase
         .from("applications")
-        .select("*, profiles(full_name, email)")
+        .select("*, profiles!applications_user_id_fkey(full_name, email)")
         .eq("id", id)
-        .eq("status", "called_for_interview")
-        .single();
+        .in("status", ["called_for_interview", "interview"])
+        .maybeSingle();
+
+      if (directError) {
+        console.error("[panel/detail] direct query failed:", directError.message);
+      }
+
+      if (directApp) {
+        app = directApp;
+      } else {
+        try {
+          const res = await fetch(`/api/panel/applications/${id}`);
+          const json = await res.json();
+          if (res.ok && json.application) {
+            app = json.application;
+          } else if (!res.ok) {
+            setLoadError(json.error || "Failed to load applicant.");
+          }
+        } catch {
+          setLoadError("Network error while loading applicant.");
+        }
+      }
 
       if (!app) {
         setLoading(false);
@@ -235,11 +264,19 @@ export default function PanelApplicantDetailPage() {
     );
   }
 
-  if (!application) {
+  if (loadError || !application) {
     return (
-      <div className="text-center">
-        <p className="text-gray-500">Applicant not found or not scheduled for interview.</p>
-        <Link href="/panel" className="mt-2 inline-block text-sm text-royal">Back to Interview Applicants</Link>
+      <div className="rounded-xl border border-gray-100 bg-white p-8 text-center">
+        <p className="font-medium text-gray-900">
+          {loadError ? "Could not load applicant" : "Applicant not found"}
+        </p>
+        <p className="mt-2 text-sm text-gray-500">
+          {loadError ||
+            "This application is not in interview stage or you do not have access."}
+        </p>
+        <Link href="/panel" className="mt-4 inline-block text-sm text-royal">
+          Back to Interview Applicants
+        </Link>
       </div>
     );
   }
@@ -254,13 +291,16 @@ export default function PanelApplicantDetailPage() {
         </Link>
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-royal text-lg font-bold text-gold">
-            {profile?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "?"}
+            {getApplicantInitials(application)}
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">
-              {application.full_name || profile?.full_name || "Unknown"}
+              {getApplicantDisplayName(application)}
             </h1>
-            <p className="text-sm text-gray-500">{profile?.email}</p>
+            <p className="text-sm text-gray-500">{getApplicantDisplayEmail(application)}</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Status: {application.status?.replace(/_/g, " ") || "—"}
+            </p>
           </div>
         </div>
       </div>
@@ -286,7 +326,7 @@ export default function PanelApplicantDetailPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Section title="Personal Information" icon={User}>
             <dl className="grid grid-cols-2 gap-x-6">
-              <Field label="Full Name" value={application.full_name} />
+              <Field label="Full Name" value={getApplicantDisplayName(application)} />
               <Field label="Date of Birth" value={application.date_of_birth} />
               <Field label="Phone" value={application.phone} />
               <Field label="Nationality" value={application.nationality} />

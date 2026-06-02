@@ -7,8 +7,6 @@ import {
   FileText,
   ArrowRight,
   CheckCircle2,
-  Search,
-  Users,
   Video,
   XCircle,
   Loader2,
@@ -16,14 +14,8 @@ import {
   Calendar,
   MapPin,
 } from "lucide-react";
-
-const statusSteps = [
-  { key: "stage_1_submitted", label: "Pending", icon: Search },
-  { key: "stage_1_approved", label: "Stage 1 ✓", icon: Users },
-  { key: "stage_2_submitted", label: "Stage 2 in review", icon: Video },
-  { key: "stage_2_approved", label: "Stage 2 ✓", icon: Video },
-  { key: "called_for_interview", label: "Interview", icon: Video },
-];
+import ApplicantProgressBar from "./components/ApplicantProgressBar";
+import { normalizeApplicationStatus } from "@/lib/application-status";
 
 function InterviewScheduledCard({ slot, onFirstView }) {
   useEffect(() => {
@@ -176,15 +168,9 @@ export default function ApplicantDashboard() {
     );
   }
 
-  const statusOrder = [
-    "stage_1_submitted",
-    "stage_1_approved",
-    "stage_2_submitted",
-    "stage_2_approved",
-    "called_for_interview",
-  ];
-  const statusToProgressIndex = (status) => statusOrder.indexOf(status);
-  const currentIndex = application ? statusToProgressIndex(application.status) : -1;
+  const normalizedStatus = application
+    ? normalizeApplicationStatus(application.status)
+    : "draft";
 
   return (
     <div>
@@ -296,7 +282,7 @@ export default function ApplicantDashboard() {
               </p>
             ) : null}
           </div>
-        ) : application.status === "stage_1_approved" ? (
+        ) : normalizedStatus === "stage_1_approved" ? (
           <div className="rounded-lg border-2 border-gold/30 bg-gradient-to-br from-royal/5 to-gold/10 p-6">
             <div className="mb-4 flex justify-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gold text-royal">
@@ -319,7 +305,7 @@ export default function ApplicantDashboard() {
               </Link>
             </div>
           </div>
-        ) : application.status === "stage_2_submitted" ? (
+        ) : normalizedStatus === "stage_2_submitted" ? (
           <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-6 text-center">
             <CheckCircle2 size={40} className="mx-auto text-indigo-600" />
             <h3 className="mt-3 text-lg font-bold text-gray-900">
@@ -329,7 +315,7 @@ export default function ApplicantDashboard() {
               Your video has been received. We will review it and notify you of the outcome.
             </p>
           </div>
-        ) : application.status === "stage_2_approved" ? (
+        ) : normalizedStatus === "stage_2_approved" ? (
           <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-6 text-center">
             <Video size={40} className="mx-auto text-amber-600" />
             <h3 className="mt-3 text-lg font-bold text-gray-900">Stage 2 approved</h3>
@@ -338,48 +324,7 @@ export default function ApplicantDashboard() {
             </p>
           </div>
         ) : (
-          <div className="flex items-center justify-center">
-            {statusSteps.map((s, i) => {
-              const completed = i < currentIndex;
-              const active = i === currentIndex;
-              const StepIcon = s.icon;
-              return (
-                <div key={s.key} className="flex flex-1 items-center">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                        completed
-                          ? "bg-royal text-white"
-                          : active
-                            ? "bg-gold text-royal ring-4 ring-gold/20"
-                            : "bg-gray-100 text-gray-400"
-                      }`}
-                    >
-                      {completed ? (
-                        <CheckCircle2 size={18} />
-                      ) : (
-                        <StepIcon size={18} />
-                      )}
-                    </div>
-                    <span
-                      className={`mt-2 text-[11px] font-medium ${
-                        active ? "text-royal" : "text-gray-400"
-                      }`}
-                    >
-                      {s.label}
-                    </span>
-                  </div>
-                  {i < statusSteps.length - 1 && (
-                    <div
-                      className={`mx-1 h-0.5 flex-1 ${
-                        completed ? "bg-royal" : "bg-gray-200"
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <ApplicantProgressBar status={application.status} />
         )}
       </div>
 

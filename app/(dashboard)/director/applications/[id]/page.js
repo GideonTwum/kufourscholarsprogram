@@ -18,15 +18,21 @@ import {
   ExternalLink,
   ChevronDown,
   ClipboardList,
+  Clock,
 } from "lucide-react";
 import { getLeadershipEvidencePaths } from "@/lib/application-validation";
+import { getDirectorStageActions } from "@/lib/director-stage-actions";
+import DirectorStageActionBar from "../../components/DirectorStageActionBar";
 
 const statusFlow = [
   { key: "draft", label: "Draft", color: "bg-gray-100 text-gray-600" },
   { key: "stage_1_submitted", label: "Stage 1 submitted", color: "bg-amber-100 text-amber-700" },
+  { key: "review_pending", label: "Deferred (Stage 1)", color: "bg-slate-100 text-slate-700" },
   { key: "stage_1_approved", label: "Stage 1 approved", color: "bg-purple-100 text-purple-700" },
   { key: "stage_2_submitted", label: "Stage 2 submitted", color: "bg-indigo-100 text-indigo-700" },
+  { key: "stage_2_review_pending", label: "Deferred (Stage 2)", color: "bg-slate-100 text-slate-700" },
   { key: "stage_2_approved", label: "Stage 2 approved", color: "bg-indigo-100 text-indigo-700" },
+  { key: "interview_review_pending", label: "Interview pending", color: "bg-slate-100 text-slate-700" },
   { key: "called_for_interview", label: "Called for interview", color: "bg-indigo-100 text-indigo-700" },
   { key: "accepted", label: "Accepted", color: "bg-green-100 text-green-700" },
   { key: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
@@ -43,6 +49,15 @@ const workflowTimeline = [
 function workflowProgressIndex(status) {
   if (status === "accepted" || status === "rejected") return workflowTimeline.length + 1;
   if (status === "draft") return -1;
+  if (status === "review_pending") {
+    return workflowTimeline.findIndex((t) => t.key === "stage_1_submitted");
+  }
+  if (status === "stage_2_review_pending") {
+    return workflowTimeline.findIndex((t) => t.key === "stage_2_submitted");
+  }
+  if (status === "interview_review_pending") {
+    return workflowTimeline.findIndex((t) => t.key === "stage_2_approved");
+  }
   const i = workflowTimeline.findIndex((t) => t.key === status);
   return i >= 0 ? i : 0;
 }
@@ -151,11 +166,27 @@ export default function ApplicationReviewPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: app } = await supabase
+      let app = null;
+
+      const { data: directApp } = await supabase
         .from("applications")
-        .select("*, profiles(full_name, email, class_name, role)")
+        .select(
+          "*, profiles!applications_user_id_fkey(full_name, email, class_name, role)"
+        )
         .eq("id", id)
         .single();
+
+      if (directApp) {
+        app = directApp;
+      } else {
+        try {
+          const res = await fetch(`/api/director/applications/${id}`);
+          if (res.ok) {
+            const json = await res.json();
+            app = json.application;
+          }
+        } catch (_) {}
+      }
 
       if (app) {
         setApplication(app);
@@ -358,6 +389,21 @@ export default function ApplicationReviewPage() {
 
   const currentStatusIndex = workflowProgressIndex(application.status);
   const isTerminal = application.status === "accepted" || application.status === "rejected";
+  const stageActions = getDirectorStageActions(application.status);
+
+  function handleStageAccept() {
+    if (!stageActions?.accept) return;
+    const a = stageActions.accept;
+    if (a.type === "disabled") return;
+    if (a.type === "status") updateStatus(a.next);
+    if (a.type === "interview_modal") setShowInterviewModal(true);
+    if (a.type === "accept_modal") setShowAcceptModal(true);
+  }
+
+  function handleStagePending() {
+    if (!stageActions?.pending?.next) return;
+    updateStatus(stageActions.pending.next);
+  }
 
   return (
     <div>
@@ -641,35 +687,30 @@ export default function ApplicationReviewPage() {
               {savingEval ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
               Save Evaluation
             </button>
-            {application.status === "called_for_interview" && (
-              <>
-                <button
-                  onClick={() => setShowAcceptModal(true)}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                >
-                  <CheckCircle2 size={16} />
-                  Accept
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRejectModal(true)}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-red-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-                >
-                  <XCircle size={16} />
-                  Reject
-                </button>
-              </>
-            )}
-            {updating && <Loader2 size={16} className="animate-spin text-gray-400" />}
+            {(application.status === "called_for_interview" || application.status === "interview") &&
+              stageActions && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <DirectorStageActionBar
+                    config={stageActions}
+                    updating={updating}
+                    onAccept={handleStageAccept}
+                    onPending={handleStagePending}
+                    onReject={() => setShowRejectModal(true)}
+                  />
+                </div>
+              )}
           </div>
         </div>
       )}
 
       {/* Director actions */}
       <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-sm font-bold text-gray-900">Director Actions</h3>
+        <h3 className="text-sm font-bold text-gray-900">Director Actions</h3>
+        <p className="mb-4 mt-1 text-xs text-gray-500">
+          At each stage use <strong>Accept</strong> to advance, <strong>Pending</strong> to defer for
+          later (still in the Pending list on Applications), or <strong>Reject</strong> to close the
+          application.
+        </p>
         <div className="mb-4">
           <label className="mb-1.5 block text-xs font-medium text-gray-500">Internal Notes</label>
           <textarea
@@ -681,67 +722,14 @@ export default function ApplicationReviewPage() {
           />
         </div>
 
-        {!isTerminal && (
-          <div className="flex flex-wrap gap-3">
-            {application.status === "stage_1_submitted" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => updateStatus("stage_1_approved")}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
-                >
-                  <Users size={14} />
-                  Approve Stage 1
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRejectModal(true)}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-                >
-                  <XCircle size={14} />
-                  Reject
-                </button>
-              </>
-            )}
-            {application.status === "stage_1_approved" && (
-              <p className="text-sm text-gray-500">Waiting for applicant to submit Stage 2 video.</p>
-            )}
-            {application.status === "stage_2_submitted" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => updateStatus("stage_2_approved")}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
-                >
-                  <Users size={14} />
-                  Approve Stage 2
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRejectModal(true)}
-                  disabled={updating}
-                  className="flex items-center gap-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-                >
-                  <XCircle size={14} />
-                  Reject
-                </button>
-              </>
-            )}
-            {application.status === "stage_2_approved" && (
-              <button
-                type="button"
-                onClick={() => setShowInterviewModal(true)}
-                disabled={updating}
-                className="flex items-center gap-1 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
-              >
-                <Video size={14} />
-                Call for interview…
-              </button>
-            )}
-          </div>
+        {!isTerminal && stageActions && (
+          <DirectorStageActionBar
+            config={stageActions}
+            updating={updating}
+            onAccept={handleStageAccept}
+            onPending={handleStagePending}
+            onReject={() => setShowRejectModal(true)}
+          />
         )}
       </div>
 

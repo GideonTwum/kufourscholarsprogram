@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { evaluateEligibilityForAutoReject } from "@/lib/eligibility-server";
-import { sendTransactionalEmail, autoRejectEmailHtml } from "@/lib/email/notify";
+import { autoRejectEmailHtml, stage1SubmittedEmailHtml } from "@/lib/email/notify";
+import { sendKspEmail } from "@/lib/email/send";
 
 function buildRow(body, userId, overrides = {}) {
   const leadership = Array.isArray(body.leadership_evidence_urls)
@@ -89,11 +90,14 @@ export async function POST(request) {
       appId = ins?.id;
     }
     if (userEmail) {
-      await sendTransactionalEmail({
+      await sendKspEmail({
+        event: "stage_1_auto_rejected",
         to: userEmail,
         subject: "Kufuor Scholars Program — application update",
         html: autoRejectEmailHtml(profileName || "Applicant", eligibility.reason),
         text: `Your application could not proceed. ${eligibility.reason}`,
+        template: "rejected",
+        meta: { applicantName: profileName || "Applicant", reason: eligibility.reason },
       });
     }
     return NextResponse.json({
@@ -122,16 +126,14 @@ export async function POST(request) {
   }
 
   if (userEmail) {
-    await sendTransactionalEmail({
+    await sendKspEmail({
+      event: "stage_1_submitted",
       to: userEmail,
       subject: "Kufuor Scholars — Stage 1 application received",
-      html: `
-        <p>Dear ${profileName || "Applicant"},</p>
-        <p>Thank you for submitting your Stage 1 application. Your status is <strong>Pending</strong> while the selection committee reviews your file.</p>
-        <p>We will notify you of the outcome.</p>
-        <p>Best,<br/>The Kufuor Scholars Program Team</p>
-      `,
+      html: stage1SubmittedEmailHtml(profileName || "Applicant"),
       text: "Your Stage 1 application was received and is pending review.",
+      template: "stage1_submitted",
+      meta: { applicantName: profileName || "Applicant" },
     });
   }
 

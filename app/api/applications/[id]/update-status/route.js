@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-import { sendTransactionalEmail, rejectionEmailHtml, acceptanceEmailHtml } from "@/lib/email/notify";
-import { sendPlatformEmail } from "@/lib/send-email-runtime";
+import { rejectionEmailHtml, acceptanceEmailHtml, interviewInviteHtml } from "@/lib/email/notify";
+import { sendKspEmail } from "@/lib/email/send";
 
 function esc(str) {
   return String(str || "")
@@ -11,23 +12,16 @@ function esc(str) {
     .replace(/"/g, "&quot;");
 }
 
-function interviewInviteHtml(k) {
-  return `
-<p>Dear ${esc(k.name)},</p>
-<p>You have been <strong>called for an interview</strong> with the Kufuor Scholars Program.</p>
-<ul>
-<li><strong>Date:</strong> ${esc(k.interviewDate)}</li>
-<li><strong>Time:</strong> ${esc(k.interviewTime)}</li>
-<li><strong>Location / link:</strong> ${esc(k.interviewLocation)}</li>
-</ul>
-${k.interviewInstructions ? `<p><strong>Instructions:</strong><br/>${esc(k.interviewInstructions)}</p>` : ""}
-<p>Best,<br/>The Kufuor Scholars Program Team</p>`;
-}
-
 const VALID = [
+  "stage_1_submitted",
+  "review_pending",
   "stage_1_approved",
+  "stage_2_submitted",
+  "stage_2_review_pending",
   "stage_2_approved",
+  "interview_review_pending",
   "called_for_interview",
+  "interview",
   "accepted",
   "rejected",
 ];
@@ -109,13 +103,20 @@ export async function POST(request, { params }) {
     updatePayload.interview_instructions = instr || null;
   }
 
-  const { error: appError } = await supabase.from("applications").update(updatePayload).eq("id", id);
+  let db;
+  try {
+    db = createAdminClient();
+  } catch {
+    db = supabase;
+  }
+
+  const { error: appError } = await db.from("applications").update(updatePayload).eq("id", id);
 
   if (appError) {
     return NextResponse.json({ error: appError.message }, { status: 500 });
   }
 
-  const { data: appRow } = await supabase
+  const { data: appRow } = await db
     .from("applications")
     .select("full_name, user_id, interview_date, interview_time, interview_location, interview_instructions")
     .eq("id", id)
@@ -152,7 +153,8 @@ export async function POST(request, { params }) {
       "success"
     );
     if (applicantEmail) {
-      await sendPlatformEmail({
+      await sendKspEmail({
+        event: "stage_1_approved",
         to: applicantEmail,
         subject: "Kufuor Scholars — Stage 1 approved",
         html: `<p>Dear ${esc(nm)},</p><p>Congratulations, your Stage 1 application has been approved. You may now proceed to the next stage.</p><p>Best,<br/>The Kufuor Scholars Program Team</p>`,
@@ -170,7 +172,8 @@ export async function POST(request, { params }) {
       "success"
     );
     if (applicantEmail) {
-      await sendPlatformEmail({
+      await sendKspEmail({
+        event: "stage_2_approved",
         to: applicantEmail,
         subject: "Kufuor Scholars — Stage 2 approved",
         html: `<p>Dear ${esc(nm)},</p><p>Congratulations, your Stage 2 application has been approved. Please check your dashboard for the next step.</p><p>Best,<br/>The Kufuor Scholars Program Team</p>`,
@@ -188,7 +191,8 @@ export async function POST(request, { params }) {
       "info"
     );
     if (applicantEmail) {
-      await sendPlatformEmail({
+      await sendKspEmail({
+        event: "called_for_interview",
         to: applicantEmail,
         subject: "Kufuor Scholars — Interview invitation",
         html: interviewInviteHtml({
@@ -213,21 +217,27 @@ export async function POST(request, { params }) {
 
   if (status === "rejected" && applicantEmail) {
     await notifyPlatform("Application update", "Your application status has been updated.", "warning");
-    await sendTransactionalEmail({
+    await sendKspEmail({
+      event: "rejected",
       to: applicantEmail,
       subject: "Kufuor Scholars Program — application update",
       html: rejectionEmailHtml(nm, rejection_reason),
       text: `Your application update. ${rejection_reason || ""}`,
+      template: "rejected",
+      meta: { applicantName: nm, reason: rejection_reason || "" },
     });
   }
 
   if (status === "accepted" && applicantEmail) {
     await notifyPlatform("Accepted to the program", "Congratulations — you have been accepted to the Kufuor Scholars Program.", "success");
-    await sendTransactionalEmail({
+    await sendKspEmail({
+      event: "accepted",
       to: applicantEmail,
       subject: "Congratulations — Kufuor Scholars Program",
       html: acceptanceEmailHtml(nm),
       text: `Congratulations ${nm}, your application has been accepted.`,
+      template: "accepted",
+      meta: { applicantName: nm },
     });
   }
 
@@ -236,10 +246,10 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: "class_name is required when accepting an applicant" }, { status: 400 });
     }
 
-    const { data: application } = await supabase.from("applications").select("user_id").eq("id", id).single();
+    const { data: application } = await db.from("applications").select("user_id").eq("id", id).single();
 
     if (application) {
-      const { error: profileError } = await supabase
+      const { error: profileError } = await db
         .from("profiles")
         .update({ role: "scholar", class_name })
         .eq("id", application.user_id);

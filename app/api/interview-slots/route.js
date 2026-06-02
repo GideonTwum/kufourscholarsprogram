@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-import { sendTransactionalEmail } from "@/lib/email/notify";
+import { sendKspEmail } from "@/lib/email/send";
 
 function escHtml(s) {
   return String(s ?? "")
@@ -47,7 +48,14 @@ export async function POST(request) {
     );
   }
 
-  const { data: slot, error: slotError } = await supabase
+  let db;
+  try {
+    db = createAdminClient();
+  } catch {
+    db = supabase;
+  }
+
+  const { data: slot, error: slotError } = await db
     .from("interview_slots")
     .insert({
       director_id: user.id,
@@ -69,7 +77,7 @@ export async function POST(request) {
   }
 
   const nowIso = new Date().toISOString();
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from("applications")
     .update({
       interview_slot_id: slot.id,
@@ -77,7 +85,12 @@ export async function POST(request) {
       updated_at: nowIso,
     })
     .in("id", application_ids)
-    .in("status", ["called_for_interview", "interview"]);
+    .in("status", [
+      "stage_2_approved",
+      "interview_review_pending",
+      "called_for_interview",
+      "interview",
+    ]);
 
   if (updateError) {
     return NextResponse.json(
@@ -86,9 +99,9 @@ export async function POST(request) {
     );
   }
 
-  const { data: rows } = await supabase
+  const { data: rows } = await db
     .from("applications")
-    .select("id, user_id, full_name, profiles(email)")
+    .select("id, user_id, full_name, profiles!applications_user_id_fkey(email)")
     .in("id", application_ids)
     .eq("interview_slot_id", slot.id);
 
@@ -131,7 +144,8 @@ export async function POST(request) {
     });
 
     if (email) {
-      await sendTransactionalEmail({
+      await sendKspEmail({
+        event: "interview_batch_assigned",
         to: email,
         subject: `Kufuor Scholars Program — Interview: ${batch_name}`,
         html: `
@@ -151,6 +165,8 @@ export async function POST(request) {
           <p>Best,<br/>The Kufuor Scholars Program Team</p>
         `,
         text: messageText,
+        template: "interview_batch",
+        meta: { applicantName: name, batchName: batch_name },
       });
     }
   }

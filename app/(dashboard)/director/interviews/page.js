@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
 import {
   Video,
   Calendar,
@@ -14,7 +13,6 @@ import {
 } from "lucide-react";
 
 export default function DirectorInterviewsPage() {
-  const supabase = createClient();
   const [applications, setApplications] = useState([]);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,24 +27,24 @@ export default function DirectorInterviewsPage() {
     congratulations_message: "",
   });
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [success, setSuccess] = useState(null);
+
+  async function loadData() {
+    setError(null);
+    const res = await fetch("/api/director/interview-slots");
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Failed to load interview data");
+      return false;
+    }
+    setApplications(data.applications || []);
+    setSlots(data.slots || []);
+    return true;
+  }
 
   useEffect(() => {
     async function load() {
-      setError(null);
-
-      const { data: apps } = await supabase
-        .from("applications")
-        .select("*, profiles!inner(full_name, email)")
-        .in("status", ["called_for_interview", "interview"])
-        .order("submitted_at", { ascending: false });
-
-      const { data: slotsData } = await supabase
-        .from("interview_slots")
-        .select("*")
-        .order("interview_date", { ascending: true });
-
-      setApplications(apps || []);
-      setSlots(slotsData || []);
+      await loadData();
       setLoading(false);
     }
     load();
@@ -71,6 +69,7 @@ export default function DirectorInterviewsPage() {
   async function createAndAssign(e) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
     setSaving(true);
 
     const res = await fetch("/api/interview-slots", {
@@ -99,20 +98,12 @@ export default function DirectorInterviewsPage() {
     });
     setSelectedIds(new Set());
 
-    // Reload data
-    const { data: apps } = await supabase
-      .from("applications")
-      .select("*, profiles!inner(full_name, email)")
-      .in("status", ["called_for_interview", "interview"])
-      .order("submitted_at", { ascending: false });
-
-    const { data: slotsData } = await supabase
-      .from("interview_slots")
-      .select("*, applications(id, profiles!inner(full_name, email))")
-      .order("interview_date", { ascending: true });
-
-    setApplications(apps || []);
-    setSlots(slotsData || []);
+    await loadData();
+    setSuccess(
+      data.notified
+        ? `Batch created and ${data.notified} applicant(s) notified.`
+        : "Batch created. Select applicants above to assign them to a batch."
+    );
     setSaving(false);
   }
 
@@ -134,13 +125,19 @@ export default function DirectorInterviewsPage() {
           Interview Scheduling
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Create batches and assign applicants who passed to interview slots.
+          Assign applicants who passed Stage 2 into interview batches. They appear here after Stage 2 is
+          approved (or after you called them for interview on their application).
         </p>
       </div>
 
       {error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+          {success}
         </div>
       )}
 
@@ -254,7 +251,8 @@ export default function DirectorInterviewsPage() {
 
             {unassigned.length === 0 ? (
               <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/50 py-4 text-center text-sm text-gray-500">
-                All interview-status applicants are already assigned.
+                No unassigned applicants right now. You can still create a batch below; assign
+                people later when Stage 2–approved applicants appear.
               </p>
             ) : (
               <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-100 p-3">

@@ -34,12 +34,19 @@ function Field({ label, value, href }) {
   );
 }
 
-export default function ReviewSubmit({ data, goToStep, readOnly, docUrls = {} }) {
+export default function ReviewSubmit({
+  data,
+  goToStep,
+  readOnly,
+  docUrls = {},
+  title = "Review Your Application (Stage 1)",
+  subtitle = "Please review your information before submitting.",
+}) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">Review Your Application (Stage 1)</h2>
-        <p className="mt-1 text-sm text-gray-500">Please review your information before submitting.</p>
+        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+        <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
       </div>
       <Section title="Personal Information" icon={User} stepIndex={0} goToStep={goToStep} readOnly={readOnly}>
         <Field label="Full Name" value={data.full_name} />

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { sendPlatformEmail } from "@/lib/send-email-runtime";
+import { sendKspEmail } from "@/lib/email/send";
 
 export async function POST(request) {
   const supabase = await createClient();
@@ -52,31 +52,23 @@ export async function POST(request) {
     </div>
   `;
 
-  const send = await sendPlatformEmail({
+  const send = await sendKspEmail({
+    event: "director_panel_broadcast",
     to: emails,
     subject: subject.trim(),
     html,
     text: message.trim(),
     template: "panel_broadcast",
+    directorId: user.id,
   });
-
-  const status = send.ok ? "sent" : "partial_or_failed";
-
-  const { error: logErr } = await supabase.from("email_logs").insert({
-    sender_director_id: user.id,
-    recipients: emails,
-    subject: subject.trim(),
-    message: message.trim(),
-    status,
-  });
-
-  if (logErr) {
-    console.error("[email-panel] log insert", logErr);
-  }
 
   if (!send.ok) {
     return NextResponse.json(
-      { error: "Email delivery failed or Resend / Edge Function not configured.", status },
+      {
+        error: "Email delivery failed or Resend / Edge Function not configured.",
+        reason: send.reason || null,
+        skipped: send.skipped || false,
+      },
       { status: 502 }
     );
   }

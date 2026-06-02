@@ -54,7 +54,13 @@ Deno.serve(async (req: Request) => {
   let finalHtml = html;
   let finalText = text;
 
-  if (template === "stage1_approved") {
+  if (template === "stage1_submitted") {
+    const name = meta.applicantName ?? "Applicant";
+    finalHtml = `<p>Dear ${escapeHtml(name)},</p>
+<p>Thank you for submitting your Stage 1 application. Your status is <strong>Pending</strong> while we review your file.</p>
+<p>Best,<br/>The Kufuor Scholars Program Team</p>`;
+    finalText = `Thank you, ${name}. Your Stage 1 application was received and is pending review.`;
+  } else if (template === "stage1_approved") {
     const name = meta.applicantName ?? "Applicant";
     finalHtml = `<p>Dear ${escapeHtml(name)},</p>
 <p>Congratulations, your Stage 1 application has been approved. You may now proceed to the next stage.</p>
@@ -84,6 +90,25 @@ Deno.serve(async (req: Request) => {
     const name = meta.applicantName ?? "Applicant";
     finalHtml = `<p>Dear ${escapeHtml(name)},</p><p>${escapeHtml(meta.message ?? "We regret we cannot proceed with your application at this time.")}</p>`;
     finalText = meta.message ?? "";
+  } else if (template === "accepted") {
+    const name = meta.applicantName ?? "Scholar";
+    finalHtml = `<p>Dear ${escapeHtml(name)},</p>
+<p><strong>Congratulations!</strong> Your application to the Kufuor Scholars Program has been accepted.</p>
+<p>Best,<br/>The Kufuor Scholars Program Team</p>`;
+    finalText = `Congratulations ${name}, your application has been accepted.`;
+  } else if (template === "rejected") {
+    const name = meta.applicantName ?? "Applicant";
+    const reason = meta.reason ? `<p><strong>Reason:</strong> ${escapeHtml(meta.reason)}</p>` : "";
+    finalHtml = `<p>Dear ${escapeHtml(name)},</p>
+<p>Thank you for your interest. After careful review, we are unable to offer you a place at this time.</p>
+${reason}
+<p>Best,<br/>The Kufuor Scholars Program Team</p>`;
+    finalText = meta.reason
+      ? `Application update. ${meta.reason}`
+      : "Thank you for your interest in the Kufuor Scholars Program.";
+  } else if (template === "interview_batch") {
+    finalHtml = html ?? `<pre>${escapeHtml(text ?? "")}</pre>`;
+    finalText = text ?? "";
   } else if (template === "panel_broadcast") {
     finalHtml = html ?? `<pre>${escapeHtml(text ?? "")}</pre>`;
     finalText = text ?? "";
