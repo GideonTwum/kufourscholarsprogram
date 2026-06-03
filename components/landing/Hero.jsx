@@ -135,7 +135,7 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
           transition={{ duration: 0.8, delay: 0.15, ease: "easeOut" }}
           className="mx-auto max-w-4xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl"
         >
-          Grooming Future{" "}
+          Rewiring Future{" "}
           <span className="text-gold">Leaders of Africa</span>
         </motion.h1>
 
