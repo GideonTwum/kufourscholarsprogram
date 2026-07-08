@@ -1,7 +1,7 @@
 import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse } from "next/server";
 
-const protectedRoutes = ["/applicant", "/director", "/panel"];
+const protectedRoutes = ["/applicant", "/director", "/panel", "/assessor"];
 const authRoutes = [
   "/login",
   "/director-login",
@@ -14,7 +14,7 @@ function applicantNeedsEmailVerification(user) {
   return user.email_confirmed_at == null;
 }
 
-/** DB role when readable; else JWT user_metadata.role (set at director/panel signup). */
+/** DB role when readable; else JWT user_metadata.role (set at director/panel/assessor signup). */
 function roleFromSession(user, profileRow) {
   const fromDb = profileRow?.role;
   if (typeof fromDb === "string" && fromDb) return fromDb;
@@ -33,7 +33,7 @@ async function fetchProfileRole(supabase, userId) {
   return profile?.role;
 }
 
-export async function middleware(request) {
+export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
   let supabase;
@@ -89,13 +89,19 @@ export async function middleware(request) {
     if (pathname.startsWith("/director")) {
       if (role !== "director") {
         const url = request.nextUrl.clone();
-        url.pathname = role === "panel" ? "/panel" : "/applicant";
+        url.pathname = role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
         return NextResponse.redirect(url);
       }
     } else if (pathname.startsWith("/panel")) {
       if (role !== "panel") {
         const url = request.nextUrl.clone();
-        url.pathname = role === "director" ? "/director" : "/applicant";
+        url.pathname = role === "director" ? "/director" : role === "assessor" ? "/assessor" : "/applicant";
+        return NextResponse.redirect(url);
+      }
+    } else if (pathname.startsWith("/assessor")) {
+      if (role !== "assessor") {
+        const url = request.nextUrl.clone();
+        url.pathname = role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
         return NextResponse.redirect(url);
       }
     } else if (pathname.startsWith("/applicant")) {
@@ -107,6 +113,11 @@ export async function middleware(request) {
       if (role === "panel") {
         const url = request.nextUrl.clone();
         url.pathname = "/panel";
+        return NextResponse.redirect(url);
+      }
+      if (role === "assessor") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/assessor";
         return NextResponse.redirect(url);
       }
     }
@@ -121,18 +132,18 @@ export async function middleware(request) {
 
     if (pathname.startsWith("/director-login")) {
       url.pathname =
-        role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
+        role === "director" ? "/director" : role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
       return NextResponse.redirect(url);
     }
 
     if (pathname === "/login" || pathname.startsWith("/login/")) {
       url.pathname =
-        role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
+        role === "director" ? "/director" : role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
       return NextResponse.redirect(url);
     }
 
     url.pathname =
-      role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
+      role === "director" ? "/director" : role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
     return NextResponse.redirect(url);
   }
 

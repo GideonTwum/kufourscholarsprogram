@@ -6,7 +6,6 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard,
-  BookOpen,
   MessageCircle,
   Settings,
   LogOut,
@@ -29,6 +28,7 @@ import {
 const directorNav = [
   { label: "Dashboard", href: "/director", icon: LayoutDashboard },
   { label: "Applications", href: "/director/applications", icon: FileText },
+  { label: "Assessors", href: "/director/assessors", icon: UsersRound },
   { label: "Interviews", href: "/director/interviews", icon: Video },
   { label: "Panel Members", href: "/director/panel", icon: UsersRound },
   { label: "Scholars", href: "/director/scholars", icon: Users },
@@ -44,9 +44,31 @@ const directorNav = [
   { label: "Email test", href: "/director/email-tests", icon: Mail },
 ];
 
-const panelNav = [
+  const panelNav = [
   { label: "Interview Applicants", href: "/panel", icon: FileText },
 ];
+
+const assessorNav = [
+  { label: "Assigned Applicants", href: "/assessor", icon: FileText },
+];
+
+function portalKind(pathname) {
+  if (pathname?.startsWith("/panel")) return "panel";
+  if (pathname?.startsWith("/assessor")) return "assessor";
+  return "director";
+}
+
+function navForKind(kind) {
+  if (kind === "panel") return panelNav;
+  if (kind === "assessor") return assessorNav;
+  return directorNav;
+}
+
+function roleLabel(kind) {
+  if (kind === "panel") return "Panel Member";
+  if (kind === "assessor") return "Assessor";
+  return "Director";
+}
 
 export default function DashboardLayout({ children }) {
   const [profile, setProfile] = useState(null);
@@ -55,6 +77,7 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
+  const kind = portalKind(pathname);
 
   useEffect(() => {
     setMounted(true);
@@ -84,7 +107,7 @@ export default function DashboardLayout({ children }) {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push(pathname?.startsWith("/director") ? "/director-login" : "/login");
+    router.push(kind === "director" ? "/director-login" : "/login");
     router.refresh();
   }
 
@@ -121,7 +144,7 @@ export default function DashboardLayout({ children }) {
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <div className="space-y-1">
-            {(pathname?.startsWith("/panel") ? panelNav : directorNav).map((item) => {
+            {navForKind(kind).map((item) => {
               const isActive =
                 mounted &&
                 (pathname === item.href ||
@@ -166,9 +189,9 @@ export default function DashboardLayout({ children }) {
               </div>
               <div className="flex-1 overflow-hidden">
                 <p className="truncate text-sm font-medium text-gray-900">
-                  {profile.full_name || (pathname?.startsWith("/panel") ? "Panel" : "Director")}
+                  {profile.full_name || roleLabel(kind)}
                 </p>
-                <p className="truncate text-xs text-gray-500">{pathname?.startsWith("/panel") ? "Panel Member" : "Director"}</p>
+                <p className="truncate text-xs text-gray-500">{roleLabel(kind)}</p>
               </div>
             </div>
           )}
@@ -192,7 +215,7 @@ export default function DashboardLayout({ children }) {
           </button>
           <div className="flex-1" />
           <span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-dark">
-            {pathname?.startsWith("/panel") ? "Panel" : "Director"}
+            {roleLabel(kind)}
           </span>
         </header>
         <main className="flex-1 p-4 lg:p-8">{children}</main>

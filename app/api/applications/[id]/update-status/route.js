@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { rejectionEmailHtml, acceptanceEmailHtml, interviewInviteHtml } from "@/lib/email/notify";
 import { sendKspEmail } from "@/lib/email/send";
+import { validateStatusUpdateInput } from "@/lib/application-status-transition.mjs";
 
 function esc(str) {
   return String(str || "")
@@ -11,20 +12,6 @@ function esc(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
-
-const VALID = [
-  "stage_1_submitted",
-  "review_pending",
-  "stage_1_approved",
-  "stage_2_submitted",
-  "stage_2_review_pending",
-  "stage_2_approved",
-  "interview_review_pending",
-  "called_for_interview",
-  "interview",
-  "accepted",
-  "rejected",
-];
 
 export async function POST(request, { params }) {
   const supabase = await createClient();
@@ -56,8 +43,9 @@ export async function POST(request, { params }) {
 
   const { status, director_notes, class_name, rejection_reason, interview } = body;
 
-  if (!VALID.includes(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  const validationError = validateStatusUpdateInput(body);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
   const nowIso = new Date().toISOString();
@@ -91,12 +79,6 @@ export async function POST(request, { params }) {
     const loc = interview?.interview_location?.trim?.() ?? "";
     const tim = interview?.interview_time?.trim?.() ?? "";
     const instr = interview?.interview_instructions?.trim?.() ?? "";
-    if (!d || !loc || !tim) {
-      return NextResponse.json(
-        { error: "Interview date, time, and location (or meeting link) are required." },
-        { status: 400 }
-      );
-    }
     updatePayload.interview_date = d;
     updatePayload.interview_time = tim;
     updatePayload.interview_location = loc;
@@ -110,7 +92,18 @@ export async function POST(request, { params }) {
     db = supabase;
   }
 
-  const { error: appError } = await db.from("applications").update(updatePayload).eq("id", id);
+  let appError;
+  if (status === "accepted") {
+    const { error } = await supabase.rpc("accept_application", {
+      application_id: id,
+      cohort_class_name: class_name.trim(),
+      notes: director_notes ?? null,
+    });
+    appError = error;
+  } else {
+    const { error } = await db.from("applications").update(updatePayload).eq("id", id);
+    appError = error;
+  }
 
   if (appError) {
     return NextResponse.json({ error: appError.message }, { status: 500 });
@@ -239,28 +232,6 @@ export async function POST(request, { params }) {
       template: "accepted",
       meta: { applicantName: nm },
     });
-  }
-
-  if (status === "accepted") {
-    if (!class_name) {
-      return NextResponse.json({ error: "class_name is required when accepting an applicant" }, { status: 400 });
-    }
-
-    const { data: application } = await db.from("applications").select("user_id").eq("id", id).single();
-
-    if (application) {
-      const { error: profileError } = await db
-        .from("profiles")
-        .update({ role: "scholar", class_name })
-        .eq("id", application.user_id);
-
-      if (profileError) {
-        return NextResponse.json(
-          { error: `Application accepted but failed to update profile: ${profileError.message}` },
-          { status: 500 }
-        );
-      }
-    }
   }
 
   return NextResponse.json({ success: true });

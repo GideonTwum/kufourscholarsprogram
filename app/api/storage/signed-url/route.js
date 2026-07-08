@@ -30,14 +30,16 @@ export async function GET(request) {
 
   const isDirector = profile?.role === "director";
   const isPanel = profile?.role === "panel";
+  const isAssessor = profile?.role === "assessor";
   const isOwner = path.startsWith(`${user.id}/`);
 
   const allowed =
     isDirector ||
     isOwner ||
-    (isPanel &&
-      (await (async () => {
-        const prefix = path.split("/")[0];
+    (await (async () => {
+      const prefix = path.split("/")[0];
+
+      if (isPanel) {
         const { data: app } = await supabase
           .from("applications")
           .select("id")
@@ -45,7 +47,21 @@ export async function GET(request) {
           .in("status", ["called_for_interview", "interview"])
           .maybeSingle();
         return !!app;
-      })()));
+      }
+
+      if (isAssessor) {
+        const { data: app } = await supabase
+          .from("applications")
+          .select("id, assessor_assignments!inner(id)")
+          .eq("user_id", prefix)
+          .eq("assessor_assignments.assessor_id", user.id)
+          .eq("assessor_assignments.status", "active")
+          .maybeSingle();
+        return !!app;
+      }
+
+      return false;
+    })());
 
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

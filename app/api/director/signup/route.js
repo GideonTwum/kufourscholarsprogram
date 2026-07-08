@@ -1,6 +1,5 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import bcrypt from "bcrypt";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sanitizeDirectorSignupInput,
@@ -9,14 +8,18 @@ import {
   validateDirectorSignupClientFields,
 } from "@/lib/director-signup-validation";
 
-const SALT_ROUNDS = 12;
-
 function expectedDirectorCode() {
   return (
     process.env.DIRECTOR_SIGNUP_CODE ||
     process.env.DIRECTOR_REGISTRATION_CODE ||
     ""
   ).trim();
+}
+
+function signupAttemptKey(request) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const address = forwarded || request.headers.get("x-real-ip") || "unknown";
+  return crypto.createHash("sha256").update(address).digest("hex");
 }
 
 export async function POST(request) {
@@ -42,15 +45,6 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, error: "Validation failed.", fields: fieldErrors }, { status: 400 });
   }
 
-  const expected = expectedDirectorCode();
-  const codeOk = expected && timingSafeEqualStrings(fields.directorCode, expected);
-  if (!codeOk) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid director code.", code: "INVALID_CODE" },
-      { status: 403 }
-    );
-  }
-
   if (!isValidEmail(fields.email)) {
     return NextResponse.json({ ok: false, error: "Invalid email format.", fields: { email: "Invalid email." } }, { status: 400 });
   }
@@ -67,6 +61,32 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, error: "Server misconfiguration." }, { status: 500 });
   }
 
+  const { data: allowed, error: limitError } = await admin.rpc(
+    "consume_director_signup_attempt",
+    { p_attempt_key: signupAttemptKey(request) }
+  );
+  if (limitError) {
+    return NextResponse.json(
+      { ok: false, error: "Director signup is temporarily unavailable." },
+      { status: 503 }
+    );
+  }
+  if (!allowed) {
+    return NextResponse.json(
+      { ok: false, error: "Too many signup attempts. Try again later." },
+      { status: 429, headers: { "Retry-After": "900" } }
+    );
+  }
+
+  const expected = expectedDirectorCode();
+  const codeOk = expected && timingSafeEqualStrings(fields.directorCode, expected);
+  if (!codeOk) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid director code.", code: "INVALID_CODE" },
+      { status: 403 }
+    );
+  }
+
   const { data: exists } = await admin
     .from("directors")
     .select("id")
@@ -78,8 +98,6 @@ export async function POST(request) {
       { status: 409 }
     );
   }
-
-  const passwordHash = await bcrypt.hash(fields.password, SALT_ROUNDS);
 
   const { data: created, error: authErr } = await admin.auth.admin.createUser({
     email: fields.email,
@@ -113,7 +131,6 @@ export async function POST(request) {
     full_name: fields.fullName,
     email: fields.email,
     phone: phoneClean,
-    password_hash: passwordHash,
   });
 
   if (insErr) {

@@ -60,6 +60,8 @@ export default function LoginPage() {
 
     if (role === "panel") {
       router.push("/panel");
+    } else if (role === "assessor") {
+      router.push("/assessor");
     } else {
       router.push("/applicant");
     }

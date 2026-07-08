@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Hero from "@/components/landing/Hero";
+import WhyApply from "@/components/landing/WhyApply";
 import About from "@/components/landing/About";
 import ProgramHighlights from "@/components/landing/ProgramHighlights";
 import Stats from "@/components/landing/Stats";
@@ -76,6 +77,7 @@ export default async function Home() {
   return (
     <main>
       <Hero applicationsOpen={applicationsOpen} applicationDeadline={applicationDeadline} />
+      <WhyApply applicationsOpen={applicationsOpen} />
       <About />
       <ProgramHighlights />
       <Stats />

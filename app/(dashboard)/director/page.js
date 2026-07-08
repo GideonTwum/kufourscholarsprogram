@@ -3,48 +3,48 @@ import { redirect } from "next/navigation";
 import {
   Users,
   FileText,
-  BookOpen,
   Megaphone,
   MessageSquare,
-  BarChart3,
+  CalendarDays,
+  UserCheck,
 } from "lucide-react";
 
 const quickActions = [
   {
     title: "Manage Scholars",
-    description: "View, approve, and manage scholar accounts and cohorts",
+    description: "Manage scholar profiles and cohorts",
     icon: Users,
     href: "/director/scholars",
   },
   {
     title: "Review Applications",
-    description: "Review and process new scholar applications",
+    description: "Review and process applicant submissions",
     icon: FileText,
     href: "/director/applications",
   },
   {
-    title: "Upload Materials",
-    description: "Assign reading materials and resources to cohorts",
-    icon: BookOpen,
-    href: "/director/materials",
+    title: "Schedule Interviews",
+    description: "Create interview batches and notify applicants",
+    icon: CalendarDays,
+    href: "/director/interviews",
   },
   {
     title: "Post Announcement",
-    description: "Send updates and announcements to scholars",
+    description: "Send updates and announcements",
     icon: Megaphone,
     href: "/director/announcements",
   },
   {
-    title: "View Requests",
-    description: "Review and respond to scholar requests",
+    title: "Messages",
+    description: "Communicate directly with applicants",
     icon: MessageSquare,
-    href: "/director/requests",
+    href: "/director/messages",
   },
   {
-    title: "Analytics",
-    description: "View program engagement and performance metrics",
-    icon: BarChart3,
-    href: "/director/analytics",
+    title: "Manage Assessors",
+    description: "Invite assessors and assign applicants for review",
+    icon: UserCheck,
+    href: "/director/assessors",
   },
 ];
 
@@ -58,23 +58,20 @@ export default async function DirectorDashboard() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select("full_name")
     .eq("id", user.id)
     .single();
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Director Dashboard
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900">Director Dashboard</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Welcome back, {profile?.full_name?.split(" ")[0] || "Director"}.
-          Manage the Kufuor Scholars Program from here.
+          Welcome back, {profile?.full_name?.split(" ")[0] || "Director"}. Manage
+          the Kufuor Scholars Program from here.
         </p>
       </div>
 
-      {/* Quick actions */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {quickActions.map((action) => (
           <a
@@ -91,14 +88,6 @@ export default async function DirectorDashboard() {
             <p className="mt-1 text-sm text-gray-500">{action.description}</p>
           </a>
         ))}
-      </div>
-
-      {/* Placeholder */}
-      <div className="mt-8 rounded-xl border border-dashed border-gray-200 bg-white p-12 text-center">
-        <p className="text-sm text-gray-400">
-          Full director features coming soon — scholar management, cohort
-          assignments, content uploads, and analytics.
-        </p>
       </div>
     </div>
   );
