@@ -1,7 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
+import { requireActiveDirector } from "@/lib/director-auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendKspEmail } from "@/lib/email/send";
+import {
+  assertStatusTransition,
+  normalizeApplicationStatus,
+} from "@/lib/application-status-transition.mjs";
+import { recordDirectorAudit } from "@/lib/audit/director-audit";
 
 function escHtml(s) {
   return String(s ?? "")
@@ -12,32 +17,23 @@ function escHtml(s) {
 }
 
 export async function POST(request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const gate = await requireActiveDirector();
+  if (gate.error) return gate.error;
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { data: directorProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (directorProfile?.role !== "director") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const body = await request.json();
   const {
     batch_name,
     interview_date,
     interview_time,
     location,
     congratulations_message,
+    meeting_link,
     application_ids = [],
   } = body;
 
@@ -48,32 +44,95 @@ export async function POST(request) {
     );
   }
 
+  if (Number.isNaN(new Date(interview_date).getTime())) {
+    return NextResponse.json({ error: "Invalid interview_date" }, { status: 400 });
+  }
+
   let db;
   try {
     db = createAdminClient();
   } catch {
-    db = supabase;
+    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
   }
+
+  const uniqueIds = [...new Set((application_ids || []).filter(Boolean))];
 
   const { data: slot, error: slotError } = await db
     .from("interview_slots")
     .insert({
-      director_id: user.id,
+      director_id: gate.user.id,
       batch_name,
       interview_date,
       interview_time,
       location,
       congratulations_message: congratulations_message || null,
+      meeting_link: meeting_link || null,
+      status: "scheduled",
     })
     .select("id")
     .single();
 
   if (slotError) {
-    return NextResponse.json({ error: slotError.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create interview batch" }, { status: 500 });
   }
 
-  if (!application_ids?.length) {
-    return NextResponse.json({ success: true, slot_id: slot.id });
+  await recordDirectorAudit({
+    actor: gate.profile,
+    action: "interview.batch_created",
+    entityType: "interview_slot",
+    entityId: slot.id,
+    newValue: {
+      batch_name,
+      interview_date,
+      interview_time,
+      location,
+      applicant_count: uniqueIds.length,
+    },
+    request,
+  });
+
+  if (!uniqueIds.length) {
+    return NextResponse.json({ success: true, slot_id: slot.id, notified: 0 });
+  }
+
+  const { data: candidates, error: candErr } = await db
+    .from("applications")
+    .select("id, status, interview_slot_id")
+    .in("id", uniqueIds);
+
+  if (candErr) {
+    return NextResponse.json(
+      { error: "Batch created but could not load applicants", slot_id: slot.id },
+      { status: 500 }
+    );
+  }
+
+  const eligibleIds = [];
+  const skipped = [];
+  for (const row of candidates || []) {
+    if (row.interview_slot_id && row.interview_slot_id !== slot.id) {
+      skipped.push({ id: row.id, reason: "already_assigned_other_batch" });
+      continue;
+    }
+    const current = normalizeApplicationStatus(row.status);
+    if (["called_for_interview", "interview"].includes(current)) {
+      eligibleIds.push(row.id);
+      continue;
+    }
+    const err = assertStatusTransition(current, "called_for_interview");
+    if (!err) eligibleIds.push(row.id);
+    else skipped.push({ id: row.id, reason: "invalid_status_transition" });
+  }
+
+  if (eligibleIds.length === 0) {
+    return NextResponse.json(
+      {
+        error: "No applicants were eligible for interview assignment from their current status.",
+        slot_id: slot.id,
+        skipped,
+      },
+      { status: 409 }
+    );
   }
 
   const nowIso = new Date().toISOString();
@@ -82,19 +141,19 @@ export async function POST(request) {
     .update({
       interview_slot_id: slot.id,
       status: "called_for_interview",
+      interview_date,
+      interview_time,
+      interview_location: location,
       updated_at: nowIso,
     })
-    .in("id", application_ids)
-    .in("status", [
-      "stage_2_approved",
-      "interview_review_pending",
-      "called_for_interview",
-      "interview",
-    ]);
+    .in("id", eligibleIds);
 
   if (updateError) {
     return NextResponse.json(
-      { error: `Slot created but assignment failed: ${updateError.message}` },
+      {
+        error: "Slot created but assignment failed. Cancel or delete the partial batch.",
+        slot_id: slot.id,
+      },
       { status: 500 }
     );
   }
@@ -102,7 +161,7 @@ export async function POST(request) {
   const { data: rows } = await db
     .from("applications")
     .select("id, user_id, full_name, profiles!applications_user_id_fkey(email)")
-    .in("id", application_ids)
+    .in("id", eligibleIds)
     .eq("interview_slot_id", slot.id);
 
   const formattedDate =
@@ -117,26 +176,9 @@ export async function POST(request) {
 
   for (const row of rows || []) {
     const name = row.full_name || "Applicant";
-    const email =
-      Array.isArray(row.profiles)
-        ? row.profiles[0]?.email
-        : row.profiles?.email;
+    const email = Array.isArray(row.profiles) ? row.profiles[0]?.email : row.profiles?.email;
 
-    const messageText = [
-      `Dear ${name},`,
-      ``,
-      `You have been assigned to interview batch "${batch_name}".`,
-      `Date: ${formattedDate}`,
-      `Time: ${interview_time}`,
-      `Location: ${location}`,
-      congratulations_message ? `\nDetails:\n${congratulations_message}` : "",
-      ``,
-      `Please sign in to the Kufuor Scholars applicant portal to view details on your dashboard.`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    await supabase.from("notifications").insert({
+    await gate.supabase.from("notifications").insert({
       user_id: row.user_id,
       title: "Interview batch scheduled",
       message: `${batch_name} — ${formattedDate} at ${interview_time}. Location: ${location}`,
@@ -162,14 +204,18 @@ export async function POST(request) {
               : ""
           }
           <p>Please sign in to the applicant dashboard for any updates.</p>
-          <p>Best,<br/>The Kufuor Scholars Program Team</p>
         `,
-        text: messageText,
+        text: `Interview batch ${batch_name} on ${formattedDate} at ${interview_time}. Location: ${location}`,
         template: "interview_batch",
         meta: { applicantName: name, batchName: batch_name },
       });
     }
   }
 
-  return NextResponse.json({ success: true, slot_id: slot.id, notified: (rows || []).length });
+  return NextResponse.json({
+    success: true,
+    slot_id: slot.id,
+    notified: (rows || []).length,
+    skipped,
+  });
 }

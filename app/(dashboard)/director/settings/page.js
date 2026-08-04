@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { ToggleLeft, Loader2, CheckCircle2, Calendar, Clock } from "lucide-react";
+import { ToggleLeft, Loader2, CheckCircle2, Calendar, Clock, AlertCircle } from "lucide-react";
 
 export default function DirectorSettingsPage() {
-  const supabase = createClient();
   const [applicationsOpen, setApplicationsOpen] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("23:59");
@@ -14,29 +12,29 @@ export default function DirectorSettingsPage() {
   const [savingDeadline, setSavingDeadline] = useState(false);
   const [message, setMessage] = useState(null);
 
-  useEffect(() => {
-    async function load() {
-      const { data: openData } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "applications_open")
-        .single();
-      setApplicationsOpen(openData?.value === "true");
-
-      const { data: deadlineData } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "application_deadline")
-        .single();
-      if (deadlineData?.value) {
+  async function load() {
+    setLoading(true);
+    const res = await fetch("/api/director/settings");
+    const data = await res.json();
+    if (res.ok) {
+      setApplicationsOpen(Boolean(data.applications_open));
+      if (data.application_deadline) {
         try {
-          const d = new Date(deadlineData.value);
+          const d = new Date(data.application_deadline);
           setDeadlineDate(d.toISOString().slice(0, 10));
           setDeadlineTime(d.toTimeString().slice(0, 5));
         } catch (_) {}
+      } else {
+        setDeadlineDate("");
+        setDeadlineTime("23:59");
       }
-      setLoading(false);
+    } else {
+      setMessage({ type: "error", text: data.error || "Failed to load settings" });
     }
+    setLoading(false);
+  }
+
+  useEffect(() => {
     load();
   }, []);
 
@@ -44,22 +42,26 @@ export default function DirectorSettingsPage() {
     setSaving(true);
     setMessage(null);
     const newValue = !applicationsOpen;
-
-    const { error } = await supabase
-      .from("site_settings")
-      .upsert(
-        { key: "applications_open", value: String(newValue), updated_at: new Date().toISOString() },
-        { onConflict: "key" }
-      );
-
-    if (error) {
-      setMessage({ type: "error", text: error.message });
+    const res = await fetch("/api/director/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applications_open: newValue }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setMessage({ type: "error", text: data.error || "Failed to update" });
     } else {
       setApplicationsOpen(newValue);
       setMessage({
         type: "success",
-        text: newValue ? "Applications are now open. Visitors can apply." : "Applications are now closed.",
+        text: newValue ? "Applications are now open." : "Applications are now closed.",
       });
+      if (data.audit_warning) {
+        setMessage({
+          type: "success",
+          text: `${newValue ? "Opened" : "Closed"} (audit warning: settings saved but audit log failed).`,
+        });
+      }
     }
     setSaving(false);
   }
@@ -77,22 +79,18 @@ export default function DirectorSettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Configure site-wide settings visible to visitors.
+          Configure site-wide application settings. Changes are audited.
         </p>
       </div>
 
       {message && (
         <div
-          className={`mb-6 rounded-lg p-4 ${
-            message.type === "error"
-              ? "bg-red-50 text-red-700"
-              : "bg-green-50 text-green-700"
+          className={`mb-6 flex items-start gap-2 rounded-lg p-4 ${
+            message.type === "error" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
           }`}
         >
-          {message.type === "success" && (
-            <CheckCircle2 size={18} className="mb-1 inline" />
-          )}{" "}
-          {message.text}
+          {message.type === "success" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+          <span>{message.text}</span>
         </div>
       )}
 
@@ -102,8 +100,7 @@ export default function DirectorSettingsPage() {
           Application Status
         </h2>
         <p className="mb-6 text-sm text-gray-600">
-          Control whether visitors can apply to the Kufuor Scholars Program. When closed, the homepage will show
-          &ldquo;Applications closed&rdquo; and the Apply Now button will be disabled.
+          Control whether visitors can apply. When closed, the homepage shows Applications closed.
         </p>
 
         <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 p-4">
@@ -111,13 +108,9 @@ export default function DirectorSettingsPage() {
             <p className="font-semibold text-gray-900">
               {applicationsOpen ? "Applications are open" : "Applications are closed"}
             </p>
-            <p className="text-xs text-gray-500">
-              {applicationsOpen
-                ? "Visitors can submit applications."
-                : "Visitors will see that applications are not currently accepted."}
-            </p>
           </div>
           <button
+            type="button"
             onClick={handleToggle}
             disabled={saving}
             className={`relative inline-flex h-10 w-18 flex-shrink-0 cursor-pointer items-center rounded-full transition-colors ${
@@ -138,16 +131,11 @@ export default function DirectorSettingsPage() {
         </div>
       </div>
 
-      {/* Application deadline / countdown */}
       <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
           <Calendar size={20} />
           Application Deadline & Countdown
         </h2>
-        <p className="mb-6 text-sm text-gray-600">
-          Set the date and time when applications close. A countdown will appear on the homepage so visitors know how much time they have left to apply.
-        </p>
-
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500">Date</label>
@@ -168,22 +156,29 @@ export default function DirectorSettingsPage() {
             />
           </div>
           <button
+            type="button"
             onClick={async () => {
               setSavingDeadline(true);
               setMessage(null);
-              const iso = deadlineDate && deadlineTime
-                ? new Date(`${deadlineDate}T${deadlineTime}`).toISOString()
-                : "";
-              const { error } = await supabase
-                .from("site_settings")
-                .upsert(
-                  { key: "application_deadline", value: iso, updated_at: new Date().toISOString() },
-                  { onConflict: "key" }
-                );
-              if (error) {
-                setMessage({ type: "error", text: error.message });
+              const iso =
+                deadlineDate && deadlineTime
+                  ? new Date(`${deadlineDate}T${deadlineTime}`).toISOString()
+                  : "";
+              const res = await fetch("/api/director/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ application_deadline: iso }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setMessage({ type: "error", text: data.error || "Failed to save deadline" });
               } else {
-                setMessage({ type: "success", text: iso ? `Deadline set to ${new Date(iso).toLocaleString()}. Countdown will appear on the homepage.` : "Deadline cleared. Countdown will no longer appear." });
+                setMessage({
+                  type: "success",
+                  text: iso
+                    ? `Deadline set to ${new Date(iso).toLocaleString()}.`
+                    : "Deadline cleared.",
+                });
               }
               setSavingDeadline(false);
             }}
@@ -195,6 +190,7 @@ export default function DirectorSettingsPage() {
           </button>
           {deadlineDate && (
             <button
+              type="button"
               onClick={() => {
                 setDeadlineDate("");
                 setDeadlineTime("23:59");

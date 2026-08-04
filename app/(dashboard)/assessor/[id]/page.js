@@ -174,7 +174,7 @@ export default function AssessorApplicantDetailPage() {
       setMessage({ success: "", error: data.error || "Could not save assessment." });
       return;
     }
-    setMessage({ error: "", success: `Saved. Application moved to ${data.status.replace(/_/g, " ")}.` });
+    setMessage({ error: "", success: data.message || "Recommendation saved. Official status unchanged." });
     setTimeout(() => router.push("/assessor"), 900);
   }
 
@@ -201,14 +201,14 @@ export default function AssessorApplicantDetailPage() {
   const recommendationOptions =
     stage === "stage_1"
       ? [
-          { value: "advance", label: "Advance to Stage 2" },
-          { value: "hold", label: "Hold / defer Stage 1" },
-          { value: "reject", label: "Reject" },
+          { value: "recommend_progress", label: "Recommend progress to Stage 2" },
+          { value: "recommend_hold", label: "Recommend hold / defer Stage 1" },
+          { value: "recommend_reject", label: "Recommend rejection" },
         ]
       : [
           { value: "recommend_interview", label: "Recommend for interview" },
-          { value: "hold", label: "Hold / defer Stage 2" },
-          { value: "reject", label: "Reject" },
+          { value: "recommend_hold", label: "Recommend hold / defer Stage 2" },
+          { value: "recommend_reject", label: "Recommend rejection" },
         ];
 
   return (
@@ -274,9 +274,11 @@ export default function AssessorApplicantDetailPage() {
 
         <form onSubmit={submitAssessment} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="flex items-center gap-2 font-bold text-gray-900">
-            <GraduationCap size={18} /> {stage === "stage_1" ? "Stage 1" : "Stage 2"} assessment
+            <GraduationCap size={18} /> {stage === "stage_1" ? "Stage 1" : "Stage 2"} recommendation
           </h2>
-          <p className="mt-1 text-sm text-gray-500">Score each category from 1 to 5.</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Score each category from 1 to 5. Your recommendation is advisory — the Director updates the official application status.
+          </p>
 
           <div className="mt-6 space-y-4">
             {scoreFields.map((field) => (
@@ -334,7 +336,7 @@ export default function AssessorApplicantDetailPage() {
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-royal disabled:opacity-50"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-            Save assessment
+            Save recommendation
           </button>
         </form>
       </div>

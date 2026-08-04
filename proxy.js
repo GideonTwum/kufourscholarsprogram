@@ -1,10 +1,14 @@
 import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse } from "next/server";
+import { dashboardPathForRole, isDirectorRole } from "@/lib/roles";
+import { loginPathForProtectedRoute } from "@/lib/portal-auth";
 
 const protectedRoutes = ["/applicant", "/director", "/panel", "/assessor"];
 const authRoutes = [
   "/login",
   "/director-login",
+  "/assessor-login",
+  "/panel-login",
   "/register",
   "/applicant-register",
 ];
@@ -14,27 +18,40 @@ function applicantNeedsEmailVerification(user) {
   return user.email_confirmed_at == null;
 }
 
-/** DB role when readable; else JWT user_metadata.role (set at director/panel/assessor signup). */
-function roleFromSession(user, profileRow) {
-  const fromDb = profileRow?.role;
-  if (typeof fromDb === "string" && fromDb) return fromDb;
-  const meta = user?.user_metadata?.role;
-  if (typeof meta === "string" && meta) return meta;
-  return undefined;
-}
-
-async function fetchProfileRole(supabase, userId) {
-  if (!supabase || !userId) return undefined;
-  const { data: profile } = await supabase
+async function fetchProfile(supabase, userId) {
+  if (!supabase || !userId) return null;
+  const { data: profile, error } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, is_active")
     .eq("id", userId)
     .maybeSingle();
-  return profile?.role;
+  if (error) {
+    console.error("[proxy] profile fetch failed:", {
+      code: error.code || null,
+      message: error.message || null,
+      details: error.details || null,
+      hint: error.hint || null,
+    });
+    return null;
+  }
+  return profile;
 }
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
+
+  const isDirectorSignup =
+    pathname === "/director/signup" || pathname.startsWith("/director/signup/");
+  if (isDirectorSignup) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/director-login";
+    return NextResponse.redirect(url);
+  }
+
+  const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r));
+  const verifyEmailPath =
+    pathname === "/applicant/verify-email" || pathname.startsWith("/applicant/verify-email/");
+  const isProtected = !isAuthRoute && protectedRoutes.some((r) => pathname.startsWith(r));
 
   let supabase;
   let user;
@@ -43,42 +60,54 @@ export async function proxy(request) {
     ({ supabase, user, supabaseResponse } = await updateSession(request));
   } catch (err) {
     console.error("[middleware] session update failed:", err?.message ?? err);
-    return NextResponse.next({ request });
-  }
-
-  const isDirectorSignup =
-    pathname === "/director/signup" || pathname.startsWith("/director/signup/");
-  if (user && isDirectorSignup && supabase) {
-    const role = roleFromSession(user, { role: await fetchProfileRole(supabase, user.id) });
-    if (role === "director") {
+    if (isProtected) {
       const url = request.nextUrl.clone();
-      url.pathname = "/director";
+      url.pathname = loginPathForProtectedRoute(pathname);
       return NextResponse.redirect(url);
     }
+    return NextResponse.next({ request });
   }
-
-  const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r));
-  const verifyEmailPath =
-    pathname === "/applicant/verify-email" || pathname.startsWith("/applicant/verify-email/");
-
-  const isProtected =
-    !isAuthRoute && !isDirectorSignup && protectedRoutes.some((r) => pathname.startsWith(r));
 
   if (isProtected) {
     if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = pathname.startsWith("/director") ? "/director-login" : "/login";
+      url.pathname = loginPathForProtectedRoute(pathname);
       return NextResponse.redirect(url);
     }
 
-    const role = roleFromSession(user, {
-      role: supabase ? await fetchProfileRole(supabase, user.id) : undefined,
-    });
+    const profile = await fetchProfile(supabase, user.id);
+    const role = typeof profile?.role === "string" ? profile.role : undefined;
+    if (!role) {
+      const url = request.nextUrl.clone();
+      url.pathname = loginPathForProtectedRoute(pathname);
+      return NextResponse.redirect(url);
+    }
+
+    if (pathname.startsWith("/panel") && role === "panel" && profile?.is_active === false) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/panel-login";
+      url.searchParams.set("deactivated", "1");
+      return NextResponse.redirect(url);
+    }
+
+    if (pathname.startsWith("/assessor") && role === "assessor" && profile?.is_active === false) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/assessor-login";
+      url.searchParams.set("deactivated", "1");
+      return NextResponse.redirect(url);
+    }
+
+    if (pathname.startsWith("/director") && isDirectorRole(role) && profile?.is_active === false) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/director-login";
+      url.searchParams.set("deactivated", "1");
+      return NextResponse.redirect(url);
+    }
 
     if (
       pathname.startsWith("/applicant") &&
       !verifyEmailPath &&
-      (role === "applicant" || role == null) &&
+      (role === "applicant" || role === "scholar") &&
       applicantNeedsEmailVerification(user)
     ) {
       const url = request.nextUrl.clone();
@@ -87,25 +116,25 @@ export async function proxy(request) {
     }
 
     if (pathname.startsWith("/director")) {
-      if (role !== "director") {
+      if (!isDirectorRole(role)) {
         const url = request.nextUrl.clone();
-        url.pathname = role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
+        url.pathname = dashboardPathForRole(role);
         return NextResponse.redirect(url);
       }
     } else if (pathname.startsWith("/panel")) {
       if (role !== "panel") {
         const url = request.nextUrl.clone();
-        url.pathname = role === "director" ? "/director" : role === "assessor" ? "/assessor" : "/applicant";
+        url.pathname = dashboardPathForRole(role);
         return NextResponse.redirect(url);
       }
     } else if (pathname.startsWith("/assessor")) {
       if (role !== "assessor") {
         const url = request.nextUrl.clone();
-        url.pathname = role === "director" ? "/director" : role === "panel" ? "/panel" : "/applicant";
+        url.pathname = dashboardPathForRole(role);
         return NextResponse.redirect(url);
       }
     } else if (pathname.startsWith("/applicant")) {
-      if (role === "director") {
+      if (isDirectorRole(role)) {
         const url = request.nextUrl.clone();
         url.pathname = "/director";
         return NextResponse.redirect(url);
@@ -124,26 +153,24 @@ export async function proxy(request) {
   }
 
   if (isAuthRoute && user) {
-    const role =
-      roleFromSession(user, {
-        role: supabase ? await fetchProfileRole(supabase, user.id) : undefined,
-      }) ?? "applicant";
+    const profile = await fetchProfile(supabase, user.id);
+    const role = typeof profile?.role === "string" ? profile.role : undefined;
+    if (!role) {
+      return supabaseResponse;
+    }
+    if (
+      (role === "panel" || role === "assessor" || isDirectorRole(role)) &&
+      profile?.is_active === false &&
+      (pathname.startsWith("/panel-login") ||
+        pathname.startsWith("/assessor-login") ||
+        pathname.startsWith("/director-login") ||
+        pathname.startsWith("/login"))
+    ) {
+      // Allow staying on login to see deactivated message after failed gate
+      return supabaseResponse;
+    }
     const url = request.nextUrl.clone();
-
-    if (pathname.startsWith("/director-login")) {
-      url.pathname =
-        role === "director" ? "/director" : role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
-      return NextResponse.redirect(url);
-    }
-
-    if (pathname === "/login" || pathname.startsWith("/login/")) {
-      url.pathname =
-        role === "director" ? "/director" : role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
-      return NextResponse.redirect(url);
-    }
-
-    url.pathname =
-      role === "director" ? "/director" : role === "panel" ? "/panel" : role === "assessor" ? "/assessor" : "/applicant";
+    url.pathname = dashboardPathForRole(role);
     return NextResponse.redirect(url);
   }
 

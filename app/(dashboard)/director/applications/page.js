@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { isDirectorRole } from "@/lib/roles";
 import {
   FileText,
   Filter,
@@ -216,7 +217,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
     .eq("id", user.id)
     .single();
 
-  if (directorProfile?.role !== "director") redirect("/director-login");
+  if (!isDirectorRole(directorProfile?.role)) redirect("/director-login");
 
   const params = await searchParams;
   const statusFilter = params?.status || "";

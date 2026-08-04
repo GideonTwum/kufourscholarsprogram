@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 import { getDirectorStageActions } from "@/lib/director-stage-actions";
+import { evaluatorDisplayName } from "@/lib/staff-lifecycle";
 import DirectorStageActionBar from "../../components/DirectorStageActionBar";
 
 const statusFlow = [
@@ -153,6 +154,8 @@ export default function ApplicationReviewPage() {
   const [rejectReasonDraft, setRejectReasonDraft] = useState("");
   const [activeTab, setActiveTab] = useState("stage1");
   const [evaluation, setEvaluation] = useState(null);
+  const [panelEvalHistory, setPanelEvalHistory] = useState([]);
+  const [assessorReviews, setAssessorReviews] = useState([]);
   const [scores, setScores] = useState({});
   const [evalNotes, setEvalNotes] = useState("");
   const [savingEval, setSavingEval] = useState(false);
@@ -194,11 +197,33 @@ export default function ApplicationReviewPage() {
         setNotes(app.director_notes || "");
       }
 
-      const { data: evalRow } = await supabase
+      const {
+        data: { user: me },
+      } = await supabase.auth.getUser();
+
+      const { data: evalRows } = await supabase
         .from("interview_evaluations")
         .select("*")
         .eq("application_id", id)
-        .maybeSingle();
+        .order("updated_at", { ascending: false });
+
+      const rows = evalRows || [];
+      setPanelEvalHistory(rows);
+
+      const { data: assessorRows } = await supabase
+        .from("application_assessments")
+        .select(
+          "id, stage, academic_score, leadership_score, service_score, communication_score, overall_score, recommendation, notes, submitted_at, assessor_name_snapshot, assessor_email_snapshot, assessor_id"
+        )
+        .eq("application_id", id)
+        .order("submitted_at", { ascending: false });
+
+      setAssessorReviews(assessorRows || []);
+
+      const evalRow =
+        rows.find((r) => r.evaluator_id === me?.id) ||
+        rows.find((r) => !r.evaluator_id) ||
+        null;
 
       if (evalRow) {
         setEvaluation(evalRow);
@@ -637,6 +662,49 @@ export default function ApplicationReviewPage() {
             Score each criterion from 1 (Low) to 5 (High). The weighted total is calculated automatically.
           </p>
 
+          {panelEvalHistory.length > 0 && (
+            <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Panel evaluation history
+              </p>
+              <ul className="space-y-2">
+                {panelEvalHistory.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm text-gray-800"
+                  >
+                    <span>
+                      <span className="font-medium">{evaluatorDisplayName(row)}</span>
+                      {row.evaluator_email_snapshot ? (
+                        <span className="ml-2 text-xs text-gray-500">{row.evaluator_email_snapshot}</span>
+                      ) : null}
+                    </span>
+                    <span className="text-xs text-gray-600">
+                      {row.total_weighted_score != null
+                        ? `${Number(row.total_weighted_score).toFixed(2)}%`
+                        : "—"}
+                      {row.updated_at
+                        ? ` · ${new Date(row.updated_at).toLocaleString()}`
+                        : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {panelEvalHistory.some((r) => r.notes) && (
+                <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+                  {panelEvalHistory
+                    .filter((r) => r.notes)
+                    .map((r) => (
+                      <p key={`notes-${r.id}`} className="text-xs text-gray-600">
+                        <span className="font-medium text-gray-800">{evaluatorDisplayName(r)}:</span>{" "}
+                        {r.notes}
+                      </p>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-4">
             {INTERVIEW_CRITERIA.map((c) => (
               <div key={c.key} className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-100 p-4">
@@ -700,6 +768,41 @@ export default function ApplicationReviewPage() {
                 </div>
               )}
           </div>
+        </div>
+      )}
+
+      {assessorReviews.length > 0 && (
+        <div className="mt-8 rounded-xl border border-amber-100 bg-amber-50/60 p-6 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-900">Assessor recommendations</h3>
+          <p className="mt-1 text-xs text-gray-600">
+            Advisory only. Official application status is unchanged until you take Director action below.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {assessorReviews.map((row) => (
+              <li key={row.id} className="rounded-lg border border-amber-100 bg-white p-4 text-sm">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="font-medium text-gray-900">
+                    {row.assessor_name_snapshot || row.assessor_email_snapshot || "Assessor"}
+                    {row.assessor_email_snapshot ? (
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        {row.assessor_email_snapshot}
+                      </span>
+                    ) : null}
+                  </p>
+                  <span className="text-xs text-gray-500">
+                    {row.stage?.replace(/_/g, " ")} ·{" "}
+                    {row.submitted_at ? new Date(row.submitted_at).toLocaleString() : "—"}
+                  </span>
+                </div>
+                <p className="mt-2 text-royal">
+                  Recommendation:{" "}
+                  <strong>{(row.recommendation || "").replace(/_/g, " ")}</strong>
+                  {row.overall_score != null ? ` · Score ${Number(row.overall_score).toFixed(2)}` : ""}
+                </p>
+                {row.notes ? <p className="mt-2 text-xs text-gray-600">{row.notes}</p> : null}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { isDirectorRole } from "@/lib/roles";
 
 export async function POST() {
   const supabase = await createClient();
@@ -18,7 +19,7 @@ export async function POST() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "director") {
+  if (isDirectorRole(profile?.role)) {
     return NextResponse.json(
       { error: "Directors use the director portal to message applicants" },
       { status: 400 }

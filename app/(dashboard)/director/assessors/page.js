@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2, Mail, UserPlus, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, UserPlus, Users } from "lucide-react";
 
 function applicantName(app) {
   return app.full_name || app.profiles?.full_name || app.profiles?.email || "Applicant";
@@ -16,7 +16,9 @@ export default function DirectorAssessorsPage() {
   const [selectedApplications, setSelectedApplications] = useState([]);
   const [inviteForm, setInviteForm] = useState({ full_name: "", email: "" });
   const [busy, setBusy] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(null);
   const [message, setMessage] = useState({ error: "", success: "" });
+  const [createdCredentials, setCreatedCredentials] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -26,7 +28,8 @@ export default function DirectorAssessorsPage() {
       setAssessors(data.assessors || []);
       setApplications(data.applications || []);
       setAssignments(data.assignments || []);
-      if (!selectedAssessor && data.assessors?.[0]) setSelectedAssessor(data.assessors[0].id);
+      const active = (data.assessors || []).filter((a) => a.is_active !== false);
+      if (!selectedAssessor && active[0]) setSelectedAssessor(active[0].id);
     } else {
       setMessage({ success: "", error: data.error || "Failed to load assessors." });
     }
@@ -37,6 +40,11 @@ export default function DirectorAssessorsPage() {
     load();
   }, []);
 
+  const activeAssessors = useMemo(
+    () => assessors.filter((a) => a.is_active !== false),
+    [assessors]
+  );
+
   const assignedByApplication = useMemo(() => {
     const map = {};
     assignments.forEach((row) => {
@@ -45,11 +53,12 @@ export default function DirectorAssessorsPage() {
     return map;
   }, [assignments]);
 
-  async function inviteAssessor(e) {
+  async function createAssessor(e) {
     e.preventDefault();
     setBusy(true);
     setMessage({ error: "", success: "" });
-    const res = await fetch("/api/assessor/invite", {
+    setCreatedCredentials(null);
+    const res = await fetch("/api/director/assessors/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(inviteForm),
@@ -57,11 +66,19 @@ export default function DirectorAssessorsPage() {
     const data = await res.json();
     setBusy(false);
     if (!res.ok) {
-      setMessage({ success: "", error: data.error || "Invite failed." });
+      setMessage({ success: "", error: data.error || "Create failed." });
       return;
     }
     setInviteForm({ full_name: "", email: "" });
-    setMessage({ error: "", success: data.message || "Invite sent." });
+    setCreatedCredentials({
+      email: data.email,
+      temporary_password: data.temporary_password,
+      login_url: data.login_url || "/assessor-login",
+    });
+    setMessage({
+      error: "",
+      success: data.message || "Assessor account created. Copy the password now.",
+    });
     load();
   }
 
@@ -92,9 +109,87 @@ export default function DirectorAssessorsPage() {
     load();
   }
 
+  async function lifecycleAction(id, action) {
+    if (action === "deactivate") {
+      const ok = confirm(
+        "Deactivate this assessor? They will no longer be able to log in or receive assignments. Existing assignments and assessment history will be preserved."
+      );
+      if (!ok) return;
+    }
+    if (action === "reactivate") {
+      const ok = confirm("Reactivate this assessor so they can sign in and receive assignments again?");
+      if (!ok) return;
+    }
+    setLifecycleBusy(id);
+    setMessage({ error: "", success: "" });
+    const res = await fetch(`/api/director/assessors/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json();
+    setLifecycleBusy(null);
+    if (!res.ok) {
+      setMessage({ success: "", error: data.error || "Action failed" });
+      return;
+    }
+    setMessage({ error: "", success: data.message || "Updated." });
+    load();
+  }
+
+  async function permanentlyDelete(id) {
+    const member = assessors.find((m) => m.id === id);
+    if ((member?.assessment_count || 0) > 0 || (member?.assignment_count || 0) > 0) {
+      setMessage({
+        success: "",
+        error:
+          "This assessor has assignment or assessment history and cannot be permanently deleted. Deactivate the account instead.",
+      });
+      return;
+    }
+    const ok = confirm(
+      "Permanently delete this assessor account? This is only allowed when the assessor has no assignment or assessment history."
+    );
+    if (!ok) return;
+    setLifecycleBusy(id);
+    setMessage({ error: "", success: "" });
+    const res = await fetch(`/api/director/assessors/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    setLifecycleBusy(null);
+    if (!res.ok) {
+      setMessage({ success: "", error: data.error || "Delete failed" });
+      return;
+    }
+    setMessage({ error: "", success: data.message || "Deleted." });
+    if (selectedAssessor === id) setSelectedAssessor("");
+    load();
+  }
+
+  async function unassignApplication(applicationId) {
+    const ok = confirm(
+      "Unassign the active assessor from this applicant? Assessment history will be preserved."
+    );
+    if (!ok) return;
+    setBusy(true);
+    setMessage({ error: "", success: "" });
+    const res = await fetch("/api/director/assessor-assignments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "unassign", application_id: applicationId }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) {
+      setMessage({ success: "", error: data.error || "Unassign failed" });
+      return;
+    }
+    setMessage({ error: "", success: data.message || "Unassigned." });
+    load();
+  }
+
   function toggleApplication(id) {
     setSelectedApplications((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   }
 
@@ -103,7 +198,8 @@ export default function DirectorAssessorsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Assessors</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Invite assessor accounts and assign applicants for pre-interview review.
+          Create assessor credentials, assign applicants, and manage account lifecycle. Assessors recommend
+          only — Directors make official status decisions. Login: /assessor-login (no public signup).
         </p>
       </div>
 
@@ -118,11 +214,40 @@ export default function DirectorAssessorsPage() {
         </div>
       )}
 
+      {createdCredentials && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Temporary credentials (shown once)</p>
+          <p className="mt-2">
+            Email: <code className="rounded bg-white px-1">{createdCredentials.email}</code>
+          </p>
+          <p className="mt-1">
+            Password:{" "}
+            <code className="rounded bg-white px-1">{createdCredentials.temporary_password}</code>
+          </p>
+          <p className="mt-1">
+            Login: <code className="rounded bg-white px-1">{createdCredentials.login_url}</code>
+          </p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-royal px-3 py-1.5 text-xs font-semibold text-white"
+            onClick={() => {
+              const text = `Email: ${createdCredentials.email}\nPassword: ${createdCredentials.temporary_password}\nLogin: ${typeof window !== "undefined" ? window.location.origin : ""}${createdCredentials.login_url}`;
+              navigator.clipboard?.writeText(text);
+            }}
+          >
+            Copy credentials
+          </button>
+          <p className="mt-2 text-xs text-amber-800">
+            Share securely out of band. Passwords are not stored. Leave this page and the password cannot be recovered from the app.
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-8 lg:grid-cols-[1fr_1.4fr]">
         <div className="space-y-8">
-          <form onSubmit={inviteAssessor} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+          <form onSubmit={createAssessor} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
-              <UserPlus size={18} /> Invite Assessor
+              <UserPlus size={18} /> Create Assessor Account
             </h2>
             <div className="space-y-4">
               <div>
@@ -132,6 +257,7 @@ export default function DirectorAssessorsPage() {
                   onChange={(e) => setInviteForm((f) => ({ ...f, full_name: e.target.value }))}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                   placeholder="Dr. Jane Doe"
+                  required
                 />
               </div>
               <div>
@@ -150,8 +276,8 @@ export default function DirectorAssessorsPage() {
                 disabled={busy}
                 className="flex items-center gap-2 rounded-lg bg-royal px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {busy ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
-                Send invite
+                {busy ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                Create account
               </button>
             </div>
           </form>
@@ -163,18 +289,73 @@ export default function DirectorAssessorsPage() {
             {loading ? (
               <Loader2 className="h-6 w-6 animate-spin text-royal" />
             ) : assessors.length === 0 ? (
-              <p className="text-sm text-gray-500">No assessors invited yet.</p>
+              <p className="text-sm text-gray-500">No assessors yet.</p>
             ) : (
               <div className="space-y-3">
-                {assessors.map((assessor) => (
-                  <div key={assessor.id} className="rounded-lg border border-gray-100 p-3">
-                    <p className="font-medium text-gray-900">{assessor.full_name || "—"}</p>
-                    <p className="text-sm text-gray-500">{assessor.email}</p>
-                    <p className="mt-1 text-xs font-semibold text-royal">
-                      {assessor.active_assignment_count || 0} active assignment(s)
-                    </p>
-                  </div>
-                ))}
+                {assessors.map((assessor) => {
+                  const active = assessor.is_active !== false;
+                  const busyId = lifecycleBusy === assessor.id;
+                  const hasHistory =
+                    (assessor.assessment_count || 0) > 0 || (assessor.assignment_count || 0) > 0;
+                  return (
+                    <div key={assessor.id} className="rounded-lg border border-gray-100 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-gray-900">{assessor.full_name || "—"}</p>
+                          <p className="text-sm text-gray-500">{assessor.email}</p>
+                          <p className="mt-1 text-xs text-gray-400">
+                            {assessor.active_assignment_count || 0} active ·{" "}
+                            {assessor.assessment_count || 0} assessment(s)
+                            {assessor.created_at
+                              ? ` · Created ${new Date(assessor.created_at).toLocaleDateString()}`
+                              : ""}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {active ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {active ? (
+                          <button
+                            type="button"
+                            disabled={busyId}
+                            onClick={() => lifecycleAction(assessor.id, "deactivate")}
+                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busyId}
+                            onClick={() => lifecycleAction(assessor.id, "reactivate")}
+                            className="rounded-lg border border-royal/30 bg-royal/5 px-3 py-1.5 text-xs font-medium text-royal disabled:opacity-50"
+                          >
+                            Reactivate
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={busyId || hasHistory}
+                          title={
+                            hasHistory
+                              ? "Cannot permanently delete — history exists. Deactivate instead."
+                              : "Permanently delete unused account"
+                          }
+                          onClick={() => permanentlyDelete(assessor.id)}
+                          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Permanently Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -183,7 +364,8 @@ export default function DirectorAssessorsPage() {
         <form onSubmit={assignApplications} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="font-bold text-gray-900">Assign Applicants</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Select an assessor, then assign applicants awaiting review. Target load is about 200 applicants per assessor.
+            One active assessor per applicant. Assigning when another assessor is active will reassign.
+            Inactive assessors are excluded.
           </p>
 
           <div className="mt-5">
@@ -194,7 +376,7 @@ export default function DirectorAssessorsPage() {
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             >
               <option value="">Select assessor</option>
-              {assessors.map((assessor) => (
+              {activeAssessors.map((assessor) => (
                 <option key={assessor.id} value={assessor.id}>
                   {assessor.full_name || assessor.email} ({assessor.active_assignment_count || 0})
                 </option>
@@ -215,18 +397,17 @@ export default function DirectorAssessorsPage() {
               applications.map((app) => {
                 const assignedTo = assignedByApplication[app.id];
                 return (
-                  <label
+                  <div
                     key={app.id}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-100 p-3"
+                    className="flex items-start gap-3 rounded-lg border border-gray-100 p-3"
                   >
                     <input
                       type="checkbox"
                       checked={selectedApplications.includes(app.id)}
-                      disabled={!!assignedTo && assignedTo !== selectedAssessor}
                       onChange={() => toggleApplication(app.id)}
                       className="mt-1"
                     />
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium text-gray-900">{applicantName(app)}</p>
                       <p className="text-xs text-gray-500">
                         {app.profiles?.email || "No email"} · {app.university || "No university"}
@@ -235,10 +416,22 @@ export default function DirectorAssessorsPage() {
                         {app.status?.replace(/_/g, " ") || "—"}
                       </p>
                       {assignedTo && assignedTo !== selectedAssessor && (
-                        <p className="mt-1 text-xs text-amber-700">Already assigned to another assessor</p>
+                        <p className="mt-1 text-xs text-amber-700">
+                          Currently assigned to another assessor — assigning will reassign
+                        </p>
+                      )}
+                      {assignedTo && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => unassignApplication(app.id)}
+                          className="mt-2 text-xs font-medium text-gray-600 underline hover:text-royal"
+                        >
+                          Unassign
+                        </button>
                       )}
                     </div>
-                  </label>
+                  </div>
                 );
               })
             )}

@@ -1,90 +1,101 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, Send, Loader2, AlertCircle } from "lucide-react";
 import {
-  ArrowLeft, Send, Loader2, Globe, FileText, Search, Users, Video,
-} from "lucide-react";
-
-const audiences = [
-  { value: "all", label: "All applicants", icon: Globe },
-  { value: "draft", label: "Draft applications", icon: FileText },
-  { value: "stage_1_submitted", label: "Stage 1 under review", icon: Search },
-  { value: "stage_1_approved", label: "Stage 1 approved (Stage 2)", icon: Users },
-  { value: "stage_2_submitted", label: "Stage 2 submitted", icon: Users },
-  { value: "stage_2_approved", label: "Stage 2 approved", icon: Users },
-  { value: "called_for_interview", label: "Called for interview", icon: Video },
-  { value: "accepted", label: "Accepted", icon: Video },
-  { value: "rejected", label: "Rejected", icon: Video },
-];
+  ANNOUNCEMENT_AUDIENCES,
+  ANNOUNCEMENT_AUDIENCE_LABELS,
+} from "@/lib/announcement-audiences";
 
 export default function NewAnnouncementPage() {
-  const supabase = createClient();
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [audience, setAudience] = useState("all");
+  const [audience, setAudience] = useState("all_applicants");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim() || !body.trim()) return;
     setSending(true);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase.from("announcements").insert({
-      director_id: user.id,
-      title: title.trim(),
-      body: body.trim(),
-      audience,
+    setError("");
+    const res = await fetch("/api/director/announcements", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim(), content: body.trim(), audience }),
     });
-
-    if (!error) router.push("/director/announcements");
+    const data = await res.json();
     setSending(false);
+    if (!res.ok) {
+      setError(data.error || "Failed to create announcement");
+      return;
+    }
+    router.push("/director/announcements");
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <div className="mb-8 flex items-center gap-3">
-        <Link href="/director/announcements" className="text-gray-400 hover:text-royal"><ArrowLeft size={20} /></Link>
+        <Link href="/director/announcements" className="text-gray-400 hover:text-royal">
+          <ArrowLeft size={20} />
+        </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">New Announcement</h1>
-          <p className="mt-1 text-sm text-gray-500">Broadcast a message to applicants.</p>
+          <p className="text-sm text-gray-500">Choose a canonical audience for launch targeting.</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl bg-white p-6 shadow-sm sm:p-8">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Title</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title" className="w-full rounded-lg border border-gray-200 p-3 text-sm text-gray-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20" required />
+      {error && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <AlertCircle size={16} /> {error}
         </div>
+      )}
 
+      <form onSubmit={handleSubmit} className="max-w-2xl space-y-5 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Message</label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} placeholder="Write your announcement..." className="w-full rounded-lg border border-gray-200 p-3 text-sm text-gray-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20" required />
+          <label className="mb-1 block text-xs font-medium text-gray-500">Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            required
+          />
         </div>
-
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">Target Audience</label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {audiences.map((a) => (
-              <button key={a.value} type="button" onClick={() => setAudience(a.value)} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${audience === a.value ? "border-royal bg-royal/5 text-royal" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
-                <a.icon size={14} /> {a.label}
-              </button>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Audience</label>
+          <select
+            value={audience}
+            onChange={(e) => setAudience(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          >
+            {ANNOUNCEMENT_AUDIENCES.map((a) => (
+              <option key={a} value={a}>
+                {ANNOUNCEMENT_AUDIENCE_LABELS[a]}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
-
-        <div className="flex justify-end">
-          <button type="submit" disabled={sending || !title.trim() || !body.trim()} className="flex items-center gap-1.5 rounded-lg bg-gold px-6 py-2.5 text-sm font-bold text-royal hover:bg-gold-light disabled:opacity-50">
-            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            Publish Announcement
-          </button>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Content</label>
+          <textarea
+            rows={8}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 p-3 text-sm"
+            required
+          />
         </div>
+        <button
+          type="submit"
+          disabled={sending}
+          className="inline-flex items-center gap-2 rounded-lg bg-royal px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          Publish
+        </button>
       </form>
     </div>
   );

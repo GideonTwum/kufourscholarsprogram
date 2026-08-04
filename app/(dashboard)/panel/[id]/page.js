@@ -234,12 +234,18 @@ export default function PanelApplicantDetailPage() {
   async function saveEvaluation() {
     setSavingEval(true);
     const { data: user } = (await supabase.auth.getUser()).data;
+    const { data: myProfile } = user?.id
+      ? await supabase.from("profiles").select("full_name, email").eq("id", user.id).maybeSingle()
+      : { data: null };
     const payload = {
       application_id: id,
       evaluator_id: user?.id,
       notes: evalNotes,
       total_weighted_score: Math.round(weightedTotal * 100) / 100,
       updated_at: new Date().toISOString(),
+      evaluator_name_snapshot:
+        myProfile?.full_name || myProfile?.email || undefined,
+      evaluator_email_snapshot: myProfile?.email || undefined,
     };
     INTERVIEW_CRITERIA.forEach((c) => {
       const v = scores[c.key];

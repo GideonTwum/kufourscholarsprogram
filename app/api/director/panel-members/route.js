@@ -1,39 +1,24 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-
-async function requireDirector(supabase) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  }
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (prof?.role !== "director") {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-  return { user };
-}
+import { requireActiveDirector } from "@/lib/director-auth";
+import { recordDirectorAudit } from "@/lib/audit/director-audit";
 
 export async function GET() {
-  const supabase = await createClient();
-  const gate = await requireDirector(supabase);
+  const gate = await requireActiveDirector();
   if (gate.error) return gate.error;
 
-  const { data, error } = await supabase
+  const { data, error } = await gate.supabase
     .from("panel_members")
     .select("id, full_name, email, phone, role, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load panel members" }, { status: 500 });
   }
   return NextResponse.json({ panel_members: data || [] });
 }
 
 export async function POST(request) {
-  const supabase = await createClient();
-  const gate = await requireDirector(supabase);
+  const gate = await requireActiveDirector();
   if (gate.error) return gate.error;
 
   let body;
@@ -48,7 +33,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "full_name and email are required." }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await gate.supabase
     .from("panel_members")
     .insert({
       full_name: full_name.trim(),
@@ -60,14 +45,23 @@ export async function POST(request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create panel member" }, { status: 500 });
   }
+
+  await recordDirectorAudit({
+    actor: gate.profile,
+    action: "panel_roster.created",
+    entityType: "panel_member",
+    entityId: data.id,
+    newValue: { email: email.trim().toLowerCase(), full_name: full_name.trim() },
+    request,
+  });
+
   return NextResponse.json({ success: true, id: data.id });
 }
 
 export async function DELETE(request) {
-  const supabase = await createClient();
-  const gate = await requireDirector(supabase);
+  const gate = await requireActiveDirector();
   if (gate.error) return gate.error;
 
   const { searchParams } = new URL(request.url);
@@ -76,9 +70,25 @@ export async function DELETE(request) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  const { error } = await supabase.from("panel_members").delete().eq("id", id);
+  const { data: existing } = await gate.supabase
+    .from("panel_members")
+    .select("id, email, full_name")
+    .eq("id", id)
+    .maybeSingle();
+
+  const { error } = await gate.supabase.from("panel_members").delete().eq("id", id);
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete panel member" }, { status: 500 });
   }
+
+  await recordDirectorAudit({
+    actor: gate.profile,
+    action: "panel_roster.deleted",
+    entityType: "panel_member",
+    entityId: id,
+    oldValue: existing || null,
+    request,
+  });
+
   return NextResponse.json({ success: true });
 }

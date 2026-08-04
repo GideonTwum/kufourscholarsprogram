@@ -1,16 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { isDirectorRole } from "@/lib/roles";
+import { sanitizeStoragePath, isOwnerStoragePath } from "@/lib/storage-path";
 
 const BUCKET = "applications";
-const EXPIRE_SECONDS = 3600; // 1 hour
+const EXPIRE_SECONDS = 3600;
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const path = searchParams.get("path");
+  const rawPath = searchParams.get("path");
 
-  if (!path || typeof path !== "string") {
-    return NextResponse.json({ error: "Missing path" }, { status: 400 });
+  const sanitized = sanitizeStoragePath(rawPath);
+  if (!sanitized.ok) {
+    return NextResponse.json({ error: sanitized.error }, { status: 400 });
   }
+  const path = sanitized.path;
 
   const supabase = await createClient();
   const {
@@ -24,26 +28,25 @@ export async function GET(request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, is_active")
     .eq("id", user.id)
     .single();
 
-  const isDirector = profile?.role === "director";
-  const isPanel = profile?.role === "panel";
-  const isAssessor = profile?.role === "assessor";
-  const isOwner = path.startsWith(`${user.id}/`);
+  const isDirector = isDirectorRole(profile?.role) && profile?.is_active !== false;
+  const isPanel = profile?.role === "panel" && profile?.is_active !== false;
+  const isAssessor = profile?.role === "assessor" && profile?.is_active !== false;
+  const isOwner = isOwnerStoragePath(path, user.id);
+  const ownerUserId = path.split("/")[0];
 
   const allowed =
     isDirector ||
     isOwner ||
     (await (async () => {
-      const prefix = path.split("/")[0];
-
       if (isPanel) {
         const { data: app } = await supabase
           .from("applications")
           .select("id")
-          .eq("user_id", prefix)
+          .eq("user_id", ownerUserId)
           .in("status", ["called_for_interview", "interview"])
           .maybeSingle();
         return !!app;
@@ -53,7 +56,7 @@ export async function GET(request) {
         const { data: app } = await supabase
           .from("applications")
           .select("id, assessor_assignments!inner(id)")
-          .eq("user_id", prefix)
+          .eq("user_id", ownerUserId)
           .eq("assessor_assignments.assessor_id", user.id)
           .eq("assessor_assignments.status", "active")
           .maybeSingle();

@@ -5,6 +5,19 @@ alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check
   check (role in ('scholar', 'director', 'pending', 'applicant', 'panel', 'assessor'));
 
+create or replace function public.is_assessor()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'assessor'
+  );
+$$;
+
 create table if not exists public.assessor_assignments (
   id uuid primary key default gen_random_uuid(),
   assessor_id uuid not null references public.profiles(id) on delete cascade,
@@ -50,24 +63,77 @@ create index if not exists application_assessments_assessor_id_idx
 alter table public.assessor_assignments enable row level security;
 alter table public.application_assessments enable row level security;
 
+drop policy if exists "Assessors can read assigned applications" on public.applications;
+create policy "Assessors can read assigned applications"
+  on public.applications
+  for select
+  using (
+    public.is_assessor()
+    and exists (
+      select 1
+      from public.assessor_assignments aa
+      where aa.application_id = applications.id
+        and aa.assessor_id = auth.uid()
+        and aa.status = 'active'
+    )
+  );
+
+drop policy if exists "Assessors can read assigned applicant profiles" on public.profiles;
+create policy "Assessors can read assigned applicant profiles"
+  on public.profiles
+  for select
+  using (
+    public.is_assessor()
+    and (
+      id = auth.uid()
+      or id in (
+        select a.user_id
+        from public.applications a
+        join public.assessor_assignments aa on aa.application_id = a.id
+        where aa.assessor_id = auth.uid()
+          and aa.status = 'active'
+      )
+    )
+  );
+
+drop policy if exists "Assessors can read assigned applicant uploads" on storage.objects;
+create policy "Assessors can read assigned applicant uploads"
+  on storage.objects
+  for select
+  using (
+    bucket_id = 'applications'
+    and public.is_assessor()
+    and (storage.foldername(name))[1] in (
+      select a.user_id::text
+      from public.applications a
+      join public.assessor_assignments aa on aa.application_id = a.id
+      where aa.assessor_id = auth.uid()
+        and aa.status = 'active'
+    )
+  );
+
+drop policy if exists "directors can manage assessor assignments" on public.assessor_assignments;
 create policy "directors can manage assessor assignments"
   on public.assessor_assignments
   for all
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'director'))
-  with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'director'));
+  using (public.is_director())
+  with check (public.is_director());
 
+drop policy if exists "assessors can read own assignments" on public.assessor_assignments;
 create policy "assessors can read own assignments"
   on public.assessor_assignments
   for select
-  using (assessor_id = auth.uid());
+  using (assessor_id = auth.uid() and public.is_assessor());
 
+drop policy if exists "directors can read application assessments" on public.application_assessments;
 create policy "directors can read application assessments"
   on public.application_assessments
   for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'director'));
+  using (public.is_director());
 
+drop policy if exists "assessors can manage own assessments" on public.application_assessments;
 create policy "assessors can manage own assessments"
   on public.application_assessments
   for all
-  using (assessor_id = auth.uid())
-  with check (assessor_id = auth.uid());
+  using (assessor_id = auth.uid() and public.is_assessor())
+  with check (assessor_id = auth.uid() and public.is_assessor());

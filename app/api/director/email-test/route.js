@@ -1,24 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { getEmailConfig } from "@/lib/email/config";
 import { sendKspEmail } from "@/lib/email/send";
+import { requireActiveDirector } from "@/lib/director-auth";
+import { recordDirectorAudit } from "@/lib/audit/director-audit";
 
-export async function POST() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function POST(request) {
+  const gate = await requireActiveDirector();
+  if (gate.error) return gate.error;
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (prof?.role !== "director") {
-    return NextResponse.json({ error: "Forbidden — directors only" }, { status: 403 });
-  }
-
-  const to = user.email;
+  const to = gate.user.email;
   if (!to) {
     return NextResponse.json({ error: "Your account has no email address." }, { status: 400 });
   }
@@ -36,7 +26,17 @@ export async function POST() {
       <p><small>Sent at ${new Date().toISOString()}</small></p>
     `,
     text: "This is a test email from the Kufuor Scholars Program platform.",
-    directorId: user.id,
+    directorId: gate.user.id,
+  });
+
+  await recordDirectorAudit({
+    actor: gate.profile,
+    action: "email.test",
+    entityType: "email",
+    entityId: null,
+    newValue: { ok: result.ok, via: result.via || null },
+    request,
+    critical: false,
   });
 
   return NextResponse.json({
@@ -57,19 +57,8 @@ export async function POST() {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (prof?.role !== "director") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const gate = await requireActiveDirector();
+  if (gate.error) return gate.error;
 
   const cfg = getEmailConfig();
   return NextResponse.json({

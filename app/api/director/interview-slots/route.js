@@ -1,6 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
+import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
 
 const INTERVIEW_APP_STATUSES = [
   "stage_2_approved",
@@ -9,63 +8,43 @@ const INTERVIEW_APP_STATUSES = [
   "interview",
 ];
 
-async function requireDirector() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  }
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (prof?.role !== "director") {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-  return { user };
-}
-
 export async function GET() {
-  const gate = await requireDirector();
+  const gate = await requireActiveDirector();
   if (gate.error) return gate.error;
 
-  try {
-    const admin = createAdminClient();
+  const adminGate = await getAdminOrError();
+  if (adminGate.error) return adminGate.error;
+  const admin = adminGate.admin;
 
-    const { data: slots, error: slotsError } = await admin
-      .from("interview_slots")
-      .select("*")
-      .order("interview_date", { ascending: true });
+  const { data: slots, error: slotsError } = await admin
+    .from("interview_slots")
+    .select("*")
+    .order("interview_date", { ascending: true });
 
-    if (slotsError) {
-      return NextResponse.json({ error: slotsError.message }, { status: 500 });
-    }
+  if (slotsError) {
+    return NextResponse.json({ error: "Failed to load interview slots" }, { status: 500 });
+  }
 
-    const { data: applications, error: appsError } = await admin
+  const { data: applications, error: appsError } = await admin
+    .from("applications")
+    .select("*, profiles!applications_user_id_fkey(full_name, email)")
+    .in("status", INTERVIEW_APP_STATUSES)
+    .order("submitted_at", { ascending: false });
+
+  if (appsError) {
+    const { data: appsFallback } = await admin
       .from("applications")
-      .select("*, profiles!applications_user_id_fkey(full_name, email)")
+      .select("*")
       .in("status", INTERVIEW_APP_STATUSES)
       .order("submitted_at", { ascending: false });
-
-    if (appsError) {
-      const { data: appsFallback } = await admin
-        .from("applications")
-        .select("*")
-        .in("status", INTERVIEW_APP_STATUSES)
-        .order("submitted_at", { ascending: false });
-      return NextResponse.json({
-        slots: slots || [],
-        applications: appsFallback || [],
-      });
-    }
-
     return NextResponse.json({
       slots: slots || [],
-      applications: applications || [],
+      applications: appsFallback || [],
     });
-  } catch (e) {
-    return NextResponse.json(
-      { error: e.message || "Server configuration error" },
-      { status: 500 }
-    );
   }
+
+  return NextResponse.json({
+    slots: slots || [],
+    applications: applications || [],
+  });
 }

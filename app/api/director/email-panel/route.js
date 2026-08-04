@@ -1,21 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { sendKspEmail } from "@/lib/email/send";
+import { requireActiveDirector } from "@/lib/director-auth";
+import { recordDirectorAudit } from "@/lib/audit/director-audit";
 
 export async function POST(request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (prof?.role !== "director") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const gate = await requireActiveDirector();
+  if (gate.error) return gate.error;
 
   let body;
   try {
@@ -32,18 +22,39 @@ export async function POST(request) {
     return NextResponse.json({ error: "Select at least one recipient." }, { status: 400 });
   }
 
-  const { data: members, error: membErr } = await supabase
+  const { data: members, error: membErr } = await gate.supabase
     .from("panel_members")
     .select("id, email, full_name")
     .in("id", panel_member_ids);
 
   if (membErr) {
-    return NextResponse.json({ error: membErr.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load panel members" }, { status: 500 });
   }
 
-  const emails = [...new Set((members || []).map((m) => m.email?.trim()).filter(Boolean))];
+  let emails = [...new Set((members || []).map((m) => m.email?.trim()).filter(Boolean))];
+
+  if (emails.length > 0) {
+    const { data: inactivePortal } = await gate.supabase
+      .from("profiles")
+      .select("email")
+      .eq("role", "panel")
+      .eq("is_active", false)
+      .in("email", emails);
+
+    const blocked = new Set(
+      (inactivePortal || []).map((p) => p.email?.trim().toLowerCase()).filter(Boolean)
+    );
+    emails = emails.filter((e) => !blocked.has(e.toLowerCase()));
+  }
+
   if (emails.length === 0) {
-    return NextResponse.json({ error: "No valid recipient emails." }, { status: 400 });
+    return NextResponse.json(
+      {
+        error:
+          "No valid recipient emails (deactivated panel portal accounts are excluded from roster sends).",
+      },
+      { status: 400 }
+    );
   }
 
   const html = `
@@ -59,7 +70,22 @@ export async function POST(request) {
     html,
     text: message.trim(),
     template: "panel_broadcast",
-    directorId: user.id,
+    directorId: gate.user.id,
+  });
+
+  await recordDirectorAudit({
+    actor: gate.profile,
+    action: "email.panel_broadcast",
+    entityType: "email",
+    entityId: null,
+    newValue: {
+      recipients: emails.length,
+      subject: subject.trim(),
+      ok: send.ok,
+      skipped: send.skipped || false,
+    },
+    request,
+    critical: false,
   });
 
   if (!send.ok) {

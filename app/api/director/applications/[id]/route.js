@@ -1,24 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-
-async function requireDirector() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  }
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (prof?.role !== "director") {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-  return { user };
-}
+import { requireActiveDirector } from "@/lib/director-auth";
 
 export async function GET(_request, { params }) {
-  const gate = await requireDirector();
+  const gate = await requireActiveDirector();
   if (gate.error) return gate.error;
 
   const { id } = await params;
@@ -31,9 +16,7 @@ export async function GET(_request, { params }) {
 
     let { data, error } = await admin
       .from("applications")
-      .select(
-        "*, profiles!applications_user_id_fkey(full_name, email, class_name, role)"
-      )
+      .select("*, profiles!applications_user_id_fkey(full_name, email, class_name, role)")
       .eq("id", id)
       .single();
 
@@ -46,7 +29,7 @@ export async function GET(_request, { params }) {
 
       if (appErr || !appRow) {
         return NextResponse.json(
-          { error: appErr?.message || error.message },
+          { error: "Application not found" },
           { status: appErr?.code === "PGRST116" ? 404 : 500 }
         );
       }
@@ -64,10 +47,7 @@ export async function GET(_request, { params }) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ application: data });
-  } catch (e) {
-    return NextResponse.json(
-      { error: e.message || "Server configuration error" },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 }

@@ -107,6 +107,62 @@ export default function DirectorInterviewsPage() {
     setSaving(false);
   }
 
+  async function cancelBatch(slotId) {
+    if (!window.confirm("Cancel this interview batch and notify assigned applicants?")) return;
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    const res = await fetch(`/api/director/interview-slots/${slotId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel" }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Failed to cancel batch");
+      setSaving(false);
+      return;
+    }
+    await loadData();
+    setSuccess("Batch cancelled. Assigned applicants were notified.");
+    setSaving(false);
+  }
+
+  async function completeBatch(slotId) {
+    setSaving(true);
+    setError(null);
+    const res = await fetch(`/api/director/interview-slots/${slotId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "complete" }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Failed to mark complete");
+      setSaving(false);
+      return;
+    }
+    await loadData();
+    setSuccess("Batch marked completed.");
+    setSaving(false);
+  }
+
+  async function deleteBatch(slotId) {
+    if (!window.confirm("Delete this empty interview batch? This cannot be undone.")) return;
+    setSaving(true);
+    setError(null);
+    const res = await fetch(`/api/director/interview-slots/${slotId}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Failed to delete batch");
+      setSaving(false);
+      return;
+    }
+    await loadData();
+    setSuccess("Empty batch deleted.");
+    setSaving(false);
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -316,6 +372,13 @@ export default function DirectorInterviewsPage() {
               const assignedApps =
                 applications?.filter((a) => a.interview_slot_id === slot.id) ||
                 [];
+              const status = slot.status || "scheduled";
+              const statusTone =
+                status === "cancelled"
+                  ? "bg-red-50 text-red-700"
+                  : status === "completed"
+                    ? "bg-green-50 text-green-700"
+                    : "bg-indigo-50 text-indigo-700";
               return (
                 <div
                   key={slot.id}
@@ -346,11 +409,18 @@ export default function DirectorInterviewsPage() {
                         </span>
                       </div>
                     </div>
-                    <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                      <Users size={12} />
-                      {assignedApps.length} applicant
-                      {assignedApps.length !== 1 ? "s" : ""}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusTone}`}
+                      >
+                        {status}
+                      </span>
+                      <span className="flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700">
+                        <Users size={12} />
+                        {assignedApps.length} applicant
+                        {assignedApps.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </div>
                   {slot.congratulations_message && (
                     <p className="mt-3 text-sm italic text-gray-600">
@@ -371,8 +441,45 @@ export default function DirectorInterviewsPage() {
                           {app.profiles?.full_name || "Unknown"}
                         </span>
                       ))}
+                      {assignedApps.length === 0 && (
+                        <span className="text-xs text-gray-400">None assigned</span>
+                      )}
                     </div>
                   </div>
+                  {status !== "cancelled" && (
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-50 pt-4">
+                      {status === "scheduled" && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => completeBatch(slot.id)}
+                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Mark completed
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => cancelBatch(slot.id)}
+                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            Cancel batch
+                          </button>
+                        </>
+                      )}
+                      {assignedApps.length === 0 && (
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => deleteBatch(slot.id)}
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Delete empty batch
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

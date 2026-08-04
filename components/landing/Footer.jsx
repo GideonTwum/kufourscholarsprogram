@@ -153,8 +153,11 @@ export default function Footer() {
               <Link href="/director-login" className="text-xs text-white/40 hover:text-white/60">
                 Director Login
               </Link>
-              <Link href="/director/signup" className="text-xs text-white/40 hover:text-white/60">
-                Director Sign Up
+              <Link href="/assessor-login" className="text-xs text-white/40 hover:text-white/60">
+                Assessor Login
+              </Link>
+              <Link href="/panel-login" className="text-xs text-white/40 hover:text-white/60">
+                Panel Login
               </Link>
               <a href="#" className="text-xs text-white/40 hover:text-white/60">
                 Privacy Policy

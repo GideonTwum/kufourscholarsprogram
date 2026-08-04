@@ -4,13 +4,15 @@ import { NextResponse } from "next/server";
 import { evaluateEligibilityForAutoReject } from "@/lib/eligibility-server";
 import { autoRejectEmailHtml, stage1SubmittedEmailHtml } from "@/lib/email/notify";
 import { sendKspEmail } from "@/lib/email/send";
+import { sanitizeStage1ApplicationData } from "@/lib/stage1-application-payload";
+import { assertStatusTransition } from "@/lib/application-status-transition.mjs";
 
-function buildRow(body, userId, overrides = {}) {
-  const leadership = Array.isArray(body.leadership_evidence_urls)
-    ? body.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
+function buildRow(applicationData, userId, overrides = {}) {
+  const leadership = Array.isArray(applicationData.leadership_evidence_urls)
+    ? applicationData.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
     : [];
   return {
-    ...body,
+    ...applicationData,
     user_id: userId,
     leadership_evidence_urls: leadership,
     leadership_evidence_url: leadership[0] || null,
@@ -40,7 +42,17 @@ export async function POST(request) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
   }
 
-  const eligibility = evaluateEligibilityForAutoReject(applicationData);
+  const { data: safeApplicationData, ignoredDangerousFields } =
+    sanitizeStage1ApplicationData(applicationData);
+
+  if (ignoredDangerousFields.length > 0) {
+    console.warn("[submit-stage1] ignored protected applicant fields", {
+      userId: user.id,
+      fields: ignoredDangerousFields,
+    });
+  }
+
+  const eligibility = evaluateEligibilityForAutoReject(safeApplicationData);
   const submitted_at = new Date().toISOString();
 
   let admin;
@@ -67,15 +79,20 @@ export async function POST(request) {
     if (existing.status !== "draft") {
       return NextResponse.json({ error: "Application already submitted" }, { status: 400 });
     }
+    const target = eligibility.ok ? "stage_1_submitted" : "rejected";
+    const transitionError = assertStatusTransition(existing.status, target);
+    if (transitionError) {
+      return NextResponse.json({ error: transitionError }, { status: 409 });
+    }
   }
 
   const userEmail = user.email || null;
 
   const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
-  const profileName = applicationData.full_name || prof?.full_name || "Applicant";
+  const profileName = safeApplicationData.full_name || prof?.full_name || "Applicant";
 
   if (!eligibility.ok) {
-    const row = buildRow(applicationData, user.id, {
+    const row = buildRow(safeApplicationData, user.id, {
       status: "rejected",
       rejection_reason: eligibility.reason,
       submitted_at,
@@ -108,7 +125,7 @@ export async function POST(request) {
     });
   }
 
-  const row = buildRow(applicationData, user.id, {
+  const row = buildRow(safeApplicationData, user.id, {
     status: "stage_1_submitted",
     rejection_reason: null,
     submitted_at,

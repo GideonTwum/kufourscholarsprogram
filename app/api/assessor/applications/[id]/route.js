@@ -1,32 +1,16 @@
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireActiveAssessor, getAdminOrError } from "@/lib/director-auth";
 import { NextResponse } from "next/server";
-import { validateAssessmentPayload } from "@/lib/assessor-workflow";
-
-async function requireAssessor() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "assessor") {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-
-  return { user };
-}
+import {
+  ASSESSOR_APPLICATION_SELECT,
+  pickAssessorSafeApplication,
+  validateAssessmentPayload,
+} from "@/lib/assessor-workflow";
+import { sendKspEmail } from "@/lib/email/send";
 
 async function requireAssignment(admin, assessorId, applicationId) {
   const { data: assignment } = await admin
     .from("assessor_assignments")
-    .select("id")
+    .select("id, status")
     .eq("assessor_id", assessorId)
     .eq("application_id", applicationId)
     .eq("status", "active")
@@ -35,11 +19,14 @@ async function requireAssignment(admin, assessorId, applicationId) {
 }
 
 export async function GET(_request, { params }) {
-  const gate = await requireAssessor();
+  const gate = await requireActiveAssessor();
   if (gate.error) return gate.error;
 
   const { id } = await params;
-  const admin = createAdminClient();
+  const adminGate = await getAdminOrError();
+  if (adminGate.error) return adminGate.error;
+  const admin = adminGate.admin;
+
   const assignment = await requireAssignment(admin, gate.user.id, id);
   if (!assignment) {
     return NextResponse.json({ error: "Not assigned to this application." }, { status: 403 });
@@ -48,31 +35,49 @@ export async function GET(_request, { params }) {
   const [{ data: application, error }, { data: assessments }] = await Promise.all([
     admin
       .from("applications")
-      .select("*, profiles!applications_user_id_fkey(full_name, email)")
+      .select(`${ASSESSOR_APPLICATION_SELECT}, profiles!applications_user_id_fkey(full_name, email)`)
       .eq("id", id)
       .single(),
     admin
       .from("application_assessments")
-      .select("*")
+      .select(
+        "id, application_id, assessor_id, stage, academic_score, leadership_score, service_score, communication_score, overall_score, recommendation, notes, submitted_at, updated_at"
+      )
       .eq("application_id", id)
       .eq("assessor_id", gate.user.id)
       .order("submitted_at", { ascending: false }),
   ]);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !application) {
+    return NextResponse.json({ error: "Application not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ application, assessments: assessments || [] });
+  return NextResponse.json({
+    application: pickAssessorSafeApplication(application),
+    assessments: assessments || [],
+    assignment: { id: assignment.id, status: assignment.status },
+  });
 }
 
+/**
+ * Submit or update assessment recommendation only.
+ * Does NOT mutate applications.status (Director decides).
+ */
 export async function PATCH(request, { params }) {
-  const gate = await requireAssessor();
+  const gate = await requireActiveAssessor();
   if (gate.error) return gate.error;
 
   const { id } = await params;
-  const body = await request.json();
-  const admin = createAdminClient();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const adminGate = await getAdminOrError();
+  if (adminGate.error) return adminGate.error;
+  const admin = adminGate.admin;
 
   const assignment = await requireAssignment(admin, gate.user.id, id);
   if (!assignment) {
@@ -81,17 +86,28 @@ export async function PATCH(request, { params }) {
 
   const { data: application, error: appLoadError } = await admin
     .from("applications")
-    .select("id, status")
+    .select("id, status, full_name")
     .eq("id", id)
     .single();
 
   if (appLoadError || !application) {
-    return NextResponse.json({ error: appLoadError?.message || "Application not found." }, { status: 404 });
+    return NextResponse.json({ error: "Application not found." }, { status: 404 });
   }
 
   const validation = validateAssessmentPayload(body, application.status);
   if (validation.error) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+
+  // Hard blocks — assessors never set official status via this API
+  if (body?.status === "accepted" || body?.status === "rejected" || body?.apply_status === true) {
+    return NextResponse.json(
+      {
+        error:
+          "Assessors submit recommendations only. Official application status is updated by the Director.",
+      },
+      { status: 403 }
+    );
   }
 
   const nowIso = new Date().toISOString();
@@ -102,42 +118,57 @@ export async function PATCH(request, { params }) {
       stage: validation.stage,
       ...validation.assessment,
       updated_at: nowIso,
+      submitted_at: nowIso,
     },
-    { onConflict: "application_id,assessor_id,stage" },
+    { onConflict: "application_id,assessor_id,stage" }
   );
 
   if (assessmentError) {
-    return NextResponse.json({ error: assessmentError.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to save assessment" }, { status: 500 });
   }
 
-  const updatePayload = {
-    status: validation.nextStatus,
-    updated_at: nowIso,
-  };
-  if (validation.nextStatus === "stage_1_approved") updatePayload.stage_1_approved_at = nowIso;
-  if (validation.nextStatus === "stage_2_approved") updatePayload.stage_2_approved_at = nowIso;
-  if (validation.nextStatus !== "rejected") updatePayload.rejection_reason = null;
+  // Notify assessor (confirmation) and directors — non-blocking
+  const applicantLabel = application.full_name || "an applicant";
+  const recLabel = validation.assessment.recommendation.replace(/_/g, " ");
 
-  const { error: updateError } = await admin
-    .from("applications")
-    .update(updatePayload)
-    .eq("id", id);
-
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (gate.profile?.email) {
+    await sendKspEmail({
+      event: "assessor_assessment_submitted",
+      to: gate.profile.email,
+      subject: `Assessment saved — ${applicantLabel}`,
+      html: `<p>Your recommendation (<strong>${recLabel}</strong>) for <strong>${applicantLabel}</strong> was saved. The Director will review and update the official application status.</p>`,
+      text: `Your recommendation (${recLabel}) for ${applicantLabel} was saved. The Director will review and update the official application status.`,
+      template: "assessor_assessment_submitted",
+    });
   }
 
-  if (["rejected", "interview_review_pending"].includes(validation.nextStatus)) {
-    await admin
-      .from("assessor_assignments")
-      .update({ status: "completed", completed_at: nowIso })
-      .eq("id", assignment.id);
+  const { data: directors } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("role", "director")
+    .eq("is_active", true);
+
+  const directorEmails = [...new Set((directors || []).map((d) => d.email).filter(Boolean))];
+  if (directorEmails.length > 0) {
+    await sendKspEmail({
+      event: "director_assessor_assessment_ready",
+      to: directorEmails,
+      subject: `Assessor recommendation ready — ${applicantLabel}`,
+      html: `<p>An assessor submitted a recommendation (<strong>${recLabel}</strong>) for <strong>${applicantLabel}</strong>. Official status was not changed. Please review and take action in the Director portal.</p>`,
+      text: `An assessor submitted a recommendation (${recLabel}) for ${applicantLabel}. Official status was not changed. Please review in the Director portal.`,
+      template: "director_assessor_assessment_ready",
+    });
   }
 
   return NextResponse.json({
     success: true,
-    status: validation.nextStatus,
+    status_unchanged: true,
+    application_status: application.status,
     stage: validation.stage,
+    recommendation: validation.assessment.recommendation,
+    suggested_status: validation.suggestedStatus,
     overall_score: validation.assessment.overall_score,
+    message:
+      "Recommendation saved. Official application status was not changed. The Director will review and decide.",
   });
 }

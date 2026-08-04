@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Video, Send, Loader2, CheckCircle2, ArrowLeft, AlertCircle } from "lucide-react";
-import { validateStage2Video, YOUTUBE_REGEX } from "@/lib/application-validation";
+import { validateStage2Video } from "@/lib/application-validation";
 
 const STAGE2_PROMPT =
   "Create a 3-minute video on a community problem, outlining the identified problem, cause, effect, intervention, and expected outcome.";
@@ -69,24 +69,27 @@ export default function Stage2Page() {
     setError(null);
     setSubmitting(true);
 
-    const submittedAt = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from("applications")
-      .update({
-        video_youtube_url: videoUrl.trim(),
-        status: "stage_2_submitted",
-        stage_2_submitted_at: submittedAt,
-        updated_at: submittedAt,
-      })
-      .eq("id", application.id);
-
-    if (updateError) {
-      setError(updateError.message || "Failed to submit");
+    try {
+      const res = await fetch("/api/applications/submit-stage2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          application_id: application.id,
+          video_youtube_url: videoUrl.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Failed to submit");
+        setSubmitting(false);
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
       setSubmitting(false);
-      return;
     }
-    setSubmitted(true);
-    setSubmitting(false);
   }
 
   if (loading) {
