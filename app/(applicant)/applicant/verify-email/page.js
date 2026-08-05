@@ -16,6 +16,24 @@ function VerifyEmailContent() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [email, setEmail] = useState("");
+  const [cooldownSec, setCooldownSec] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.sessionStorage.getItem("ksp_verify_resend_at");
+    if (!raw) return;
+    const elapsed = Math.floor((Date.now() - Number(raw)) / 1000);
+    const left = 60 - elapsed;
+    if (left > 0) setCooldownSec(left);
+  }, []);
+
+  useEffect(() => {
+    if (cooldownSec <= 0) return undefined;
+    const t = setInterval(() => {
+      setCooldownSec((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [cooldownSec]);
 
   useEffect(() => {
     async function run() {
@@ -39,6 +57,10 @@ function VerifyEmailContent() {
   async function handleResend() {
     setError(null);
     setMessage(null);
+    if (cooldownSec > 0) {
+      setError(`Please wait ${cooldownSec}s before requesting another email.`);
+      return;
+    }
     setResending(true);
     const {
       data: { user },
@@ -59,9 +81,15 @@ function VerifyEmailContent() {
       },
     });
     if (err) {
-      setError(err.message);
+      setError("Could not resend verification email. Try again shortly.");
     } else {
-      setMessage("Verification email sent. Please check your inbox.");
+      setMessage("If verification is still pending, a new email has been sent. Check your inbox.");
+      try {
+        window.sessionStorage.setItem("ksp_verify_resend_at", String(Date.now()));
+      } catch {
+        /* ignore */
+      }
+      setCooldownSec(60);
     }
     setResending(false);
   }
@@ -123,10 +151,14 @@ function VerifyEmailContent() {
         <button
           type="button"
           onClick={handleResend}
-          disabled={resending}
+          disabled={resending || cooldownSec > 0}
           className="mt-6 w-full rounded-lg bg-royal py-2.5 text-sm font-semibold text-white transition-colors hover:bg-royal/90 disabled:opacity-50"
         >
-          {resending ? "Sending…" : "Resend verification email"}
+          {resending
+            ? "Sending…"
+            : cooldownSec > 0
+              ? `Resend available in ${cooldownSec}s`
+              : "Resend verification email"}
         </button>
       )}
 

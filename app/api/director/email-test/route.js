@@ -51,6 +51,9 @@ export async function POST(request) {
       hasServiceRoleKey: Boolean(cfg.serviceRoleKey),
       isProductionReady: cfg.isProductionReady,
       usingDevFallbackFrom: cfg.usingDevFallbackFrom,
+      sandboxSenderInUse: cfg.sandboxSenderInUse,
+      emailFromDomain: cfg.emailFromDomainClass,
+      fromError: cfg.fromError,
       missing: cfg.missing,
     },
   });
@@ -69,6 +72,9 @@ export async function GET() {
       hasServiceRoleKey: Boolean(cfg.serviceRoleKey),
       isProductionReady: cfg.isProductionReady,
       usingDevFallbackFrom: cfg.usingDevFallbackFrom,
+      sandboxSenderInUse: cfg.sandboxSenderInUse,
+      emailFromDomain: cfg.emailFromDomainClass,
+      fromError: cfg.fromError,
       missing: cfg.missing,
     },
   });

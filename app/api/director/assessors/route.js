@@ -1,7 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { requireActiveDirector } from "@/lib/director-auth";
-import { ASSESSOR_ASSIGNABLE_STATUSES } from "@/lib/assessor-assignment";
+import {
+  ASSESSOR_ASSIGNABLE_STATUSES,
+  buildCurrentAssignmentPayload,
+} from "@/lib/assessor-assignment";
 
 export async function GET() {
   const gate = await requireActiveDirector();
@@ -25,26 +28,60 @@ export async function GET() {
         .in("status", ASSESSOR_ASSIGNABLE_STATUSES)
         .order("submitted_at", { ascending: false })
         .limit(500),
-      admin.from("application_assessments").select("id, assessor_id"),
+      admin
+        .from("application_assessments")
+        .select("id, assessor_id, application_id, recommendation, submitted_at, updated_at"),
     ]);
+
+  const assessorById = Object.fromEntries((assessors || []).map((a) => [a.id, a]));
 
   const activeCountByAssessor = {};
   const assignmentCountByAssessor = {};
-  const assignedApplicationIds = new Set();
+  const activeByApplication = {};
   (assignments || []).forEach((row) => {
     assignmentCountByAssessor[row.assessor_id] =
       (assignmentCountByAssessor[row.assessor_id] || 0) + 1;
     if (row.status === "active") {
       activeCountByAssessor[row.assessor_id] = (activeCountByAssessor[row.assessor_id] || 0) + 1;
-      assignedApplicationIds.add(row.application_id);
+      activeByApplication[row.application_id] = row;
     }
   });
 
   const assessmentCountByAssessor = {};
+  /** Latest assessment per application+assessor (by submitted_at). */
+  const assessmentByAppAssessor = {};
   (assessments || []).forEach((row) => {
     if (!row.assessor_id) return;
     assessmentCountByAssessor[row.assessor_id] =
       (assessmentCountByAssessor[row.assessor_id] || 0) + 1;
+    if (!row.application_id) return;
+    const key = `${row.application_id}:${row.assessor_id}`;
+    const prev = assessmentByAppAssessor[key];
+    const prevTs = prev?.submitted_at || prev?.updated_at || "";
+    const nextTs = row.submitted_at || row.updated_at || "";
+    if (!prev || nextTs >= prevTs) {
+      assessmentByAppAssessor[key] = row;
+    }
+  });
+
+  const enrichedApplications = (applications || []).map((app) => {
+    const active = activeByApplication[app.id] || null;
+    const assessor = active ? assessorById[active.assessor_id] || null : null;
+    const assessmentKey = active ? `${app.id}:${active.assessor_id}` : null;
+    const assessment = assessmentKey ? assessmentByAppAssessor[assessmentKey] || null : null;
+    const current_assignment = buildCurrentAssignmentPayload(active, assessor, assessment);
+
+    return {
+      id: app.id,
+      applicant_name: app.full_name || null,
+      email: app.profiles?.email || null,
+      university: app.university || null,
+      status: app.status,
+      submitted_at: app.submitted_at || null,
+      full_name: app.full_name || null,
+      profiles: app.profiles || null,
+      current_assignment,
+    };
   });
 
   return NextResponse.json({
@@ -61,8 +98,8 @@ export async function GET() {
     })),
     assignments: (assignments || []).filter((a) => a.status === "active"),
     all_assignments: assignments || [],
-    applications: applications || [],
-    unassigned_applications: (applications || []).filter((app) => !assignedApplicationIds.has(app.id)),
+    applications: enrichedApplications,
+    unassigned_applications: enrichedApplications.filter((app) => !app.current_assignment),
     assignable_statuses: ASSESSOR_ASSIGNABLE_STATUSES,
   });
 }

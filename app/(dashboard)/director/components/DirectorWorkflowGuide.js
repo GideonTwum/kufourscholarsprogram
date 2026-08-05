@@ -35,19 +35,20 @@ export default function DirectorWorkflowGuide({ compact = false }) {
             </li>
           </ul>
           <p>
-            On each application, use the same three actions: <strong>Accept</strong> (move forward),{" "}
-            <strong>Pending</strong> (defer at this stage), or <strong>Reject</strong> (final no).
-            Deferred files still appear under the <strong>Pending</strong> filter on Applications.
+            On each application, actions are stage-specific. After Stage 2 approval, use{" "}
+            <strong>Shortlist for Interview</strong> to place the applicant in the unscheduled queue.
+            Schedule dates in bulk from <strong>Interviews</strong>. Use <strong>Keep Pending</strong> to
+            defer without shortlisting, or <strong>Reject Application</strong> for a final no.
           </p>
           <p>
-            <strong className="text-gray-900">Typical path:</strong> Accept Stage 1 → applicant submits
-            Stage 2 → Accept Stage 2 → Accept (schedule interview) → score interview → Accept into program
-            or Reject.
+            <strong className="text-gray-900">Typical path:</strong> Approve Stage 1 → applicant submits
+            Stage 2 → Approve Stage 2 → Shortlist for Interview → batch-schedule on Interviews → mark
+            interview complete → Accept into Programme or Reject.
           </p>
           <p>
-            <strong className="text-gray-900">Interviews page</strong> — use for batch scheduling (groups).
-            After Stage 2 is approved, applicants appear there for assignment.{" "}
-            <strong>Call for interview…</strong> on one application is for a single invite by email.
+            <strong className="text-gray-900">Interviews page</strong> — primary place to select multiple
+            shortlisted candidates and assign one date/time/venue. Scheduling emails send only after batch
+            assignment, not at shortlist.
           </p>
         </div>
       )}

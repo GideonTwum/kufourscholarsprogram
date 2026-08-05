@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { validateStage2Video } from "@/lib/application-validation";
 import { assertStatusTransition } from "@/lib/application-status-transition.mjs";
 import { sendKspEmail } from "@/lib/email/send";
+import { escapeHtml } from "@/lib/email/escape";
 
 export async function POST(request) {
   const supabase = await createClient();
@@ -96,7 +97,7 @@ export async function POST(request) {
       event: "stage_2_submitted",
       to,
       subject: "Kufuor Scholars — Stage 2 video received",
-      html: `<p>Dear ${String(name).replace(/</g, "&lt;")},</p>
+      html: `<p>Dear ${escapeHtml(name)},</p>
 <p>Your Stage 2 video submission has been received and is pending review.</p>
 <p>Best,<br/>The Kufuor Scholars Program Team</p>`,
       text: "Your Stage 2 video submission has been received and is pending review.",

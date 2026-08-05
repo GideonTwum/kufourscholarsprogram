@@ -2,6 +2,12 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse } from "next/server";
 import { dashboardPathForRole, isDirectorRole } from "@/lib/roles";
 import { loginPathForProtectedRoute } from "@/lib/portal-auth";
+import {
+  isDirectorMfaPath,
+  MFA_CHALLENGE_PATH,
+  MFA_SETUP_PATH,
+  resolveDirectorMfaDestination,
+} from "@/lib/director-mfa";
 
 const protectedRoutes = ["/applicant", "/director", "/panel", "/assessor"];
 const authRoutes = [
@@ -11,7 +17,13 @@ const authRoutes = [
   "/panel-login",
   "/register",
   "/applicant-register",
+  "/forgot-password",
 ];
+
+/** Recovery session must stay on this page — do not bounce to dashboard. */
+function isRecoveryRoute(pathname) {
+  return pathname === "/reset-password" || pathname.startsWith("/reset-password/");
+}
 
 function applicantNeedsEmailVerification(user) {
   if (!user?.email) return false;
@@ -37,6 +49,47 @@ async function fetchProfile(supabase, userId) {
   return profile;
 }
 
+async function enforceDirectorMfa(request, supabase, profile) {
+  const { pathname } = request.nextUrl;
+  if (!isDirectorRole(profile?.role)) return null;
+  if (profile?.is_active === false) return null;
+
+  const dest = await resolveDirectorMfaDestination(supabase);
+  const onMfa = isDirectorMfaPath(pathname);
+
+  if (dest === "setup") {
+    if (pathname === MFA_SETUP_PATH || pathname.startsWith(`${MFA_SETUP_PATH}/`)) {
+      return null;
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = MFA_SETUP_PATH;
+    return NextResponse.redirect(url);
+  }
+
+  if (dest === "challenge") {
+    if (pathname === MFA_CHALLENGE_PATH || pathname.startsWith(`${MFA_CHALLENGE_PATH}/`)) {
+      return null;
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = MFA_CHALLENGE_PATH;
+    return NextResponse.redirect(url);
+  }
+
+  if (dest === "ok" && onMfa) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/director";
+    return NextResponse.redirect(url);
+  }
+
+  if (dest === "error" && !onMfa) {
+    const url = request.nextUrl.clone();
+    url.pathname = MFA_CHALLENGE_PATH;
+    return NextResponse.redirect(url);
+  }
+
+  return null;
+}
+
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -51,7 +104,10 @@ export async function proxy(request) {
   const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r));
   const verifyEmailPath =
     pathname === "/applicant/verify-email" || pathname.startsWith("/applicant/verify-email/");
-  const isProtected = !isAuthRoute && protectedRoutes.some((r) => pathname.startsWith(r));
+  const isProtected =
+    !isAuthRoute &&
+    !isRecoveryRoute(pathname) &&
+    protectedRoutes.some((r) => pathname.startsWith(r));
 
   let supabase;
   let user;
@@ -121,6 +177,8 @@ export async function proxy(request) {
         url.pathname = dashboardPathForRole(role);
         return NextResponse.redirect(url);
       }
+      const mfaRedirect = await enforceDirectorMfa(request, supabase, profile);
+      if (mfaRedirect) return mfaRedirect;
     } else if (pathname.startsWith("/panel")) {
       if (role !== "panel") {
         const url = request.nextUrl.clone();
@@ -166,7 +224,10 @@ export async function proxy(request) {
         pathname.startsWith("/director-login") ||
         pathname.startsWith("/login"))
     ) {
-      // Allow staying on login to see deactivated message after failed gate
+      return supabaseResponse;
+    }
+    // Allow browsing forgot-password while signed in (e.g. change of mind).
+    if (pathname.startsWith("/forgot-password")) {
       return supabaseResponse;
     }
     const url = request.nextUrl.clone();

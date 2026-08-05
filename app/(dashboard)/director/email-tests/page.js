@@ -93,6 +93,17 @@ export default function DirectorEmailTestPage() {
             EMAIL_FROM is not set — using Resend sandbox sender (dev only; limited recipients).
           </p>
         )}
+        {config?.fromError && (
+          <p className="mt-3 text-xs text-red-600">
+            Sender configuration error: {config.fromError}. Production will not send until EMAIL_FROM
+            is a valid verified-domain address (not onboarding@resend.dev).
+          </p>
+        )}
+        {config?.sandboxSenderInUse && !config?.usingDevFallbackFrom && (
+          <p className="mt-3 text-xs text-amber-700">
+            Sandbox sender is configured. Use a verified production domain for launch.
+          </p>
+        )}
         {config?.missing?.length > 0 && (
           <p className="mt-3 text-xs text-red-600">
             Missing: {config.missing.join(", ")}. Add them in <code className="rounded bg-gray-100 px-1">.env.local</code>{" "}

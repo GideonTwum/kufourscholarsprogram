@@ -52,9 +52,18 @@ export async function POST(request, { params }) {
   }
 
   const oldStatus = currentApp.status;
-  const transitionError = assertStatusTransition(oldStatus, status);
-  if (transitionError) {
-    return NextResponse.json({ error: transitionError }, { status: 409 });
+  const isInterviewReschedule =
+    oldStatus === "called_for_interview" &&
+    status === "called_for_interview" &&
+    interview?.interview_date &&
+    interview?.interview_time?.trim?.() &&
+    interview?.interview_location?.trim?.();
+
+  if (!isInterviewReschedule) {
+    const transitionError = assertStatusTransition(oldStatus, status);
+    if (transitionError) {
+      return NextResponse.json({ error: transitionError }, { status: 409 });
+    }
   }
 
   const nowIso = new Date().toISOString();
@@ -80,6 +89,19 @@ export async function POST(request, { params }) {
   }
   if (status === "stage_2_approved") {
     updatePayload.stage_2_approved_at = nowIso;
+  }
+
+  const isShortlist =
+    status === "interview_review_pending" &&
+    (oldStatus === "stage_2_approved" || oldStatus === "stage_2_submitted" || oldStatus === "stage_2_review_pending");
+
+  if (isShortlist) {
+    updatePayload.interview_shortlisted_at = nowIso;
+  }
+
+  if (status === "stage_2_approved" && oldStatus === "interview_review_pending") {
+    updatePayload.interview_shortlisted_at = null;
+    updatePayload.interview_slot_id = null;
   }
 
   if (status === "called_for_interview") {
@@ -112,12 +134,15 @@ export async function POST(request, { params }) {
 
   const audit = await recordDirectorAudit({
     actor: gate.profile,
-    action: "application.status_changed",
+    action: isShortlist ? "application.shortlisted_for_interview" : "application.status_changed",
     entityType: "application",
     entityId: id,
     oldValue: { status: oldStatus },
     newValue: { status, class_name: class_name || null },
-    metadata: { rejection_reason: rejection_reason || null },
+    metadata: {
+      rejection_reason: rejection_reason || null,
+      shortlisted: isShortlist || null,
+    },
     request,
     critical: true,
   });
@@ -194,6 +219,14 @@ export async function POST(request, { params }) {
         })
       );
     }
+  }
+
+  if (isShortlist && applicantUserId) {
+    await notifyPlatform(
+      "Shortlisted for interview",
+      "You have progressed to the interview stage. The program team will schedule your interview date and time soon.",
+      "info"
+    );
   }
 
   if (status === "called_for_interview" && applicantUserId) {

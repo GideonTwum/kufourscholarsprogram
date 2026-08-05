@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { assertLoginPortalRole, portalHomeForRole } from "@/lib/portal-auth";
+import { resolveDirectorMfaDestination, MFA_SETUP_PATH, MFA_CHALLENGE_PATH } from "@/lib/director-mfa";
 
 const PROFILE_COLUMNS = "id, email, full_name, role, is_active";
 
@@ -143,9 +144,27 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
       return;
     }
 
+    if (expectedRole === "director") {
+      const dest = await resolveDirectorMfaDestination(supabase);
+      if (dest === "setup") {
+        router.push(MFA_SETUP_PATH);
+        router.refresh();
+        setLoading(false);
+        return;
+      }
+      if (dest === "challenge" || dest === "error") {
+        router.push(MFA_CHALLENGE_PATH);
+        router.refresh();
+        setLoading(false);
+        return;
+      }
+    }
+
     router.push(portalHomeForRole(role));
     router.refresh();
   }
+
+  const forgotHref = `/forgot-password?portal=${encodeURIComponent(expectedRole)}`;
 
   return (
     <div className="rounded-2xl bg-white p-8 shadow-xl">
@@ -181,7 +200,12 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Password</label>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <Link href={forgotHref} className="text-xs font-medium text-gold-dark hover:text-gold">
+              Forgot password?
+            </Link>
+          </div>
           <div className="relative">
             <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input

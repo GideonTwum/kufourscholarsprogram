@@ -7,14 +7,7 @@ import {
   normalizeApplicationStatus,
 } from "@/lib/application-status-transition.mjs";
 import { recordDirectorAudit } from "@/lib/audit/director-audit";
-
-function escHtml(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+import { escapeHtml, escapeHtmlWithBreaks } from "@/lib/email/escape";
 
 export async function POST(request) {
   const gate = await requireActiveDirector();
@@ -35,6 +28,7 @@ export async function POST(request) {
     congratulations_message,
     meeting_link,
     application_ids = [],
+    allow_unshortlisted = false,
   } = body;
 
   if (!batch_name || !interview_date || !interview_time || !location) {
@@ -115,13 +109,31 @@ export async function POST(request) {
       continue;
     }
     const current = normalizeApplicationStatus(row.status);
+    // Primary queue: shortlisted (interview_review_pending). Allow re-attach for already scheduled.
+    if (current === "interview_review_pending") {
+      const err = assertStatusTransition(current, "called_for_interview");
+      if (!err) eligibleIds.push(row.id);
+      else skipped.push({ id: row.id, reason: "invalid_status_transition" });
+      continue;
+    }
     if (["called_for_interview", "interview"].includes(current)) {
       eligibleIds.push(row.id);
       continue;
     }
-    const err = assertStatusTransition(current, "called_for_interview");
-    if (!err) eligibleIds.push(row.id);
-    else skipped.push({ id: row.id, reason: "invalid_status_transition" });
+    // Exceptional one-off: Stage 2 approved without shortlist (secondary path)
+    if (current === "stage_2_approved" && allow_unshortlisted === true) {
+      const err = assertStatusTransition(current, "called_for_interview");
+      if (!err) eligibleIds.push(row.id);
+      else skipped.push({ id: row.id, reason: "invalid_status_transition" });
+      continue;
+    }
+    skipped.push({
+      id: row.id,
+      reason:
+        current === "stage_2_approved"
+          ? "not_shortlisted_use_shortlist_first"
+          : "invalid_status_transition",
+    });
   }
 
   if (eligibleIds.length === 0) {
@@ -191,16 +203,16 @@ export async function POST(request) {
         to: email,
         subject: `Kufuor Scholars Program — Interview: ${batch_name}`,
         html: `
-          <p>Dear ${escHtml(name)},</p>
-          <p>You have been assigned to interview batch <strong>${escHtml(batch_name)}</strong>.</p>
+          <p>Dear ${escapeHtml(name)},</p>
+          <p>You have been assigned to interview batch <strong>${escapeHtml(batch_name)}</strong>.</p>
           <ul>
-            <li><strong>Date:</strong> ${escHtml(formattedDate)}</li>
-            <li><strong>Time:</strong> ${escHtml(interview_time)}</li>
-            <li><strong>Location:</strong> ${escHtml(location)}</li>
+            <li><strong>Date:</strong> ${escapeHtml(formattedDate)}</li>
+            <li><strong>Time:</strong> ${escapeHtml(interview_time)}</li>
+            <li><strong>Location:</strong> ${escapeHtml(location)}</li>
           </ul>
           ${
             congratulations_message
-              ? `<p>${escHtml(congratulations_message).replace(/\n/g, "<br/>")}</p>`
+              ? `<p>${escapeHtmlWithBreaks(congratulations_message)}</p>`
               : ""
           }
           <p>Please sign in to the applicant dashboard for any updates.</p>

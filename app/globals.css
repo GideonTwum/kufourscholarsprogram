@@ -43,10 +43,16 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Dashboard portals: contain content inside the sidebar + main column */
+/* Shared portal shell: viewport-locked; only main scrolls */
+.dashboard-shell {
+  width: 100%;
+  max-width: 100vw;
+}
+
 .dashboard-content {
   max-width: 100%;
   min-width: 0;
+  overscroll-behavior: contain;
 }
 
 .dashboard-content img,

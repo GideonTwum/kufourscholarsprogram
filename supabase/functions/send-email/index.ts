@@ -40,10 +40,24 @@ Deno.serve(async (req: Request) => {
   }
 
   const key = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("EMAIL_FROM") ?? "Kufuor Scholars <onboarding@resend.dev>";
   if (!key) {
-    return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
+
+  const fromResolved = resolveEmailFrom();
+  if (fromResolved.error) {
+    return new Response(
+      JSON.stringify({
+        error: fromResolved.error,
+        message: "EMAIL_FROM is required for sending. Set the Edge secret EMAIL_FROM.",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const from = fromResolved.from;
 
   const { to, subject, html, text, template, meta = {} } = body;
   const recipients = Array.isArray(to) ? to : to ? [to] : [];
@@ -148,4 +162,42 @@ function escapeHtml(s: string) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+const SANDBOX_FALLBACK_FROM = "Kufuor Scholars Program <onboarding@resend.dev>";
+
+function isValidEmailFrom(value: string) {
+  const s = String(value ?? "").trim();
+  if (!s || s.length > 320) return false;
+  if (/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(s)) return true;
+  if (/^[^<>]+<[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>$/.test(s)) return true;
+  return false;
+}
+
+/**
+ * EMAIL_FROM is required unless ALLOW_RESEND_SANDBOX_FALLBACK=true (local/dev Edge only).
+ * Production Edge must set EMAIL_FROM — never silent onboarding@resend.dev.
+ */
+function resolveEmailFrom(): { from: string } | { error: "EMAIL_FROM_MISSING" | "EMAIL_FROM_INVALID" } {
+  const configured = (Deno.env.get("EMAIL_FROM") ?? "").trim();
+  const allowSandbox = (Deno.env.get("ALLOW_RESEND_SANDBOX_FALLBACK") ?? "").trim() === "true";
+
+  if (configured) {
+    if (!isValidEmailFrom(configured)) {
+      return { error: "EMAIL_FROM_INVALID" };
+    }
+    const addr = configured.includes("<")
+      ? (configured.match(/<([^>]+)>/)?.[1] ?? "").trim().toLowerCase()
+      : configured.toLowerCase();
+    if (addr === "onboarding@resend.dev" && !allowSandbox) {
+      return { error: "EMAIL_FROM_INVALID" };
+    }
+    return { from: configured };
+  }
+
+  if (allowSandbox) {
+    return { from: SANDBOX_FALLBACK_FROM };
+  }
+
+  return { error: "EMAIL_FROM_MISSING" };
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sendKspEmail } from "@/lib/email/send";
 import { requireActiveDirector } from "@/lib/director-auth";
 import { recordDirectorAudit } from "@/lib/audit/director-audit";
+import { escapeHtmlWithBreaks } from "@/lib/email/escape";
 
 export async function POST(request) {
   const gate = await requireActiveDirector();
@@ -59,7 +60,7 @@ export async function POST(request) {
 
   const html = `
     <div style="font-family: sans-serif; line-height: 1.5;">
-      ${message.trim().replace(/\n/g, "<br/>")}
+      ${escapeHtmlWithBreaks(message.trim())}
     </div>
   `;
 

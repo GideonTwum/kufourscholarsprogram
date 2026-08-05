@@ -152,7 +152,9 @@ export default function ApplicationReviewPage() {
   const [selectedClass, setSelectedClass] = useState("Class of 2029");
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showViewInterviewModal, setShowViewInterviewModal] = useState(false);
   const [rejectReasonDraft, setRejectReasonDraft] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [activeTab, setActiveTab] = useState("stage1");
   const [evaluation, setEvaluation] = useState(null);
   const [panelEvalHistory, setPanelEvalHistory] = useState([]);
@@ -289,10 +291,26 @@ export default function ApplicationReviewPage() {
       }
       if (newStatus === "called_for_interview") {
         setShowInterviewModal(false);
+        setActionMessage("Interview scheduled successfully.");
+      } else if (newStatus === "interview_review_pending" && application.status === "stage_2_approved") {
+        setActionMessage("Applicant added to the interview queue.");
+      } else if (newStatus === "stage_2_approved" && application.status === "interview_review_pending") {
+        setActionMessage("Applicant removed from the interview queue.");
+      } else if (newStatus === "interview") {
+        setActionMessage("Interview marked complete. Final programme review is now available.");
+      } else {
+        setActionMessage("");
       }
       setShowAcceptModal(false);
       setShowRejectModal(false);
       setRejectReasonDraft("");
+    } else {
+      try {
+        const err = await res.json();
+        setActionMessage(err.error || "Status update failed.");
+      } catch {
+        setActionMessage("Status update failed.");
+      }
     }
     setUpdating(false);
   }
@@ -415,20 +433,51 @@ export default function ApplicationReviewPage() {
 
   const currentStatusIndex = workflowProgressIndex(application.status);
   const isTerminal = application.status === "accepted" || application.status === "rejected";
-  const stageActions = getDirectorStageActions(application.status);
+  const hasInterviewDetails = Boolean(
+    application.interview_date && application.interview_time && application.interview_location
+  );
+  const stageActions = getDirectorStageActions(application.status, { hasInterviewDetails });
 
-  function handleStageAccept() {
-    if (!stageActions?.accept) return;
-    const a = stageActions.accept;
-    if (a.type === "disabled") return;
-    if (a.type === "status") updateStatus(a.next);
-    if (a.type === "interview_modal") setShowInterviewModal(true);
-    if (a.type === "accept_modal") setShowAcceptModal(true);
+  function openInterviewModal({ reschedule = false } = {}) {
+    if (reschedule || hasInterviewDetails) {
+      setInterviewDraft({
+        interview_date: application.interview_date || "",
+        interview_time: application.interview_time || "",
+        interview_location: application.interview_location || "",
+        interview_instructions: application.interview_instructions || "",
+      });
+    }
+    setShowViewInterviewModal(false);
+    setShowInterviewModal(true);
   }
 
-  function handleStagePending() {
-    if (!stageActions?.pending?.next) return;
-    updateStatus(stageActions.pending.next);
+  function handleStageAction(action) {
+    if (!action || action.type === "disabled") return;
+    if (action.type === "noop") {
+      setActionMessage("Application kept pending at Stage 2 approved — not yet shortlisted for interview.");
+      return;
+    }
+    if (action.type === "status" && action.next) {
+      updateStatus(action.next);
+      return;
+    }
+    if (action.type === "interview_modal") {
+      openInterviewModal({
+        reschedule: application.status === "called_for_interview" || application.status === "interview",
+      });
+      return;
+    }
+    if (action.type === "view_interview") {
+      setShowViewInterviewModal(true);
+      return;
+    }
+    if (action.type === "accept_modal") {
+      setShowAcceptModal(true);
+      return;
+    }
+    if (action.type === "reject") {
+      setShowRejectModal(true);
+    }
   }
 
   return (
@@ -762,9 +811,7 @@ export default function ApplicationReviewPage() {
                   <DirectorStageActionBar
                     config={stageActions}
                     updating={updating}
-                    onAccept={handleStageAccept}
-                    onPending={handleStagePending}
-                    onReject={() => setShowRejectModal(true)}
+                    onAction={handleStageAction}
                   />
                 </div>
               )}
@@ -816,10 +863,32 @@ export default function ApplicationReviewPage() {
       <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <h3 className="text-sm font-bold text-gray-900">Director Actions</h3>
         <p className="mb-4 mt-1 text-xs text-gray-500">
-          At each stage use <strong>Accept</strong> to advance, <strong>Pending</strong> to defer for
-          later (still in the Pending list on Applications), or <strong>Reject</strong> to close the
-          application.
+          Actions change with the current workflow stage. After Stage 2 approval, use{" "}
+          <strong>Shortlist for Interview</strong> to add the applicant to the unscheduled queue, then
+          schedule dates in bulk from <strong>Interviews</strong>. Final acceptance is only offered after
+          the interview is marked complete.
         </p>
+        {actionMessage ? (
+          <div
+            className={`mb-4 rounded-lg p-3 text-sm ${
+              /fail|error|invalid/i.test(actionMessage)
+                ? "bg-red-50 text-red-700"
+                : "bg-green-50 text-green-800"
+            }`}
+          >
+            {actionMessage}
+            {/interview queue/i.test(actionMessage) ? (
+              <div className="mt-2">
+                <Link
+                  href="/director/interviews"
+                  className="text-sm font-semibold text-royal underline hover:text-gold"
+                >
+                  Go to Interview Scheduling
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mb-4">
           <label className="mb-1.5 block text-xs font-medium text-gray-500">Internal Notes</label>
           <textarea
@@ -835,19 +904,68 @@ export default function ApplicationReviewPage() {
           <DirectorStageActionBar
             config={stageActions}
             updating={updating}
-            onAccept={handleStageAccept}
-            onPending={handleStagePending}
-            onReject={() => setShowRejectModal(true)}
+            onAction={handleStageAction}
           />
         )}
       </div>
 
+      {showViewInterviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900">Interview details</h3>
+            <dl className="mt-4 space-y-3 text-sm">
+              <div>
+                <dt className="text-xs font-medium text-gray-500">Date</dt>
+                <dd className="mt-0.5 text-gray-900">{application.interview_date || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-gray-500">Time</dt>
+                <dd className="mt-0.5 text-gray-900">{application.interview_time || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-gray-500">Location / meeting link</dt>
+                <dd className="mt-0.5 break-words text-gray-900">
+                  {application.interview_location || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-gray-500">Instructions</dt>
+                <dd className="mt-0.5 whitespace-pre-wrap text-gray-900">
+                  {application.interview_instructions || "—"}
+                </dd>
+              </div>
+            </dl>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowViewInterviewModal(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => openInterviewModal({ reschedule: true })}
+                className="rounded-lg bg-royal px-4 py-2 text-sm font-semibold text-gold"
+              >
+                Reschedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showInterviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Schedule interview</h3>
+            <h3 className="text-lg font-bold text-gray-900">
+              {hasInterviewDetails || application.status === "called_for_interview" || application.status === "interview"
+                ? "Reschedule interview"
+                : "Schedule interview"}
+            </h3>
             <p className="mt-1 text-sm text-gray-500">
-              We will notify the applicant by email with these details.
+              We will notify the applicant by email with these details. This does not accept them into
+              the programme.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
@@ -907,7 +1025,7 @@ export default function ApplicationReviewPage() {
                 onClick={() => updateStatus("called_for_interview")}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                {updating ? "Saving…" : "Send invitation"}
+                {updating ? "Saving…" : hasInterviewDetails ? "Save & notify" : "Send invitation"}
               </button>
             </div>
           </div>
@@ -957,8 +1075,11 @@ export default function ApplicationReviewPage() {
       {showAcceptModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Accept Applicant</h3>
-            <p className="mt-1 text-sm text-gray-500">Assign this applicant to a cohort. They will become a Scholar upon acceptance.</p>
+            <h3 className="text-lg font-bold text-gray-900">Accept into Programme</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Final scholarship acceptance. Select the cohort class for this scholar. They will become a
+              Scholar upon acceptance.
+            </p>
             <div className="mt-4">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Assign to Cohort</label>
               <div className="relative">

@@ -103,7 +103,7 @@ Enable custom SMTP and enter:
 | **Port** | `465` (recommended) or `587` |
 | **Username** | `resend` |
 | **Password** | Your Resend API key (`re_...`) — same type as `RESEND_API_KEY` |
-| **Sender email** | Address on verified domain, e.g. `noreply@yourdomain.com` |
+| **Sender email** | Address on verified domain, e.g. `noreply@kufuorscholarapplication.com` |
 | **Sender name** | `Kufuor Scholars Program` |
 
 Resend docs: [Send with SMTP](https://resend.com/docs/send-with-smtp) · [Send with Supabase](https://resend.com/docs/send-with-supabase)

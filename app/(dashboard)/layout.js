@@ -3,15 +3,10 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
 import {
   LayoutDashboard,
   MessageCircle,
   Settings,
-  LogOut,
-  Menu,
-  X,
-  ChevronRight,
   Users,
   UsersRound,
   FileText,
@@ -24,6 +19,7 @@ import {
   FolderKanban,
   Mail,
 } from "lucide-react";
+import DashboardShell from "@/components/dashboard/DashboardShell";
 
 const directorNav = [
   { label: "Dashboard", href: "/director", icon: LayoutDashboard },
@@ -43,9 +39,10 @@ const directorNav = [
   { label: "Audit Log", href: "/director/audit-log", icon: FileText },
   { label: "Settings", href: "/director/settings", icon: Settings },
   { label: "Email test", href: "/director/email-tests", icon: Mail },
+  { label: "Auth health", href: "/director/auth-health", icon: Settings },
 ];
 
-  const panelNav = [
+const panelNav = [
   { label: "Interview Applicants", href: "/panel", icon: FileText },
 ];
 
@@ -71,24 +68,26 @@ function roleLabel(kind) {
   return "Director";
 }
 
+function rootHrefForKind(kind) {
+  if (kind === "panel") return "/panel";
+  if (kind === "assessor") return "/assessor";
+  return "/director";
+}
+
 export default function DashboardLayout({ children }) {
   const [profile, setProfile] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
   const kind = portalKind(pathname);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     async function loadProfile() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (cancelled || !session?.user) return;
 
         const { data } = await supabase
@@ -98,131 +97,34 @@ export default function DashboardLayout({ children }) {
           .single();
 
         if (!cancelled) setProfile(data);
-      } catch (err) {
+      } catch {
         if (!cancelled) setProfile(null);
       }
     }
     loadProfile();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [supabase]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push(kind === "director" ? "/director-login" : "/login");
+    if (kind === "director") router.push("/director-login");
+    else if (kind === "panel") router.push("/panel-login");
+    else if (kind === "assessor") router.push("/assessor-login");
+    else router.push("/login");
     router.refresh();
   }
 
   return (
-    <div className="flex min-h-screen min-w-0 overflow-x-hidden bg-gray-50">
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col bg-white shadow-lg transition-transform duration-300 lg:static lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex h-16 items-center justify-between border-b border-gray-100 px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-royal text-gold font-bold text-sm">
-              KS
-            </div>
-            <span className="text-sm font-bold text-royal">
-              Kufuor Scholars
-            </span>
-          </Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="text-gray-400 lg:hidden"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-1">
-            {navForKind(kind).map((item) => {
-              const isActive =
-                mounted &&
-                (pathname === item.href ||
-                  (item.href !== "/director" &&
-                    pathname.startsWith(item.href)));
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-royal/5 text-royal"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-royal"
-                  }`}
-                >
-                  <item.icon size={18} />
-                  {item.label}
-                  {isActive && (
-                    <ChevronRight
-                      size={14}
-                      className="ml-auto text-royal/50"
-                    />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-
-        <div className="border-t border-gray-100 p-4">
-          {profile && (
-            <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-royal text-xs font-bold text-gold">
-                {profile.full_name
-                  ? profile.full_name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                  : "?"}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <p className="truncate text-sm font-medium text-gray-900">
-                  {profile.full_name || roleLabel(kind)}
-                </p>
-                <p className="truncate text-xs text-gray-500">{roleLabel(kind)}</p>
-              </div>
-            </div>
-          )}
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
-          >
-            <LogOut size={16} />
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        <header className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-100 bg-white px-4 lg:px-8">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-500 lg:hidden"
-          >
-            <Menu size={22} />
-          </button>
-          <div className="min-w-0 flex-1" />
-          <span className="shrink-0 rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-dark">
-            {roleLabel(kind)}
-          </span>
-        </header>
-        <main className="dashboard-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-8">
-          <div className="mx-auto w-full max-w-full min-w-0">{children}</div>
-        </main>
-      </div>
-    </div>
+    <DashboardShell
+      navItems={navForKind(kind)}
+      roleLabel={roleLabel(kind)}
+      rootHref={rootHrefForKind(kind)}
+      profile={profile}
+      onLogout={handleLogout}
+    >
+      {children}
+    </DashboardShell>
   );
 }

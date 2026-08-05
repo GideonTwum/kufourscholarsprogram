@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
 import { recordDirectorAudit } from "@/lib/audit/director-audit";
 import { sendKspEmail } from "@/lib/email/send";
+import { escapeHtml } from "@/lib/email/escape";
 
 async function loadSlot(admin, id) {
   const { data, error } = await admin.from("interview_slots").select("*").eq("id", id).maybeSingle();
@@ -44,6 +45,7 @@ export async function PATCH(request, { params }) {
     patch.cancelled_at = nowIso;
   } else if (body.action === "complete") {
     patch.status = "completed";
+    patch.completed_at = nowIso;
   } else {
     if (body.batch_name != null) patch.batch_name = String(body.batch_name).trim();
     if (body.interview_date != null) patch.interview_date = body.interview_date;
@@ -63,12 +65,66 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: "Failed to update interview batch" }, { status: 500 });
   }
 
+  if (body.action === "complete") {
+    const { data: appsToComplete } = await admin
+      .from("applications")
+      .select("id, status")
+      .eq("interview_slot_id", id)
+      .eq("status", "called_for_interview");
+
+    const completeIds = (appsToComplete || []).map((a) => a.id);
+    if (completeIds.length) {
+      await admin
+        .from("applications")
+        .update({ status: "interview", updated_at: nowIso })
+        .in("id", completeIds);
+    }
+
+    await recordDirectorAudit({
+      actor: gate.profile,
+      action: "interview.batch_completed",
+      entityType: "interview_slot",
+      entityId: id,
+      oldValue: { status: slot.status },
+      newValue: { status: "completed", applicants_advanced: completeIds.length },
+      request,
+    });
+
+    return NextResponse.json({
+      success: true,
+      action: "complete",
+      applicants_advanced: completeIds.length,
+    });
+  }
+
+  if (body.action === "cancel") {
+    const { data: appsToReturn } = await admin
+      .from("applications")
+      .select("id, status")
+      .eq("interview_slot_id", id)
+      .in("status", ["called_for_interview", "interview"]);
+
+    const returnIds = (appsToReturn || []).map((a) => a.id);
+    if (returnIds.length) {
+      await admin
+        .from("applications")
+        .update({
+          status: "interview_review_pending",
+          interview_slot_id: null,
+          interview_date: null,
+          interview_time: null,
+          interview_location: null,
+          interview_instructions: null,
+          updated_at: nowIso,
+        })
+        .in("id", returnIds);
+    }
+  }
+
   const action =
     body.action === "cancel"
       ? "interview.batch_cancelled"
-      : body.action === "complete"
-        ? "interview.batch_updated"
-        : "interview.batch_updated";
+      : "interview.batch_updated";
 
   await recordDirectorAudit({
     actor: gate.profile,
@@ -114,7 +170,7 @@ export async function PATCH(request, { params }) {
             body.action === "cancel"
               ? "Kufuor Scholars — Interview cancelled"
               : "Kufuor Scholars — Interview updated",
-          html: `<p>Dear ${name},</p><p>${
+          html: `<p>Dear ${escapeHtml(name)},</p><p>${
             body.action === "cancel"
               ? "Your interview batch has been cancelled. The program team will contact you with next steps."
               : "Your interview details have been updated. Please sign in to the applicant portal for the latest information."

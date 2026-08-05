@@ -1,17 +1,66 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2, UserPlus, Users } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  UserCheck,
+  UserPlus,
+  UserRound,
+  Users,
+} from "lucide-react";
+import {
+  assessorDisplayName,
+  classifyAssignmentCardState,
+  filterAssignableSelection,
+  formatAssignedDate,
+} from "@/lib/assessor-assignment";
 
 function applicantName(app) {
-  return app.full_name || app.profiles?.full_name || app.profiles?.email || "Applicant";
+  return (
+    app.applicant_name ||
+    app.full_name ||
+    app.profiles?.full_name ||
+    app.email ||
+    app.profiles?.email ||
+    "Applicant"
+  );
+}
+
+function applicantEmail(app) {
+  return app.email || app.profiles?.email || "No email";
+}
+
+function AssignmentStateBadge({ state, assessorName }) {
+  if (state === "assigned_to_selected") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800">
+        <CheckCircle2 size={12} aria-hidden="true" />
+        Assigned to {assessorName}
+      </span>
+    );
+  }
+  if (state === "assigned_to_other") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+        <UserRound size={12} aria-hidden="true" />
+        Assigned to {assessorName}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+      <UserCheck size={12} aria-hidden="true" />
+      Unassigned
+    </span>
+  );
 }
 
 export default function DirectorAssessorsPage() {
   const [loading, setLoading] = useState(true);
   const [assessors, setAssessors] = useState([]);
   const [applications, setApplications] = useState([]);
-  const [assignments, setAssignments] = useState([]);
   const [selectedAssessor, setSelectedAssessor] = useState("");
   const [selectedApplications, setSelectedApplications] = useState([]);
   const [inviteForm, setInviteForm] = useState({ full_name: "", email: "" });
@@ -25,11 +74,15 @@ export default function DirectorAssessorsPage() {
     const res = await fetch("/api/director/assessors");
     const data = await res.json();
     if (res.ok) {
-      setAssessors(data.assessors || []);
-      setApplications(data.applications || []);
-      setAssignments(data.assignments || []);
-      const active = (data.assessors || []).filter((a) => a.is_active !== false);
-      if (!selectedAssessor && active[0]) setSelectedAssessor(active[0].id);
+      const nextAssessors = data.assessors || [];
+      const nextApps = data.applications || [];
+      setAssessors(nextAssessors);
+      setApplications(nextApps);
+      const active = nextAssessors.filter((a) => a.is_active !== false);
+      setSelectedAssessor((prev) => {
+        if (prev && active.some((a) => a.id === prev)) return prev;
+        return active[0]?.id || "";
+      });
     } else {
       setMessage({ success: "", error: data.error || "Failed to load assessors." });
     }
@@ -45,13 +98,41 @@ export default function DirectorAssessorsPage() {
     [assessors]
   );
 
-  const assignedByApplication = useMemo(() => {
-    const map = {};
-    assignments.forEach((row) => {
-      map[row.application_id] = row.assessor_id;
+  const selectedAssessorProfile = useMemo(
+    () => activeAssessors.find((a) => a.id === selectedAssessor) || null,
+    [activeAssessors, selectedAssessor]
+  );
+
+  const selectedAssessorName = assessorDisplayName(selectedAssessorProfile);
+
+  const applicationsById = useMemo(
+    () => Object.fromEntries(applications.map((app) => [app.id, app])),
+    [applications]
+  );
+
+  // Keep checkboxes in sync: apps already assigned to the selected assessor stay checked.
+  useEffect(() => {
+    if (!selectedAssessor) {
+      setSelectedApplications([]);
+      return;
+    }
+    setSelectedApplications((prev) => {
+      const assignedToSelected = applications
+        .filter(
+          (app) =>
+            classifyAssignmentCardState(app.current_assignment, selectedAssessor) ===
+            "assigned_to_selected"
+        )
+        .map((app) => app.id);
+      const kept = prev.filter((id) => {
+        const app = applicationsById[id];
+        if (!app) return false;
+        const state = classifyAssignmentCardState(app.current_assignment, selectedAssessor);
+        return state !== "assigned_to_selected";
+      });
+      return [...new Set([...assignedToSelected, ...kept])];
     });
-    return map;
-  }, [assignments]);
+  }, [selectedAssessor, applications, applicationsById]);
 
   async function createAssessor(e) {
     e.preventDefault();
@@ -88,6 +169,37 @@ export default function DirectorAssessorsPage() {
       setMessage({ success: "", error: "Select an assessor and at least one applicant." });
       return;
     }
+
+    const { toProcess, alreadyAssigned, toReassign } = filterAssignableSelection(
+      selectedApplications,
+      applicationsById,
+      selectedAssessor
+    );
+
+    if (toProcess.length === 0) {
+      setMessage({
+        success: "",
+        error:
+          alreadyAssigned.length > 0
+            ? "All selected applicants are already assigned to this assessor. Use Unassign to remove an assignment."
+            : "Select at least one applicant to assign.",
+      });
+      return;
+    }
+
+    if (toReassign.length > 0) {
+      const lines = toReassign.slice(0, 5).map((id) => {
+        const app = applicationsById[id];
+        const fromName = assessorDisplayName(app?.current_assignment?.assessor);
+        return `${applicantName(app)} (currently ${fromName})`;
+      });
+      const more = toReassign.length > 5 ? `\n…and ${toReassign.length - 5} more` : "";
+      const ok = confirm(
+        `Reassign ${toReassign.length} applicant(s) to ${selectedAssessorName}?\n\n${lines.join("\n")}${more}\n\nPrevious assignment history will be preserved.`
+      );
+      if (!ok) return;
+    }
+
     setBusy(true);
     setMessage({ error: "", success: "" });
     const res = await fetch("/api/director/assessor-assignments", {
@@ -95,8 +207,8 @@ export default function DirectorAssessorsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         assessor_id: selectedAssessor,
-        application_ids: selectedApplications,
-        force_reassign: true,
+        application_ids: toProcess,
+        force_reassign: toReassign.length > 0,
       }),
     });
     const data = await res.json();
@@ -105,8 +217,14 @@ export default function DirectorAssessorsPage() {
       setMessage({ success: "", error: data.error || "Assignment failed." });
       return;
     }
-    setSelectedApplications([]);
-    setMessage({ error: "", success: `Assigned ${data.assigned || selectedApplications.length} applicant(s).` });
+    const skippedNote =
+      alreadyAssigned.length > 0
+        ? ` Skipped ${alreadyAssigned.length} already assigned to ${selectedAssessorName}.`
+        : "";
+    setMessage({
+      error: "",
+      success: `Assigned ${data.assigned || toProcess.length} applicant(s) to ${selectedAssessorName}.${skippedNote}`,
+    });
     load();
   }
 
@@ -184,14 +302,45 @@ export default function DirectorAssessorsPage() {
       setMessage({ success: "", error: data.error || "Unassign failed" });
       return;
     }
+    setSelectedApplications((prev) => prev.filter((id) => id !== applicationId));
     setMessage({ error: "", success: data.message || "Unassigned." });
     load();
   }
 
-  function toggleApplication(id) {
+  function toggleApplication(app) {
+    const state = classifyAssignmentCardState(app.current_assignment, selectedAssessor);
+    if (state === "assigned_to_selected") return;
     setSelectedApplications((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(app.id) ? prev.filter((x) => x !== app.id) : [...prev, app.id]
     );
+  }
+
+  function checkboxLabel(app, state) {
+    const name = applicantName(app);
+    if (state === "assigned_to_selected") {
+      return `${name} is assigned to ${selectedAssessorName}`;
+    }
+    if (state === "assigned_to_other") {
+      const other = assessorDisplayName(app.current_assignment?.assessor);
+      return `Select ${name} for reassignment from ${other} to ${selectedAssessorName}`;
+    }
+    return `Select unassigned applicant ${name}`;
+  }
+
+  function cardClass(state, checked) {
+    if (state === "assigned_to_selected") {
+      return "border-green-200 bg-green-50/40";
+    }
+    if (state === "assigned_to_other" && checked) {
+      return "border-amber-200 bg-amber-50/50";
+    }
+    if (state === "assigned_to_other") {
+      return "border-amber-100 bg-white";
+    }
+    if (checked) {
+      return "border-royal/20 bg-royal/[0.03]";
+    }
+    return "border-gray-100 bg-white";
   }
 
   return (
@@ -301,9 +450,9 @@ export default function DirectorAssessorsPage() {
                   return (
                     <div key={assessor.id} className="rounded-lg border border-gray-100 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-medium text-gray-900">{assessor.full_name || "—"}</p>
-                          <p className="text-sm text-gray-500">{assessor.email}</p>
+                          <p className="truncate text-sm text-gray-500">{assessor.email}</p>
                           <p className="mt-1 text-xs text-gray-400">
                             {assessor.active_assignment_count || 0} active ·{" "}
                             {assessor.assessment_count || 0} assessment(s)
@@ -365,15 +514,19 @@ export default function DirectorAssessorsPage() {
         <form onSubmit={assignApplications} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="font-bold text-gray-900">Assign Applicants</h2>
           <p className="mt-1 text-sm text-gray-500">
-            One active assessor per applicant. Assigning when another assessor is active will reassign.
-            Inactive assessors are excluded.
+            One active assessor per applicant. Cards show who currently owns each assignment. Assigning
+            when another assessor is active will reassign after confirmation. Inactive assessors are
+            excluded.
           </p>
 
           <div className="mt-5">
             <label className="mb-1 block text-xs font-medium text-gray-500">Assessor</label>
             <select
               value={selectedAssessor}
-              onChange={(e) => setSelectedAssessor(e.target.value)}
+              onChange={(e) => {
+                setSelectedAssessor(e.target.value);
+                setSelectedApplications([]);
+              }}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             >
               <option value="">Select assessor</option>
@@ -396,32 +549,79 @@ export default function DirectorAssessorsPage() {
               </p>
             ) : (
               applications.map((app) => {
-                const assignedTo = assignedByApplication[app.id];
+                const state = classifyAssignmentCardState(app.current_assignment, selectedAssessor);
+                const checked = selectedApplications.includes(app.id);
+                const currentName = assessorDisplayName(app.current_assignment?.assessor);
+                const assignedDate = formatAssignedDate(app.current_assignment?.assigned_at);
+                const assessment = app.current_assignment?.assessment;
+                const assessmentLabel =
+                  assessment?.status === "submitted"
+                    ? `Assessment submitted${
+                        assessment.recommendation
+                          ? ` · ${String(assessment.recommendation).replace(/_/g, " ")}`
+                          : ""
+                      }`
+                    : state === "unassigned"
+                      ? null
+                      : "Assessment: Pending";
+
                 return (
                   <div
                     key={app.id}
-                    className="flex items-start gap-3 rounded-lg border border-gray-100 p-3"
+                    className={`flex items-start gap-3 rounded-lg border p-3 ${cardClass(state, checked)}`}
                   >
                     <input
                       type="checkbox"
-                      checked={selectedApplications.includes(app.id)}
-                      onChange={() => toggleApplication(app.id)}
+                      checked={checked}
+                      disabled={!selectedAssessor || state === "assigned_to_selected"}
+                      onChange={() => toggleApplication(app)}
                       className="mt-1"
+                      aria-label={checkboxLabel(app, state)}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900">{applicantName(app)}</p>
-                      <p className="text-xs text-gray-500">
-                        {app.profiles?.email || "No email"} · {app.university || "No university"}
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900">{applicantName(app)}</p>
+                          <p className="truncate text-xs text-gray-500">
+                            {applicantEmail(app)} · {app.university || "No university"}
+                          </p>
+                        </div>
+                        <AssignmentStateBadge
+                          state={state}
+                          assessorName={
+                            state === "assigned_to_selected" ? selectedAssessorName : currentName
+                          }
+                        />
+                      </div>
+
+                      <p className="mt-1 text-xs font-semibold capitalize text-royal">
+                        {(app.status || "—").replace(/_/g, " ")}
                       </p>
-                      <p className="mt-1 text-xs font-semibold text-royal">
-                        {app.status?.replace(/_/g, " ") || "—"}
-                      </p>
-                      {assignedTo && assignedTo !== selectedAssessor && (
-                        <p className="mt-1 text-xs text-amber-700">
-                          Currently assigned to another assessor — assigning will reassign
+
+                      {assignedDate ? (
+                        <p className="mt-1 text-xs text-gray-500">Assigned on {assignedDate}</p>
+                      ) : null}
+                      {assessmentLabel ? (
+                        <p className="mt-0.5 text-xs text-gray-500">{assessmentLabel}</p>
+                      ) : null}
+
+                      {state === "assigned_to_other" ? (
+                        <p className="mt-2 text-xs text-amber-800">
+                          {checked
+                            ? `Selecting this applicant will reassign them to ${selectedAssessorName}.`
+                            : `Currently assigned to ${currentName}. Select to reassign to ${
+                                selectedAssessorName || "the chosen assessor"
+                              }.`}
                         </p>
-                      )}
-                      {assignedTo && (
+                      ) : null}
+
+                      {state === "assigned_to_selected" ? (
+                        <p className="mt-2 text-xs text-green-800">
+                          Already assigned to {selectedAssessorName}. Use Unassign to remove.
+                        </p>
+                      ) : null}
+
+                      {app.current_assignment ? (
                         <button
                           type="button"
                           disabled={busy}
@@ -430,7 +630,7 @@ export default function DirectorAssessorsPage() {
                         >
                           Unassign
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );

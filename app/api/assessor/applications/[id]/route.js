@@ -6,6 +6,7 @@ import {
   validateAssessmentPayload,
 } from "@/lib/assessor-workflow";
 import { sendKspEmail } from "@/lib/email/send";
+import { escapeHtml } from "@/lib/email/escape";
 
 async function requireAssignment(admin, assessorId, applicationId) {
   const { data: assignment } = await admin
@@ -130,13 +131,15 @@ export async function PATCH(request, { params }) {
   // Notify assessor (confirmation) and directors — non-blocking
   const applicantLabel = application.full_name || "an applicant";
   const recLabel = validation.assessment.recommendation.replace(/_/g, " ");
+  const safeApplicant = escapeHtml(applicantLabel);
+  const safeRec = escapeHtml(recLabel);
 
   if (gate.profile?.email) {
     await sendKspEmail({
       event: "assessor_assessment_submitted",
       to: gate.profile.email,
       subject: `Assessment saved — ${applicantLabel}`,
-      html: `<p>Your recommendation (<strong>${recLabel}</strong>) for <strong>${applicantLabel}</strong> was saved. The Director will review and update the official application status.</p>`,
+      html: `<p>Your recommendation (<strong>${safeRec}</strong>) for <strong>${safeApplicant}</strong> was saved. The Director will review and update the official application status.</p>`,
       text: `Your recommendation (${recLabel}) for ${applicantLabel} was saved. The Director will review and update the official application status.`,
       template: "assessor_assessment_submitted",
     });
@@ -154,7 +157,7 @@ export async function PATCH(request, { params }) {
       event: "director_assessor_assessment_ready",
       to: directorEmails,
       subject: `Assessor recommendation ready — ${applicantLabel}`,
-      html: `<p>An assessor submitted a recommendation (<strong>${recLabel}</strong>) for <strong>${applicantLabel}</strong>. Official status was not changed. Please review and take action in the Director portal.</p>`,
+      html: `<p>An assessor submitted a recommendation (<strong>${safeRec}</strong>) for <strong>${safeApplicant}</strong>. Official status was not changed. Please review and take action in the Director portal.</p>`,
       text: `An assessor submitted a recommendation (${recLabel}) for ${applicantLabel}. Official status was not changed. Please review in the Director portal.`,
       template: "director_assessor_assessment_ready",
     });
