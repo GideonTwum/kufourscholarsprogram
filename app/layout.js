@@ -26,6 +26,17 @@ export const metadata = {
   ],
   authors: [{ name: "John A. Kufuor Foundation" }],
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://scholars.kufuorfoundation.org"),
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  manifest: "/site.webmanifest",
   openGraph: {
     title: "Kufuor Scholars Program | Grooming Future Leaders of Africa",
     description:

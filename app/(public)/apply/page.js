@@ -25,10 +25,10 @@ const eligibility = [
 ];
 
 const timeline = [
-  { phase: "Applications open", description: "Submit your application and create an account." },
+  { phase: "Applications open", description: "Create an account and submit your application before the deadline." },
   { phase: "Review period", description: "Applications are reviewed by our selection committee." },
   { phase: "Interviews", description: "Shortlisted candidates are invited for interviews." },
-  { phase: "Final selection", description: "Successful scholars are notified and welcomed to the cohort." },
+  { phase: "Final selection", description: "Successful scholars are notified and welcomed to the program." },
 ];
 
 const tips = [

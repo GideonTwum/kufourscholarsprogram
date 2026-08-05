@@ -24,6 +24,7 @@ import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 import { getDirectorStageActions } from "@/lib/director-stage-actions";
 import { evaluatorDisplayName } from "@/lib/staff-lifecycle";
 import DirectorStageActionBar from "../../components/DirectorStageActionBar";
+import DirectorAssessorAssignmentPanel from "@/components/director/DirectorAssessorAssignmentPanel";
 
 const statusFlow = [
   { key: "draft", label: "Draft", color: "bg-gray-100 text-gray-600" },
@@ -770,6 +771,11 @@ export default function ApplicationReviewPage() {
           </div>
         </div>
       )}
+
+      <DirectorAssessorAssignmentPanel
+        applicationId={id}
+        applicationStatus={application.status}
+      />
 
       {assessorReviews.length > 0 && (
         <div className="mt-8 rounded-xl border border-amber-100 bg-amber-50/60 p-6 shadow-sm">

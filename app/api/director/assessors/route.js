@@ -1,13 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { requireActiveDirector } from "@/lib/director-auth";
-
-const ASSIGNABLE_STATUSES = [
-  "stage_1_submitted",
-  "review_pending",
-  "stage_2_submitted",
-  "stage_2_review_pending",
-];
+import { ASSESSOR_ASSIGNABLE_STATUSES } from "@/lib/assessor-assignment";
 
 export async function GET() {
   const gate = await requireActiveDirector();
@@ -28,7 +22,7 @@ export async function GET() {
       admin
         .from("applications")
         .select("id, status, full_name, university, submitted_at, profiles!applications_user_id_fkey(email)")
-        .in("status", ASSIGNABLE_STATUSES)
+        .in("status", ASSESSOR_ASSIGNABLE_STATUSES)
         .order("submitted_at", { ascending: false })
         .limit(500),
       admin.from("application_assessments").select("id, assessor_id"),
@@ -48,18 +42,27 @@ export async function GET() {
 
   const assessmentCountByAssessor = {};
   (assessments || []).forEach((row) => {
+    if (!row.assessor_id) return;
     assessmentCountByAssessor[row.assessor_id] =
       (assessmentCountByAssessor[row.assessor_id] || 0) + 1;
   });
 
   return NextResponse.json({
     assessors: (assessors || []).map((a) => ({
-      ...a,
+      id: a.id,
+      email: a.email,
+      full_name: a.full_name,
+      created_at: a.created_at,
       is_active: a.is_active !== false,
+      deactivated_at: a.deactivated_at || null,
+      active_assignment_count: activeCountByAssessor[a.id] || 0,
+      assignment_count: assignmentCountByAssessor[a.id] || 0,
+      assessment_count: assessmentCountByAssessor[a.id] || 0,
     })),
     assignments: (assignments || []).filter((a) => a.status === "active"),
     all_assignments: assignments || [],
     applications: applications || [],
     unassigned_applications: (applications || []).filter((app) => !assignedApplicationIds.has(app.id)),
+    assignable_statuses: ASSESSOR_ASSIGNABLE_STATUSES,
   });
 }

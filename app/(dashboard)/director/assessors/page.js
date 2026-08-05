@@ -96,6 +96,7 @@ export default function DirectorAssessorsPage() {
       body: JSON.stringify({
         assessor_id: selectedAssessor,
         application_ids: selectedApplications,
+        force_reassign: true,
       }),
     });
     const data = await res.json();
