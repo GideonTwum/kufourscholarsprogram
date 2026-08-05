@@ -62,7 +62,7 @@ export default function ApplicantLayout({ children }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen min-w-0 overflow-x-hidden bg-gray-50">
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -71,7 +71,7 @@ export default function ApplicantLayout({ children }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white shadow-lg transition-transform duration-300 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col bg-white shadow-lg transition-transform duration-300 lg:static lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -155,20 +155,23 @@ export default function ApplicantLayout({ children }) {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center gap-4 border-b border-gray-100 bg-white px-4 lg:px-8">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+        <header className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-100 bg-white px-4 lg:px-8">
           <button
             onClick={() => setSidebarOpen(true)}
             className="text-gray-500 lg:hidden"
           >
             <Menu size={22} />
           </button>
+          <div className="min-w-0 flex-1" />
           <NotificationsBell />
-          <span className="rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-dark">
+          <span className="shrink-0 rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold text-gold-dark">
             Applicant
           </span>
         </header>
-        <main className="flex-1 p-4 lg:p-8">{children}</main>
+        <main className="dashboard-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-8">
+          <div className="mx-auto w-full max-w-full min-w-0">{children}</div>
+        </main>
       </div>
     </div>
   );

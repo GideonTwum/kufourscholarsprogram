@@ -30,18 +30,18 @@ function nameFor(app) {
 
 function Field({ label, value }) {
   return (
-    <div className="py-2">
+    <div className="min-w-0 py-2">
       <dt className="text-xs font-medium text-gray-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-gray-900">{value || "—"}</dd>
+      <dd className="mt-0.5 break-words text-sm text-gray-900">{value || "—"}</dd>
     </div>
   );
 }
 
 function Section({ title, icon: Icon, children }) {
   return (
-    <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-gray-900">
-        <Icon size={16} className="text-royal" /> {title}
+    <section className="min-w-0 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <h2 className="mb-4 flex min-w-0 items-center gap-2 text-sm font-bold text-gray-900">
+        <Icon size={16} className="shrink-0 text-royal" /> <span className="min-w-0 break-words">{title}</span>
       </h2>
       {children}
     </section>
@@ -50,9 +50,9 @@ function Section({ title, icon: Icon, children }) {
 
 function DocumentLink({ label, url, loading }) {
   return (
-    <div className="rounded-lg border border-gray-100 p-4">
+    <div className="min-w-0 rounded-lg border border-gray-100 p-4">
       <FileText size={20} className="mb-2 text-gray-400" />
-      <p className="text-sm font-medium text-gray-900">{label}</p>
+      <p className="truncate text-sm font-medium text-gray-900" title={label}>{label}</p>
       {url ? (
         <a
           href={url}
@@ -235,10 +235,10 @@ export default function AssessorApplicantDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <div className="min-w-0 space-y-6">
           <Section title="Applicant details" icon={User}>
-            <dl className="grid gap-x-6 sm:grid-cols-2">
+            <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
               <Field label="Full name" value={nameFor(application)} />
               <Field label="Phone" value={application.phone} />
               <Field label="Nationality" value={application.nationality} />
@@ -251,7 +251,7 @@ export default function AssessorApplicantDetailPage() {
           </Section>
 
           <Section title="Documents" icon={FileText}>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <DocumentLink label="CV / Personal Statement" url={docUrls.cv} loading={!!(application.cv_personal_statement_url || application.cv_url)} />
               <DocumentLink label="Academic Transcript" url={docUrls.transcript} loading={!!application.academic_transcript_url} />
               <DocumentLink label="Recommendation Letter" url={docUrls.recommendation} loading={!!application.recommendation_url} />
@@ -272,7 +272,7 @@ export default function AssessorApplicantDetailPage() {
           </Section>
         </div>
 
-        <form onSubmit={submitAssessment} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <form onSubmit={submitAssessment} className="min-w-0 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="flex items-center gap-2 font-bold text-gray-900">
             <GraduationCap size={18} /> {stage === "stage_1" ? "Stage 1" : "Stage 2"} recommendation
           </h2>

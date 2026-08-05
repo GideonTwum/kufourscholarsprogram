@@ -106,7 +106,7 @@ export default function DirectorProjectsPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
           <p className="mt-1 text-sm text-gray-500">Manage scholar-led projects for the public website.</p>
@@ -208,14 +208,14 @@ export default function DirectorProjectsPage() {
       ) : (
         <div className="space-y-3">
           {projects.map((p) => (
-            <div key={p.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-              <div>
-                <p className="font-semibold text-gray-900">{p.title}</p>
-                <p className="text-xs text-gray-500">
+            <div key={p.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-gray-900">{p.title}</p>
+                <p className="truncate text-xs text-gray-500">
                   {p.scholars?.full_name || "—"} · {p.year || "—"} · {p.location || "—"}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <button onClick={() => openForm(p)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-royal">
                   <Edit size={14} />
                 </button>

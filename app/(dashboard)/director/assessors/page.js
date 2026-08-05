@@ -244,7 +244,7 @@ export default function DirectorAssessorsPage() {
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_1.4fr]">
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <div className="space-y-8">
           <form onSubmit={createAssessor} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">

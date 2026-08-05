@@ -98,9 +98,9 @@ export default function ApplicantChatPage() {
               const sender = members[msg.sender_id];
               return (
                 <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[75%]`}>
-                    {!isMe && <p className="mb-0.5 text-[10px] font-medium text-gray-400">{sender?.full_name || "Director"}</p>}
-                    <div className={`rounded-2xl px-4 py-2.5 text-sm ${isMe ? "bg-royal text-white" : "bg-gray-100 text-gray-900"}`}>{msg.content}</div>
+                  <div className="min-w-0 max-w-[75%]">
+                    {!isMe && <p className="mb-0.5 truncate text-[10px] font-medium text-gray-400">{sender?.full_name || "Director"}</p>}
+                    <div className={`break-words rounded-2xl px-4 py-2.5 text-sm ${isMe ? "bg-royal text-white" : "bg-gray-100 text-gray-900"}`}>{msg.content}</div>
                     <p className={`mt-0.5 text-[10px] text-gray-400 ${isMe ? "text-right" : ""}`}>
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>

@@ -485,8 +485,8 @@ export default function ApplicationPage() {
         {step === 3 && <ReviewSubmit data={data} goToStep={setStep} errors={errors} docUrls={docUrls} />}
       </div>
 
-      <div className="mt-6 flex items-center justify-between">
-        <div className="flex gap-2">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
           {step > 0 && (
             <button onClick={() => setStep(step - 1)} className="flex items-center gap-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
               <ChevronLeft size={16} /> Back

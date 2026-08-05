@@ -131,7 +131,7 @@ export default function ApplicantMessagesPage() {
               <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-royal text-xs font-bold text-gold">
                 {convo.displayName?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?"}
               </div>
-              <div className="flex-1 overflow-hidden">
+              <div className="min-w-0 flex-1 overflow-hidden">
                 <div className="flex items-center justify-between">
                   <p className="truncate font-semibold text-gray-900">{convo.displayName}</p>
                   <span className="ml-2 flex-shrink-0 text-[10px] text-gray-400">{convo.lastMessageAt ? new Date(convo.lastMessageAt).toLocaleDateString() : ""}</span>

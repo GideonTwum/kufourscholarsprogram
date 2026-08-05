@@ -45,10 +45,10 @@ const SCORE_OPTIONS = [
 
 function Section({ title, icon: Icon, children }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-gray-900">
-        <Icon size={16} className="text-royal" />
-        {title}
+    <div className="min-w-0 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <h3 className="mb-4 flex min-w-0 items-center gap-2 text-sm font-bold text-gray-900">
+        <Icon size={16} className="shrink-0 text-royal" />
+        <span className="min-w-0 break-words">{title}</span>
       </h3>
       {children}
     </div>
@@ -57,9 +57,9 @@ function Section({ title, icon: Icon, children }) {
 
 function Field({ label, value }) {
   return (
-    <div className="py-2">
+    <div className="min-w-0 py-2">
       <dt className="text-xs font-medium text-gray-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-gray-900">{value || "—"}</dd>
+      <dd className="mt-0.5 break-words text-sm text-gray-900">{value || "—"}</dd>
     </div>
   );
 }
@@ -69,9 +69,9 @@ function DocCard({ label, field, application, docUrls, icon: Icon }) {
   const url = docUrls[field] || docUrls[field?.replace("_url", "")];
   const hasFile = !!path;
   return (
-    <div className="rounded-lg border border-gray-100 p-4">
+    <div className="min-w-0 rounded-lg border border-gray-100 p-4">
       <Icon size={20} className="mb-2 text-gray-400" />
-      <p className="text-sm font-medium text-gray-900">{label}</p>
+      <p className="truncate text-sm font-medium text-gray-900" title={label}>{label}</p>
       {!hasFile ? (
         <p className="mt-1 text-xs text-gray-400">Not uploaded</p>
       ) : url ? (
@@ -295,15 +295,15 @@ export default function PanelApplicantDetailPage() {
         <Link href="/panel" className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-royal">
           <ArrowLeft size={14} /> Back to Interview Applicants
         </Link>
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-royal text-lg font-bold text-gold">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-royal text-lg font-bold text-gold">
             {getApplicantInitials(application)}
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold text-gray-900">
               {getApplicantDisplayName(application)}
             </h1>
-            <p className="text-sm text-gray-500">{getApplicantDisplayEmail(application)}</p>
+            <p className="truncate text-sm text-gray-500">{getApplicantDisplayEmail(application)}</p>
             <p className="mt-1 text-xs text-gray-400">
               Status: {application.status?.replace(/_/g, " ") || "—"}
             </p>
@@ -312,16 +312,16 @@ export default function PanelApplicantDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-2 border-b border-gray-200">
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
         <button
           onClick={() => setActiveTab("details")}
-          className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === "details" ? "border-royal text-royal" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+          className={`shrink-0 border-b-2 px-4 py-2 text-sm font-medium ${activeTab === "details" ? "border-royal text-royal" : "border-transparent text-gray-500 hover:text-gray-700"}`}
         >
           Applicant Details
         </button>
         <button
           onClick={() => setActiveTab("scoring")}
-          className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === "scoring" ? "border-royal text-royal" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+          className={`shrink-0 border-b-2 px-4 py-2 text-sm font-medium ${activeTab === "scoring" ? "border-royal text-royal" : "border-transparent text-gray-500 hover:text-gray-700"}`}
         >
           Interview Scoring
         </button>
@@ -331,7 +331,7 @@ export default function PanelApplicantDetailPage() {
       {activeTab === "details" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <Section title="Personal Information" icon={User}>
-            <dl className="grid grid-cols-2 gap-x-6">
+            <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
               <Field label="Full Name" value={getApplicantDisplayName(application)} />
               <Field label="Date of Birth" value={application.date_of_birth} />
               <Field label="Phone" value={application.phone} />
@@ -348,7 +348,7 @@ export default function PanelApplicantDetailPage() {
           </Section>
 
           <Section title="Stage 1 Documents" icon={FileText}>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {application.photo_url && (
                 <DocCard label="Passport / profile photo" field="photo_url" application={application} docUrls={docUrls} icon={ImageIcon} />
               )}
@@ -356,9 +356,9 @@ export default function PanelApplicantDetailPage() {
                 <DocCard key={doc.field} label={doc.label} field={doc.field} application={appWithCv} docUrls={docUrls} icon={FileText} />
               ))}
               {getLeadershipEvidencePaths(application).map((path, i) => (
-                <div key={`lead-${i}`} className="rounded-lg border border-gray-100 p-4">
+                <div key={`lead-${i}`} className="min-w-0 rounded-lg border border-gray-100 p-4">
                   <FileText size={20} className="mb-2 text-gray-400" />
-                  <p className="text-sm font-medium text-gray-900">Leadership evidence {i + 1}</p>
+                  <p className="truncate text-sm font-medium text-gray-900">Leadership evidence {i + 1}</p>
                   {!path ? (
                     <p className="mt-1 text-xs text-gray-400">Not uploaded</p>
                   ) : docUrls.leadership?.[i] ? (
@@ -401,8 +401,8 @@ export default function PanelApplicantDetailPage() {
           <div className="space-y-4">
             {INTERVIEW_CRITERIA.map((c) => (
               <div key={c.key} className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-100 p-4">
-                <div className="min-w-[200px] flex-1">
-                  <span className="text-sm font-medium text-gray-900">{c.label}</span>
+                <div className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-[200px]">
+                  <span className="break-words text-sm font-medium text-gray-900">{c.label}</span>
                   <span className="ml-1 text-xs text-gray-500">({c.weight}%)</span>
                 </div>
                 <select

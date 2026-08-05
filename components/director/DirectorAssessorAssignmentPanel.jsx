@@ -169,14 +169,14 @@ export default function DirectorAssessorAssignmentPanel({ applicationId, applica
         </div>
       )}
 
-      <div className="mt-4 grid gap-3 rounded-lg border border-indigo-100 bg-white p-4 text-sm sm:grid-cols-2">
-        <div>
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 rounded-lg border border-indigo-100 bg-white p-4 text-sm sm:grid-cols-2">
+        <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Assigned to</p>
-          <p className="mt-1 font-medium text-gray-900">
+          <p className="mt-1 break-words font-medium text-gray-900">
             {assignment ? `Assigned to: ${currentName}` : "Unassigned"}
           </p>
           {assignment?.assessor?.email ? (
-            <p className="text-xs text-gray-500">{assignment.assessor.email}</p>
+            <p className="truncate text-xs text-gray-500" title={assignment.assessor.email}>{assignment.assessor.email}</p>
           ) : null}
         </div>
         <div>

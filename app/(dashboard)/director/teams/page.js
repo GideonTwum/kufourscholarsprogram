@@ -162,10 +162,10 @@ export default function DirectorTeamsPage() {
         <p className="mt-1 text-sm text-gray-500">Manage teams and mentors for the public website.</p>
       </div>
 
-      <div className="mb-6 flex gap-2 border-b border-gray-200">
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
         <button
           onClick={() => setActiveTab("teams")}
-          className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === "teams" ? "border-royal text-royal" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+          className={`shrink-0 border-b-2 px-4 py-2 text-sm font-medium ${activeTab === "teams" ? "border-royal text-royal" : "border-transparent text-gray-500 hover:text-gray-700"}`}
         >
           Teams ({teams.length})
         </button>
@@ -245,13 +245,13 @@ export default function DirectorTeamsPage() {
           )}
           <div className="space-y-3">
             {teams.map((team) => (
-              <div key={team.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-royal/10 text-royal">
+              <div key={team.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-royal/10 text-royal">
                     <Users size={20} />
                   </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{team.name}</p>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-gray-900">{team.name}</p>
                     {team.description && <p className="text-sm text-gray-500 line-clamp-1">{team.description}</p>}
                   </div>
                 </div>
@@ -428,22 +428,22 @@ export default function DirectorTeamsPage() {
           )}
           <div className="space-y-3">
             {mentors.map((mentor) => (
-              <div key={mentor.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center gap-4">
+              <div key={mentor.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
                   {mentor.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={mentor.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                    <img src={mentor.photo_url} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
                   ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/10 text-gold">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
                       <UserCircle size={20} />
                     </div>
                   )}
-                  <div>
-                    <p className="font-semibold text-gray-900">{mentor.full_name}</p>
-                    <p className="text-sm text-gray-500">{mentor.title || mentor.teams?.name || "—"}</p>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-gray-900">{mentor.full_name}</p>
+                    <p className="truncate text-sm text-gray-500">{mentor.title || mentor.teams?.name || "—"}</p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                   <button onClick={() => openMentorForm(mentor)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-royal">
                     <Edit size={16} />
                   </button>

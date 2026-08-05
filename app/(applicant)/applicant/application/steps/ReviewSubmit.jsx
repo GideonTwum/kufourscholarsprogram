@@ -6,9 +6,9 @@ import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 function Section({ title, icon: Icon, stepIndex, goToStep, readOnly, children }) {
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900"><Icon size={16} className="text-royal" />{title}</h3>
-        {!readOnly && goToStep && <button onClick={() => goToStep(stepIndex)} className="flex items-center gap-1 text-xs text-royal hover:text-gold"><Edit size={12} />Edit</button>}
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-gray-900"><Icon size={16} className="shrink-0 text-royal" /><span className="truncate">{title}</span></h3>
+        {!readOnly && goToStep && <button onClick={() => goToStep(stepIndex)} className="flex shrink-0 items-center gap-1 text-xs text-royal hover:text-gold"><Edit size={12} />Edit</button>}
       </div>
       <div className="mt-3 space-y-1.5">{children}</div>
     </div>
@@ -18,16 +18,16 @@ function Section({ title, icon: Icon, stepIndex, goToStep, readOnly, children })
 function Field({ label, value, href }) {
   const filled = !!value || !!href;
   return (
-    <div className="flex items-start gap-2 text-sm">
+    <div className="flex min-w-0 items-start gap-2 text-sm">
       {filled ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-green-500" /> : <XCircle size={14} className="mt-0.5 shrink-0 text-red-400" />}
-      <div>
+      <div className="min-w-0">
         <span className="text-gray-500">{label}:</span>{" "}
         {href ? (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-royal hover:text-gold">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 break-all text-royal hover:text-gold">
             View document <ExternalLink size={10} />
           </a>
         ) : (
-          <span className={filled ? "text-gray-900" : "text-red-400 italic"}>{value || "Not provided"}</span>
+          <span className={`break-words ${filled ? "text-gray-900" : "text-red-400 italic"}`}>{value || "Not provided"}</span>
         )}
       </div>
     </div>

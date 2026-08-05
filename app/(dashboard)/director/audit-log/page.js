@@ -54,7 +54,7 @@ export default function DirectorAuditLogPage() {
       </div>
 
       <form
-        className="mb-6 grid gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-3 lg:grid-cols-6"
+        className="mb-6 grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6"
         onSubmit={(e) => {
           e.preventDefault();
           setPage(1);

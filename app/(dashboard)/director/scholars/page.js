@@ -132,7 +132,7 @@ export default function DirectorScholarsPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Scholars Directory</h1>
           <p className="mt-1 text-sm text-gray-500">Manage scholar profiles for the public website.</p>
@@ -312,14 +312,14 @@ export default function DirectorScholarsPage() {
       ) : (
         <div className="space-y-3">
           {scholars.map((s) => (
-            <div key={s.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-royal/10 text-royal font-bold">
+            <div key={s.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-royal/10 text-royal font-bold">
                   {(s.full_name || "?").charAt(0)}
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-900">{s.full_name}</p>
-                  <p className="text-xs text-gray-500">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-gray-900">{s.full_name}</p>
+                  <p className="truncate text-xs text-gray-500">
                     {s.cohort_year} · {s.university || "—"} {s.is_featured && <Star size={12} className="inline text-gold" />}
                   </p>
                 </div>

@@ -145,7 +145,7 @@ export default function DirectorMessagesPage() {
                     .slice(0, 2) || "?"}
                 </div>
               )}
-              <div className="flex-1 overflow-hidden">
+              <div className="min-w-0 flex-1 overflow-hidden">
                 <div className="flex items-center justify-between">
                   <p className="truncate font-semibold text-gray-900">
                     {convo.displayName}

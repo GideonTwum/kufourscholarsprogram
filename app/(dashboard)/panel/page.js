@@ -119,12 +119,12 @@ export default function PanelDashboardPage() {
               <Link
                 key={app.id}
                 href={`/panel/${app.id}`}
-                className="group flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                className="group flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center sm:gap-4"
               >
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-royal text-xs font-bold text-gold">
                   {getApplicantInitials(app)}
                 </div>
-                <div className="flex-1 overflow-hidden">
+                <div className="min-w-0 flex-1 overflow-hidden">
                   <p className="truncate font-semibold text-gray-900">
                     {getApplicantDisplayName(app)}
                   </p>

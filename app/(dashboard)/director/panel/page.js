@@ -267,7 +267,7 @@ export default function DirectorPanelPage() {
         )}
 
         <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[200px] flex-1">
+          <div className="min-w-0 w-full flex-1 sm:min-w-[200px]">
             <label className="mb-1 block text-xs font-medium text-gray-500">
               Email Address <span className="text-red-500">*</span>
             </label>
@@ -283,7 +283,7 @@ export default function DirectorPanelPage() {
               />
             </div>
           </div>
-          <div className="min-w-[180px] flex-1">
+          <div className="min-w-0 w-full flex-1 sm:min-w-[180px]">
             <label className="mb-1 block text-xs font-medium text-gray-500">
               Full Name <span className="text-red-500">*</span>
             </label>
@@ -424,7 +424,7 @@ export default function DirectorPanelPage() {
           </div>
         )}
 
-        <form onSubmit={addToRoster} className="mb-10 grid gap-3 rounded-xl border border-gray-100 bg-white p-6 shadow-sm md:grid-cols-4">
+        <form onSubmit={addToRoster} className="mb-10 grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-white p-6 shadow-sm sm:grid-cols-2 md:grid-cols-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500">Full name</label>
             <input

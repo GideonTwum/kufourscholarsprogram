@@ -113,7 +113,7 @@ export default function DirectorNewsPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">News Articles</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -295,14 +295,14 @@ export default function DirectorNewsPage() {
           {articles.map((a) => (
             <div
               key={a.id}
-              className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+              className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 {a.featured && (
-                  <Star size={16} className="text-gold" fill="currentColor" />
+                  <Star size={16} className="shrink-0 text-gold" fill="currentColor" />
                 )}
-                <div>
-                  <p className="font-semibold text-gray-900">{a.title}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-gray-900">{a.title}</p>
                   <p className="text-xs text-gray-500">
                     {a.category} ·{" "}
                     {a.published_at

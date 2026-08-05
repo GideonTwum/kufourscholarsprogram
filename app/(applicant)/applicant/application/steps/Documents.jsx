@@ -233,11 +233,11 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
           {leadershipPaths.map((path, index) => (
             <div
               key={`${path}-${index}`}
-              className="flex items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50/80 px-3 py-2"
+              className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50/80 px-3 py-2"
             >
-              <span className="flex items-center gap-2 text-sm text-green-800">
+              <span className="flex min-w-0 items-center gap-2 text-sm text-green-800">
                 <CheckCircle2 size={16} className="shrink-0" />
-                Leadership file {index + 1} uploaded
+                <span className="truncate">Leadership file {index + 1} uploaded</span>
               </span>
               <button
                 type="button"

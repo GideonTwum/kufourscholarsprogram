@@ -97,7 +97,7 @@ export default function DirectorEventsPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Events</h1>
           <p className="mt-1 text-sm text-gray-500">Manage leadership events for the public website.</p>
@@ -195,14 +195,14 @@ export default function DirectorEventsPage() {
       ) : (
         <div className="space-y-3">
           {events.map((ev) => (
-            <div key={ev.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-              <div>
-                <p className="font-semibold text-gray-900">{ev.title}</p>
-                <p className="text-xs text-gray-500">
+            <div key={ev.id} className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-gray-900">{ev.title}</p>
+                <p className="truncate text-xs text-gray-500">
                   {new Date(ev.event_date).toLocaleDateString()} {ev.event_time && `· ${ev.event_time}`} · {ev.location || "—"}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <a href={`/events`} target="_blank" className="text-xs text-royal hover:text-gold">
                   View
                 </a>
