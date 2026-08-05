@@ -171,14 +171,16 @@ export default function DirectorAssessorAssignmentPanel({ applicationId, applica
 
       <div className="mt-4 grid gap-3 rounded-lg border border-indigo-100 bg-white p-4 text-sm sm:grid-cols-2">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Current assessor</p>
-          <p className="mt-1 font-medium text-gray-900">{currentName || "Unassigned"}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Assigned to</p>
+          <p className="mt-1 font-medium text-gray-900">
+            {assignment ? `Assigned to: ${currentName}` : "Unassigned"}
+          </p>
           {assignment?.assessor?.email ? (
             <p className="text-xs text-gray-500">{assignment.assessor.email}</p>
           ) : null}
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Assignment</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Assignment status</p>
           <p className="mt-1 capitalize text-gray-900">{assignment?.status || "none"}</p>
           <p className="text-xs text-gray-500">
             {assignment?.assigned_at
@@ -188,19 +190,33 @@ export default function DirectorAssessorAssignmentPanel({ applicationId, applica
         </div>
         <div className="sm:col-span-2">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Assessment</p>
-          {latestAssessment ? (
-            <p className="mt-1 text-gray-900">
-              {(latestAssessment.recommendation || "").replace(/_/g, " ") || "Submitted"}
-              {latestAssessment.overall_score != null
-                ? ` · Score ${Number(latestAssessment.overall_score).toFixed(2)}`
-                : ""}
-              {latestAssessment.submitted_at
-                ? ` · ${new Date(latestAssessment.submitted_at).toLocaleString()}`
-                : ""}
-            </p>
-          ) : (
-            <p className="mt-1 text-gray-500">Pending — no recommendation yet</p>
-          )}
+          {(() => {
+            const assessment = assignment?.assessment || (latestAssessment
+              ? {
+                  status: "submitted",
+                  recommendation: latestAssessment.recommendation,
+                  submitted_at: latestAssessment.submitted_at,
+                  overall_score: latestAssessment.overall_score,
+                }
+              : { status: "pending" });
+            if (assessment.status === "submitted") {
+              return (
+                <p className="mt-1 text-gray-900">
+                  Submitted
+                  {assessment.recommendation
+                    ? ` · ${(assessment.recommendation || "").replace(/_/g, " ")}`
+                    : ""}
+                  {assessment.overall_score != null
+                    ? ` · Score ${Number(assessment.overall_score).toFixed(2)}`
+                    : ""}
+                  {assessment.submitted_at
+                    ? ` · ${new Date(assessment.submitted_at).toLocaleString()}`
+                    : ""}
+                </p>
+              );
+            }
+            return <p className="mt-1 text-gray-500">Pending — no recommendation yet</p>;
+          })()}
         </div>
       </div>
 

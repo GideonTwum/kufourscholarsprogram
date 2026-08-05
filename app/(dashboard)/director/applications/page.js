@@ -203,6 +203,52 @@ async function loadCounts() {
   }
 }
 
+async function loadActiveAssignmentLabels() {
+  try {
+    const admin = createAdminClient();
+    const { data: rows } = await admin
+      .from("assessor_assignments")
+      .select("application_id, assessor_id, status, profiles:assessor_id(full_name, email)")
+      .eq("status", "active");
+
+    const map = {};
+    for (const row of rows || []) {
+      const name = row.profiles?.full_name || row.profiles?.email || "Assessor";
+      map[row.application_id] = {
+        assessor_id: row.assessor_id,
+        label: `Assigned to ${name}`,
+        email: row.profiles?.email || null,
+      };
+    }
+
+    const appIds = Object.keys(map);
+    if (appIds.length === 0) return map;
+
+    const { data: assessments } = await admin
+      .from("application_assessments")
+      .select("application_id, assessor_id, recommendation, submitted_at, assessor_name_snapshot")
+      .in("application_id", appIds)
+      .order("submitted_at", { ascending: false });
+
+    const seen = new Set();
+    for (const a of assessments || []) {
+      if (seen.has(a.application_id)) continue;
+      if (map[a.application_id]?.assessor_id && a.assessor_id !== map[a.application_id].assessor_id) {
+        continue;
+      }
+      seen.add(a.application_id);
+      if (map[a.application_id]) {
+        const who = a.assessor_name_snapshot || map[a.application_id].label.replace(/^Assigned to /, "");
+        map[a.application_id].label = `Assessment submitted by ${who}`;
+        map[a.application_id].recommendation = a.recommendation || null;
+      }
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 export default async function DirectorApplicationsPage({ searchParams }) {
   const supabase = await createClient();
   const {
@@ -222,9 +268,10 @@ export default async function DirectorApplicationsPage({ searchParams }) {
   const params = await searchParams;
   const statusFilter = params?.status || "";
 
-  const [{ applications, loadError }, counts] = await Promise.all([
+  const [{ applications, loadError }, counts, assignmentLabels] = await Promise.all([
     loadApplications(statusFilter),
     loadCounts(),
+    loadActiveAssignmentLabels(),
   ]);
 
   const countForFilter = (key) => {
@@ -293,6 +340,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         <div className="space-y-3">
           {applications.map((app) => {
             const config = statusConfig[app.status] || statusConfig.pending;
+            const assignee = assignmentLabels[app.id];
             return (
               <Link
                 key={app.id}
@@ -312,6 +360,10 @@ export default async function DirectorApplicationsPage({ searchParams }) {
                   </p>
                   <p className="truncate text-xs text-gray-500">
                     {app.profiles?.email || "\u2014"}
+                    {" · "}
+                    <span className={assignee ? "text-indigo-700" : "text-gray-400"}>
+                      {assignee?.label || "Unassigned"}
+                    </span>
                   </p>
                 </div>
                 <span

@@ -77,6 +77,19 @@ export async function GET(_request, { params }) {
       ]);
 
     const latestAssessment = (assessments || [])[0] || null;
+    const assessmentSummary = latestAssessment
+      ? {
+          status: "submitted",
+          recommendation: latestAssessment.recommendation || null,
+          submitted_at: latestAssessment.submitted_at || null,
+          overall_score: latestAssessment.overall_score ?? null,
+        }
+      : {
+          status: "pending",
+          recommendation: null,
+          submitted_at: null,
+          overall_score: null,
+        };
 
     return NextResponse.json({
       application,
@@ -86,7 +99,15 @@ export async function GET(_request, { params }) {
             assessor_id: activeAssignment.assessor_id,
             status: activeAssignment.status,
             assigned_at: activeAssignment.assigned_at,
-            assessor: activeAssignment.profiles || null,
+            assessor: activeAssignment.profiles
+              ? {
+                  id: activeAssignment.profiles.id,
+                  full_name: activeAssignment.profiles.full_name,
+                  email: activeAssignment.profiles.email,
+                  is_active: activeAssignment.profiles.is_active !== false,
+                }
+              : null,
+            assessment: assessmentSummary,
           }
         : null,
       assessments: assessments || [],
