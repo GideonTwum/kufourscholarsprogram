@@ -2,8 +2,8 @@
 
 import { motion, useInView } from "framer-motion";
 import { ArrowRight, GraduationCap, Handshake, Network, Sparkles } from "lucide-react";
-import Link from "next/link";
 import { useRef } from "react";
+import ApplyNowCta from "@/components/landing/ApplyNowCta";
 
 const reasons = [
   {
@@ -73,13 +73,17 @@ export default function WhyApply({ applicationsOpen = false }) {
         </div>
 
         <div className="mt-12 text-center">
-          <Link
-            href={applicationsOpen ? "/applicant-register" : "/apply"}
+          <ApplyNowCta
+            applicationsOpen={applicationsOpen}
+            linkWhenClosed
+            closedLabel="Prepare to apply"
             className="inline-flex items-center gap-2 rounded-lg bg-royal px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-royal/90"
           >
-            {applicationsOpen ? "Start your application" : "Prepare to apply"}
-            <ArrowRight size={16} />
-          </Link>
+            <>
+              Start your application
+              <ArrowRight size={16} />
+            </>
+          </ApplyNowCta>
         </div>
       </div>
     </section>

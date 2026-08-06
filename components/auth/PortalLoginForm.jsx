@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { assertLoginPortalRole, portalHomeForRole } from "@/lib/portal-auth";
-import { resolveDirectorMfaDestination, MFA_SETUP_PATH, MFA_CHALLENGE_PATH } from "@/lib/director-mfa";
 
 const PROFILE_COLUMNS = "id, email, full_name, role, is_active";
 
@@ -144,22 +143,8 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
       return;
     }
 
-    if (expectedRole === "director") {
-      const dest = await resolveDirectorMfaDestination(supabase);
-      if (dest === "setup") {
-        router.push(MFA_SETUP_PATH);
-        router.refresh();
-        setLoading(false);
-        return;
-      }
-      if (dest === "challenge" || dest === "error") {
-        router.push(MFA_CHALLENGE_PATH);
-        router.refresh();
-        setLoading(false);
-        return;
-      }
-    }
-
+    // Director MFA (when enabled) is enforced server-side in proxy via resolveDirectorMfaDestination.
+    // Do not branch on MFA here — DIRECTOR_MFA_REQUIRED is not available in the browser.
     router.push(portalHomeForRole(role));
     router.refresh();
   }

@@ -10,6 +10,7 @@ import {
   isNavHrefActive,
   isNavItemActive,
 } from "@/lib/public-navigation";
+import ApplyNowCta from "@/components/landing/ApplyNowCta";
 
 function linkTone(scrolled, active) {
   if (active) return scrolled ? "text-royal" : "text-gold";
@@ -281,19 +282,15 @@ export default function Navbar({ applicationsOpen = false }) {
             Login
           </Link>
           {applicationsOpen ? (
-            <Link
-              href="/applicant-register"
+            <ApplyNowCta
+              applicationsOpen
               className="whitespace-nowrap rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-royal transition-all duration-200 hover:bg-gold-light hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal"
-            >
-              Apply Now
-            </Link>
+            />
           ) : (
-            <span
-              className="cursor-not-allowed whitespace-nowrap rounded-lg border border-gray-300/80 bg-gray-100 px-3.5 py-2 text-sm font-medium text-gray-400"
-              aria-disabled="true"
-            >
-              Applications Closed
-            </span>
+            <ApplyNowCta
+              applicationsOpen={false}
+              closedClassName="cursor-not-allowed whitespace-nowrap rounded-lg border border-gray-300/80 bg-gray-100 px-3.5 py-2 text-sm font-medium text-gray-400"
+            />
           )}
         </div>
 
@@ -378,17 +375,16 @@ export default function Navbar({ applicationsOpen = false }) {
                   Login
                 </Link>
                 {applicationsOpen ? (
-                  <Link
-                    href="/applicant-register"
-                    onClick={() => setMobileOpen(false)}
+                  <ApplyNowCta
+                    applicationsOpen
+                    onNavigate={() => setMobileOpen(false)}
                     className="rounded-lg bg-gold px-3 py-2.5 text-center text-sm font-semibold text-royal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal"
-                  >
-                    Apply Now
-                  </Link>
+                  />
                 ) : (
-                  <span className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-center text-sm font-medium text-gray-500">
-                    Applications Closed
-                  </span>
+                  <ApplyNowCta
+                    applicationsOpen={false}
+                    closedClassName="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-center text-sm font-medium text-gray-500"
+                  />
                 )}
               </div>
             </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { isDirectorRole } from "@/lib/roles";
+import { isDirectorRole, dashboardPathForRole } from "@/lib/roles";
 import { isProfileActive } from "@/lib/staff-lifecycle";
 import {
   MFA_SETUP_PATH,
@@ -40,8 +40,9 @@ export default function DirectorMfaChallengePage() {
         .maybeSingle();
 
       if (!isDirectorRole(profile?.role) || !isProfileActive(profile)) {
-        await supabase.auth.signOut();
-        router.replace("/director-login");
+        router.replace(
+          profile?.role ? dashboardPathForRole(profile.role) : "/login"
+        );
         return;
       }
 

@@ -9,7 +9,9 @@
     "start": "next start",
     "test": "node --test tests/*.test.mjs",
     "check": "npm run test && npm run build",
-    "seed:test-accounts": "node scripts/seed-test-accounts.mjs"
+    "seed:test-accounts": "node scripts/seed-test-accounts.mjs",
+    "reset:test-data": "node scripts/reset-test-data.mjs",
+    "verify:apply-now": "node scripts/verify-apply-now-browser.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -22,7 +24,9 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4"
   }
 }

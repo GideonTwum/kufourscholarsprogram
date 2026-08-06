@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
+import ApplyNowCta from "@/components/landing/ApplyNowCta";
 
 function Countdown({ deadline }) {
   const [remaining, setRemaining] = useState(null);
@@ -84,13 +85,13 @@ function Countdown({ deadline }) {
 export default function Hero({ applicationsOpen = false, applicationDeadline = null }) {
   return (
     <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-royal">
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-br from-royal-dark via-royal to-royal-light opacity-90" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(200,169,81,0.15),_transparent_60%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(200,169,81,0.1),_transparent_60%)]" />
+      {/* Gradient overlays — decorative only; must not steal clicks from CTAs */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-royal-dark via-royal to-royal-light opacity-90" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(200,169,81,0.15),_transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(200,169,81,0.1),_transparent_60%)]" />
 
       {/* Decorative pattern */}
-      <div className="absolute inset-0 opacity-5">
+      <div className="pointer-events-none absolute inset-0 opacity-5">
         <div
           className="h-full w-full"
           style={{
@@ -159,8 +160,8 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
           className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
           {applicationsOpen ? (
-            <Link
-              href="/applicant-register"
+            <ApplyNowCta
+              applicationsOpen
               className="group flex items-center gap-2 rounded-lg bg-gold px-8 py-3.5 text-sm font-semibold text-royal shadow-lg shadow-gold/20 transition-all duration-200 hover:bg-gold-light hover:shadow-xl hover:shadow-gold/30"
             >
               Apply Now
@@ -168,11 +169,12 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
                 size={16}
                 className="transition-transform group-hover:translate-x-1"
               />
-            </Link>
+            </ApplyNowCta>
           ) : (
-            <span className="flex items-center gap-2 rounded-lg border border-white/30 bg-white/5 px-8 py-3.5 text-sm font-semibold text-white/70">
-              Applications Closed
-            </span>
+            <ApplyNowCta
+              applicationsOpen={false}
+              closedClassName="flex items-center gap-2 rounded-lg border border-white/30 bg-white/5 px-8 py-3.5 text-sm font-semibold text-white/70"
+            />
           )}
           <Link
             href="/scholars"

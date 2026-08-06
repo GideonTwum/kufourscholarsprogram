@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
+import StaffApplyNotice from "@/components/landing/StaffApplyNotice";
 
 export default async function PublicLayout({ children }) {
   let applicationsOpen = false;
@@ -16,9 +18,12 @@ export default async function PublicLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-white font-sans">
+      <Suspense fallback={null}>
+        <StaffApplyNotice />
+      </Suspense>
       <Navbar applicationsOpen={applicationsOpen} />
       {children}
-      <Footer />
+      <Footer applicationsOpen={applicationsOpen} />
     </div>
   );
 }

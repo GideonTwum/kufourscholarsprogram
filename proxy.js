@@ -1,7 +1,12 @@
 import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse } from "next/server";
 import { dashboardPathForRole, isDirectorRole } from "@/lib/roles";
-import { loginPathForProtectedRoute } from "@/lib/portal-auth";
+import {
+  authRouteBouncePath,
+  authRouteBounceSearchParams,
+  isApplicantRole,
+  loginPathForProtectedRoute,
+} from "@/lib/portal-auth";
 import {
   isDirectorMfaPath,
   MFA_CHALLENGE_PATH,
@@ -51,9 +56,14 @@ async function fetchProfile(supabase, userId) {
 
 async function enforceDirectorMfa(request, supabase, profile) {
   const { pathname } = request.nextUrl;
+  // Hard gate: MFA destinations are Director-only. Never evaluate MFA for other roles.
   if (!isDirectorRole(profile?.role)) return null;
   if (profile?.is_active === false) return null;
+  // Only enforce while the user is on /director* (caller also checks; belt-and-suspenders).
+  if (!(pathname === "/director" || pathname.startsWith("/director/"))) return null;
 
+  // resolveDirectorMfaDestination returns "ok" when DIRECTOR_MFA_REQUIRED=false
+  // (including redirects away from setup/challenge pages).
   const dest = await resolveDirectorMfaDestination(supabase);
   const onMfa = isDirectorMfaPath(pathname);
 
@@ -163,7 +173,7 @@ export async function proxy(request) {
     if (
       pathname.startsWith("/applicant") &&
       !verifyEmailPath &&
-      (role === "applicant" || role === "scholar") &&
+      isApplicantRole(role) &&
       applicantNeedsEmailVerification(user)
     ) {
       const url = request.nextUrl.clone();
@@ -173,6 +183,7 @@ export async function proxy(request) {
 
     if (pathname.startsWith("/director")) {
       if (!isDirectorRole(role)) {
+        // Non-directors (including applicants) never enter Director MFA paths.
         const url = request.nextUrl.clone();
         url.pathname = dashboardPathForRole(role);
         return NextResponse.redirect(url);
@@ -226,12 +237,20 @@ export async function proxy(request) {
     ) {
       return supabaseResponse;
     }
-    // Allow browsing forgot-password while signed in (e.g. change of mind).
-    if (pathname.startsWith("/forgot-password")) {
+    const bounceTo = authRouteBouncePath(pathname, role);
+    if (!bounceTo) {
       return supabaseResponse;
     }
     const url = request.nextUrl.clone();
-    url.pathname = dashboardPathForRole(role);
+    url.pathname = bounceTo;
+    const extra = authRouteBounceSearchParams(pathname, role);
+    if (extra) {
+      for (const [key, value] of Object.entries(extra)) {
+        url.searchParams.set(key, value);
+      }
+    } else if (bounceTo === "/") {
+      url.search = "";
+    }
     return NextResponse.redirect(url);
   }
 

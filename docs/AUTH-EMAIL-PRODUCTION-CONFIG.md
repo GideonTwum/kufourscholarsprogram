@@ -38,6 +38,7 @@ Set these in Vercel (Production + Preview as appropriate). Never commit real val
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser/server anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only Admin client (never `NEXT_PUBLIC_`) |
+| `DIRECTOR_MFA_REQUIRED` | `true`/unset = enforce Director TOTP (AAL2); `false` = temporary password-only Director access for testing (never `NEXT_PUBLIC_`) |
 | `RESEND_API_KEY` | Transactional email via Resend (Next.js direct send path) |
 | `EMAIL_FROM` | Verified sender, e.g. `Kufuor Scholars Program <noreply@kufuorscholarapplication.com>` |
 | `NEXT_PUBLIC_SITE_URL` | Canonical site origin, e.g. `https://www.example.com` (no trailing slash) |
@@ -82,7 +83,7 @@ supabase functions deploy send-email
 | Redirect allowlist | Include `{SITE}/auth/callback` and production/staging origins |
 | Confirm email | Enabled for applicant self-registration |
 | Password recovery | Enabled; recovery redirects through `/auth/callback?next=/reset-password` |
-| MFA (TOTP) | Enabled — required for Directors in this app |
+| MFA (TOTP) | Enabled in Supabase Auth. App enforcement via `DIRECTOR_MFA_REQUIRED` (see below) |
 | Rate limits | Keep Supabase defaults (or stricter); app adds best-effort cooldowns only |
 | Custom SMTP | Optional; use if Auth emails (confirm / reset) must leave Supabase default mailer |
 
@@ -100,7 +101,11 @@ Auth SMTP is separate from the Next/Edge Resend API path. Do not confuse Auth SM
 ## Application behavior notes
 
 - Applicant verification uses a **confirmation email link**, not typed OTP and not SMS OTP.
-- Directors must complete **TOTP MFA** (AAL2) before `/director` and privileged APIs.
+- Director MFA remains **implemented** (`/director/mfa-setup`, `/director/mfa-challenge`, AAL2 helpers).
+  Enforcement is controlled by server-side **`DIRECTOR_MFA_REQUIRED`** (not `NEXT_PUBLIC_*`):
+  - `true` or unset → Directors must complete TOTP MFA (AAL2) before `/director` and privileged APIs.
+  - `false` → temporary password-only Director access for local/staging (routes still exist; proxy redirects MFA pages to `/director`).
+  - **Before production launch set `DIRECTOR_MFA_REQUIRED=true`.**
 - Password reset uses `resetPasswordForEmail` → `/auth/callback` → `/reset-password`.
 - Staff lifecycle fields (`role`, `class_name`, `is_active`, `deactivated_at`, `deactivated_by`) are writable only via **service_role** after migration `202608060001`.
 - App-level forgot-password rate limiting is **best-effort** on serverless (per isolate). Supabase Auth limits remain authoritative.
