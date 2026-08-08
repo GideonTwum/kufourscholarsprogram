@@ -108,13 +108,15 @@ function VerifyEmailContent() {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-royal/10">
           <Mail size={24} className="text-royal" />
         </div>
-        <h1 className="mt-4 text-xl font-bold text-gray-900">Verify your email</h1>
+        <h1 className="mt-4 text-xl font-bold text-gray-900">Email Verification</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Please verify your email before continuing.
+          Account verification is required before you can continue to the applicant portal.
+          Open the verification link we emailed you — this is not a typed code.
         </p>
         {registered && (
           <p className="mt-2 text-sm text-gray-500">
-            We sent a link to <strong>{email || "your address"}</strong>. Open it to activate your account.
+            We sent a verification link to <strong>{email || "your address"}</strong>. Open
+            that email and tap the link to verify your account, then return here or sign in.
           </p>
         )}
       </div>

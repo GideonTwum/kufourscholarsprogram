@@ -579,6 +579,22 @@ export default function ApplicationReviewPage() {
               <Field label="Hometown & Region" value={[application.hometown, application.region].filter(Boolean).join(", ")} />
               <Field label="Country of Origin" value={application.country_of_origin} />
               <Field
+                label="Dual citizenship"
+                value={
+                  application.has_dual_citizenship === true
+                    ? "Yes"
+                    : application.has_dual_citizenship === false
+                      ? "No"
+                      : null
+                }
+              />
+              {application.has_dual_citizenship ? (
+                <Field
+                  label="Second Country of Citizenship"
+                  value={application.second_citizenship_country}
+                />
+              ) : null}
+              <Field
                 label="Emergency contact 1"
                 value={
                   application.emergency_contact_name

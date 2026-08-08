@@ -13,9 +13,12 @@ import {
   AlertCircle,
   Calendar,
   MapPin,
+  Users,
+  MessageCircle,
 } from "lucide-react";
 import ApplicantProgressBar from "./components/ApplicantProgressBar";
 import { normalizeApplicationStatus } from "@/lib/application-status";
+import { isValidWhatsAppGroupUrl } from "@/lib/countries";
 
 function InterviewScheduledCard({ slot, onFirstView }) {
   useEffect(() => {
@@ -81,21 +84,77 @@ function InterviewScheduledCard({ slot, onFirstView }) {
   );
 }
 
+function prefersReducedMotion() {
+  if (typeof window === "undefined") return true;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function fireConfetti() {
   if (typeof window === "undefined") return;
+  if (prefersReducedMotion()) return;
   import("canvas-confetti").then(({ default: confetti }) => {
-    const count = 200;
-    const defaults = { origin: { y: 0.6 } };
-    confetti({ ...defaults, particleCount: count, spread: 80, colors: ["#1e3a5f", "#c9a227", "#ffffff"] });
-    confetti({ ...defaults, particleCount: count * 0.3, angle: 60, spread: 55, origin: { x: 0 } });
-    confetti({ ...defaults, particleCount: count * 0.3, angle: 120, spread: 55, origin: { x: 1 } });
+    const count = 160;
+    const defaults = { origin: { y: 0.65 }, disableForReducedMotion: true };
+    confetti({
+      ...defaults,
+      particleCount: count,
+      spread: 70,
+      colors: ["#1e3a5f", "#c9a227", "#ffffff"],
+    });
+    confetti({
+      ...defaults,
+      particleCount: count * 0.25,
+      angle: 60,
+      spread: 50,
+      origin: { x: 0 },
+    });
+    confetti({
+      ...defaults,
+      particleCount: count * 0.25,
+      angle: 120,
+      spread: 50,
+      origin: { x: 1 },
+    });
   });
+}
+
+function AcceptedCelebration({ firstName, whatsappUrl, onFirstView }) {
+  useEffect(() => {
+    onFirstView?.();
+  }, [onFirstView]);
+
+  return (
+    <div className="overflow-hidden rounded-xl border-2 border-gold/40 bg-gradient-to-br from-green-50 via-white to-gold/10 p-6 text-center sm:p-8">
+      <CheckCircle2 size={48} className="mx-auto text-green-600" />
+      <h3 className="mt-4 text-2xl font-bold text-gray-900">
+        Congratulations{firstName ? `, ${firstName}` : ""}!
+      </h3>
+      <p className="mt-2 text-base font-medium text-green-800">
+        You have been accepted into the Kufuor Scholars Program.
+      </p>
+      <p className="mx-auto mt-3 max-w-md text-sm text-gray-600">
+        We are delighted to welcome you to the next chapter of your leadership journey.
+      </p>
+      {whatsappUrl ? (
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 inline-flex max-w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1ebe5d]"
+        >
+          <MessageCircle size={18} className="shrink-0" />
+          <span className="truncate">Join the Scholars WhatsApp Group</span>
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 export default function ApplicantDashboard() {
   const supabase = createClient();
   const [profile, setProfile] = useState(null);
   const [application, setApplication] = useState(null);
+  const [whatsappUrl, setWhatsappUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const hasFiredConfetti = useRef(false);
@@ -140,6 +199,18 @@ export default function ApplicantDashboard() {
       }
       setApplication(applicationData);
 
+      if (applicationData?.status === "accepted") {
+        const { data: wa } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", "accepted_whatsapp_group_url")
+          .maybeSingle();
+        const raw = String(wa?.value || "").trim();
+        if (raw && isValidWhatsAppGroupUrl(raw)) {
+          setWhatsappUrl(raw.startsWith("http") ? raw : `https://${raw}`);
+        }
+      }
+
       setLoading(false);
     }
     load();
@@ -161,7 +232,9 @@ export default function ApplicantDashboard() {
           <div>
             <h2 className="font-semibold text-red-800">Something went wrong</h2>
             <p className="mt-1 text-sm text-red-700">{error}</p>
-            <p className="mt-2 text-xs text-red-600">Try refreshing the page. If the problem persists, please contact support.</p>
+            <p className="mt-2 text-xs text-red-600">
+              Try refreshing the page. If the problem persists, please contact support.
+            </p>
           </div>
         </div>
       </div>
@@ -171,24 +244,24 @@ export default function ApplicantDashboard() {
   const normalizedStatus = application
     ? normalizeApplicationStatus(application.status)
     : "draft";
+  const firstName = profile?.full_name?.split(" ")[0] || "";
 
   return (
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
-          Welcome, {profile?.full_name?.split(" ")[0] || "Applicant"}
+          Welcome, {firstName || "Applicant"}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Track your application progress and stay updated.
         </p>
       </div>
 
-      {/* Application status */}
       <div className="mb-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 font-bold text-gray-900">Application Status</h2>
 
         {!application || application.status === "draft" ? (
-          <div className="text-center py-6">
+          <div className="py-6 text-center">
             <FileText size={40} className="mx-auto text-gray-300" />
             <p className="mt-3 text-sm text-gray-500">
               {application?.status === "draft"
@@ -199,23 +272,21 @@ export default function ApplicantDashboard() {
               href="/applicant/application"
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-royal px-5 py-2.5 text-sm font-semibold text-white hover:bg-royal-light"
             >
-              {application?.status === "draft"
-                ? "Continue Application"
-                : "Start Application"}
+              {application?.status === "draft" ? "Continue Application" : "Start Application"}
               <ArrowRight size={14} />
             </Link>
           </div>
         ) : application.status === "accepted" ? (
-          <div className="rounded-lg bg-green-50 p-6 text-center">
-            <CheckCircle2 size={40} className="mx-auto text-green-600" />
-            <h3 className="mt-3 text-lg font-bold text-green-800">
-              Congratulations!
-            </h3>
-            <p className="mt-1 text-sm text-green-700">
-              Your application has been accepted into the Kufuor Scholars
-              Program!
-            </p>
-          </div>
+          <AcceptedCelebration
+            firstName={firstName}
+            whatsappUrl={whatsappUrl}
+            onFirstView={() => {
+              if (!hasFiredConfetti.current) {
+                hasFiredConfetti.current = true;
+                fireConfetti();
+              }
+            }}
+          />
         ) : application.status === "called_for_interview" &&
           application.interview_date &&
           !application.interview_slot_id ? (
@@ -269,12 +340,10 @@ export default function ApplicantDashboard() {
         ) : application.status === "rejected" ? (
           <div className="rounded-lg bg-red-50 p-6 text-center">
             <XCircle size={40} className="mx-auto text-red-500" />
-            <h3 className="mt-3 text-lg font-bold text-red-800">
-              Application Not Successful
-            </h3>
+            <h3 className="mt-3 text-lg font-bold text-red-800">Application Not Successful</h3>
             <p className="mt-1 text-sm text-red-700">
-              Unfortunately, your application was not successful this time.
-              Thank you for your interest.
+              Unfortunately, your application was not successful this time. Thank you for your
+              interest.
             </p>
             {application.rejection_reason ? (
               <p className="mt-4 rounded-lg bg-white/80 p-3 text-left text-sm text-red-900">
@@ -293,7 +362,9 @@ export default function ApplicantDashboard() {
               Congratulations! You&apos;re Shortlisted for Stage 2
             </h3>
             <p className="mt-2 text-center text-sm text-gray-700">
-              Submit your poster presentation video. Create a 3-minute video on a community problem, outlining the identified problem, cause, effect, intervention, and expected outcome.
+              Submit your poster presentation video. Create a 3-minute video on a community
+              problem, outlining the identified problem, cause, effect, intervention, and expected
+              outcome.
             </p>
             <div className="mt-6 flex justify-center">
               <Link
@@ -308,9 +379,7 @@ export default function ApplicantDashboard() {
         ) : normalizedStatus === "stage_2_submitted" ? (
           <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-6 text-center">
             <CheckCircle2 size={40} className="mx-auto text-indigo-600" />
-            <h3 className="mt-3 text-lg font-bold text-gray-900">
-              Stage 2 Submitted
-            </h3>
+            <h3 className="mt-3 text-lg font-bold text-gray-900">Stage 2 Submitted</h3>
             <p className="mt-1 text-sm text-gray-600">
               Your video has been received. We will review it and notify you of the outcome.
             </p>
@@ -320,14 +389,14 @@ export default function ApplicantDashboard() {
             <Video size={40} className="mx-auto text-amber-600" />
             <h3 className="mt-3 text-lg font-bold text-gray-900">Stage 2 approved</h3>
             <p className="mt-1 text-sm text-gray-600">
-              The committee has approved your Stage 2 submission. You will receive interview details here and by email when scheduled.
+              The committee has approved your Stage 2 submission. You will receive interview
+              details here and by email when scheduled.
             </p>
           </div>
         ) : (
           <ApplicantProgressBar status={application.status} />
         )}
       </div>
-
     </div>
   );
 }

@@ -1,15 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ToggleLeft, Loader2, CheckCircle2, Calendar, Clock, AlertCircle } from "lucide-react";
+import {
+  ToggleLeft,
+  Loader2,
+  CheckCircle2,
+  Calendar,
+  Clock,
+  AlertCircle,
+  MessageCircle,
+} from "lucide-react";
 
 export default function DirectorSettingsPage() {
   const [applicationsOpen, setApplicationsOpen] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("23:59");
+  const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [cohortYear, setCohortYear] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingDeadline, setSavingDeadline] = useState(false);
+  const [savingExtras, setSavingExtras] = useState(false);
   const [message, setMessage] = useState(null);
 
   async function load() {
@@ -18,6 +29,8 @@ export default function DirectorSettingsPage() {
     const data = await res.json();
     if (res.ok) {
       setApplicationsOpen(Boolean(data.applications_open));
+      setWhatsappUrl(data.accepted_whatsapp_group_url || "");
+      setCohortYear(data.application_cohort_year || "");
       if (data.application_deadline) {
         try {
           const d = new Date(data.application_deadline);
@@ -200,6 +213,81 @@ export default function DirectorSettingsPage() {
               Clear
             </button>
           )}
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
+          <MessageCircle size={20} />
+          Acceptance & Stage 2
+        </h2>
+        <p className="mb-4 text-sm text-gray-600">
+          WhatsApp group link is shown only to accepted applicants. Cohort year appears in Stage 2
+          YouTube title instructions.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">
+              Accepted Scholars WhatsApp Group URL
+            </label>
+            <input
+              type="url"
+              value={whatsappUrl}
+              onChange={(e) => setWhatsappUrl(e.target.value)}
+              placeholder="https://chat.whatsapp.com/..."
+              className="w-full max-w-xl rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Leave empty to hide the button on the accepted dashboard.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">
+              Application cohort year (Stage 2 title)
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              value={cohortYear}
+              onChange={(e) => setCohortYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="e.g. 2026"
+              className="w-32 rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              setSavingExtras(true);
+              setMessage(null);
+              const res = await fetch("/api/director/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  accepted_whatsapp_group_url: whatsappUrl,
+                  application_cohort_year: cohortYear,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setMessage({ type: "error", text: data.error || "Failed to save" });
+              } else {
+                setWhatsappUrl(data.settings?.accepted_whatsapp_group_url || whatsappUrl);
+                setCohortYear(data.settings?.application_cohort_year || cohortYear);
+                setMessage({ type: "success", text: "Acceptance and Stage 2 settings saved." });
+              }
+              setSavingExtras(false);
+            }}
+            disabled={savingExtras}
+            className="flex items-center gap-2 rounded-lg bg-royal px-4 py-2.5 text-sm font-semibold text-white hover:bg-royal/90 disabled:opacity-50"
+          >
+            {savingExtras ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <CheckCircle2 size={16} />
+            )}
+            Save acceptance settings
+          </button>
         </div>
       </div>
     </div>

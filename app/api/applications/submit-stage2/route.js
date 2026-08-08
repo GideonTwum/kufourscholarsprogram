@@ -35,15 +35,20 @@ export async function POST(request) {
 
   const applicationId = body?.application_id;
   const videoUrl = typeof body?.video_youtube_url === "string" ? body.video_youtube_url.trim() : "";
+  const confirms = {
+    confirms_youtube_public: Boolean(body?.confirms_youtube_public),
+    confirms_youtube_title_format: Boolean(body?.confirms_youtube_title_format),
+    confirms_youtube_description_concept: Boolean(body?.confirms_youtube_description_concept),
+  };
 
   if (!applicationId || typeof applicationId !== "string") {
     return NextResponse.json({ error: "application_id is required" }, { status: 400 });
   }
 
-  const fieldErrors = validateStage2Video({ video_youtube_url: videoUrl });
+  const fieldErrors = validateStage2Video({ video_youtube_url: videoUrl, ...confirms });
   if (Object.keys(fieldErrors).length > 0) {
     return NextResponse.json(
-      { error: fieldErrors.video_youtube_url || "Invalid video link" },
+      { error: Object.values(fieldErrors)[0] || "Invalid video submission" },
       { status: 400 }
     );
   }

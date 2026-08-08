@@ -2,6 +2,7 @@
 
 import { Building, BookOpen, GraduationCap, BarChart3, School } from "lucide-react";
 import { GRADE_TYPES } from "@/lib/application-validation";
+import { ALLOWED_YEAR_OF_STUDY } from "@/lib/countries";
 
 function gradePlaceholder(type) {
   switch (type) {
@@ -39,18 +40,24 @@ export default function AcademicInfo({ data, onChange, errors = {} }) {
         </p>
       </div>
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Junior High School Attended</label>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Junior High School Attended <span className="text-red-500">*</span>
+        </label>
         <div className="relative">
           <School size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" value={data.junior_high_school || ""} onChange={(e) => update("junior_high_school", e.target.value)} placeholder="e.g. Prempeh College JHS" className={fieldClass("junior_high_school")} />
         </div>
+        {errors.junior_high_school && <p className="mt-1 text-xs text-red-600">{errors.junior_high_school}</p>}
       </div>
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Senior High School Attended</label>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Senior High School Attended <span className="text-red-500">*</span>
+        </label>
         <div className="relative">
           <School size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" value={data.senior_high_school || ""} onChange={(e) => update("senior_high_school", e.target.value)} placeholder="e.g. Prempeh College" className={fieldClass("senior_high_school")} />
         </div>
+        {errors.senior_high_school && <p className="mt-1 text-xs text-red-600">{errors.senior_high_school}</p>}
       </div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">University / Institution <span className="text-red-500">*</span></label>
@@ -76,18 +83,26 @@ export default function AcademicInfo({ data, onChange, errors = {} }) {
         {errors.program && <p className="mt-1 text-xs text-red-600">{errors.program}</p>}
       </div>
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Year of Study <span className="text-red-500">*</span></label>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Year of Study <span className="text-red-500">*</span>
+        </label>
         <div className="relative">
           <GraduationCap size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <select value={data.year_of_study || ""} onChange={(e) => update("year_of_study", e.target.value)} className={fieldClass("year_of_study")}>
             <option value="">Select year</option>
-            <option value="1st Year">1st Year</option>
-            <option value="2nd Year">2nd Year</option>
-            <option value="3rd Year">3rd Year</option>
-            <option value="4th Year">4th Year</option>
-            <option value="Postgraduate">Postgraduate</option>
+            {data.year_of_study && !ALLOWED_YEAR_OF_STUDY.includes(data.year_of_study) ? (
+              <option value={data.year_of_study}>{data.year_of_study} (not eligible)</option>
+            ) : null}
+            {ALLOWED_YEAR_OF_STUDY.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
           </select>
         </div>
+        <p className="mt-1 text-xs text-gray-500">
+          Only <strong>First Year</strong> and <strong>Sophomore</strong> applicants are eligible.
+        </p>
         {errors.year_of_study && <p className="mt-1 text-xs text-red-600">{errors.year_of_study}</p>}
       </div>
       <div>

@@ -55,7 +55,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
     const fieldKey = "photo_url";
     if (!file || !userId) return;
     if (file.size > MAX_FILE_SIZE_PHOTO) {
-      setUploadErrors((prev) => ({ ...prev, [fieldKey]: "Image must be under 2MB." }));
+      setUploadErrors((prev) => ({ ...prev, [fieldKey]: "Image must be under 5MB." }));
       return;
     }
     const ext = file.name.toLowerCase().split(".").pop();
@@ -161,7 +161,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
       <div>
         <h2 className="text-lg font-bold text-gray-900">Stage 1 Documents</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Passport photo: JPG/PNG/WebP, max 2MB. Other documents: PDF, max 5MB each. This photo will be used as your
+          Passport photo: JPG/PNG/WebP, max 5MB. Other documents: PDF, max 5MB each. This photo will be used as your
           profile picture.
         </p>
       </div>

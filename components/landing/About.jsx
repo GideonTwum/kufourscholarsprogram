@@ -41,7 +41,7 @@ export default function About() {
               networks needed to drive positive change across Africa.
             </p>
             <p className="mt-4 text-lg leading-relaxed text-gray-600">
-              Founded on the legacy of President John A. Kufuor, the
+              Founded on the legacy of President John Agyekum Kufuor, the
               program embodies the belief that investing in young leaders is
               the most impactful way to shape Africa&apos;s future.
             </p>

@@ -191,7 +191,7 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
               href="/apply"
               className="group flex items-center gap-2 rounded-lg border border-gold/40 bg-white/10 px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/15"
             >
-              New to the program? Apply now
+              Create an account to begin your application
               <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
             </Link>
           ) : null}

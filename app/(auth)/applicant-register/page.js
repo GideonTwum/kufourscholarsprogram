@@ -70,8 +70,9 @@ export default function ApplicantRegisterPage() {
         </div>
         <h1 className="mt-4 text-2xl font-bold text-royal">Applicant registration</h1>
         <p className="mt-2 text-sm text-gray-500">
-          Create an account to apply for the Kufuor Scholars Program. For
-          Foundation staff, use the links in the site footer.
+          Create an account to begin your application. You will receive an email
+          verification link after signup — verify your email before continuing.
+          For Foundation staff, use the links in the site footer.
         </p>
       </div>
 

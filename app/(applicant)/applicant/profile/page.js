@@ -52,8 +52,8 @@ export default function ApplicantProfilePage() {
       setUploadError("Please use JPG or PNG format.");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setUploadError("Image must be under 2MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Image must be under 5MB.");
       return;
     }
     setUploading(true);

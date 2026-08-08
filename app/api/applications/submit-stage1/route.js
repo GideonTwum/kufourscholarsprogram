@@ -6,6 +6,10 @@ import { autoRejectEmailHtml, stage1SubmittedEmailHtml } from "@/lib/email/notif
 import { sendKspEmail } from "@/lib/email/send";
 import { sanitizeStage1ApplicationData } from "@/lib/stage1-application-payload";
 import { assertStatusTransition } from "@/lib/application-status-transition.mjs";
+import {
+  normalizeDualCitizenshipFields,
+} from "@/lib/application-validation";
+import { normalizeYearOfStudy } from "@/lib/countries";
 
 function buildRow(applicationData, userId, overrides = {}) {
   const leadership = Array.isArray(applicationData.leadership_evidence_urls)
@@ -45,6 +49,11 @@ export async function POST(request) {
   const { data: safeApplicationData, ignoredDangerousFields } =
     sanitizeStage1ApplicationData(applicationData);
 
+  const normalized = normalizeDualCitizenshipFields({
+    ...safeApplicationData,
+    year_of_study: normalizeYearOfStudy(safeApplicationData.year_of_study) || safeApplicationData.year_of_study,
+  });
+
   if (ignoredDangerousFields.length > 0) {
     console.warn("[submit-stage1] ignored protected applicant fields", {
       userId: user.id,
@@ -52,7 +61,7 @@ export async function POST(request) {
     });
   }
 
-  const eligibility = evaluateEligibilityForAutoReject(safeApplicationData);
+  const eligibility = evaluateEligibilityForAutoReject(normalized);
   const submitted_at = new Date().toISOString();
 
   let admin;
@@ -89,16 +98,19 @@ export async function POST(request) {
   const userEmail = user.email || null;
 
   const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
-  const profileName = safeApplicationData.full_name || prof?.full_name || "Applicant";
+  const profileName = normalized.full_name || prof?.full_name || "Applicant";
 
   if (!eligibility.ok) {
-    const row = buildRow(safeApplicationData, user.id, {
+    const row = buildRow(normalized, user.id, {
       status: "rejected",
       rejection_reason: eligibility.reason,
       submitted_at,
     });
     if (appId) {
-      await admin.from("applications").update(row).eq("id", appId);
+      const { error: updErr } = await admin.from("applications").update(row).eq("id", appId);
+      if (updErr) {
+        return NextResponse.json({ error: updErr.message }, { status: 500 });
+      }
     } else {
       const { data: ins, error: insErr } = await admin.from("applications").insert(row).select("id").single();
       if (insErr) {
@@ -125,7 +137,7 @@ export async function POST(request) {
     });
   }
 
-  const row = buildRow(safeApplicationData, user.id, {
+  const row = buildRow(normalized, user.id, {
     status: "stage_1_submitted",
     rejection_reason: null,
     submitted_at,
@@ -133,7 +145,10 @@ export async function POST(request) {
   });
 
   if (appId) {
-    await admin.from("applications").update(row).eq("id", appId);
+    const { error: updErr } = await admin.from("applications").update(row).eq("id", appId);
+    if (updErr) {
+      return NextResponse.json({ error: updErr.message }, { status: 500 });
+    }
   } else {
     const { data: ins, error: insErr } = await admin.from("applications").insert(row).select("id").single();
     if (insErr) {

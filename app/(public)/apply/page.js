@@ -18,7 +18,7 @@ export const metadata = {
 const eligibility = [
   "Citizen of an African country — not limited to Ghanaian nationals",
   "Aged 25 or under at time of application",
-  "Currently enrolled in a recognized tertiary institution in Ghana",
+  "Currently enrolled as a First Year or Sophomore at a recognized tertiary institution in Ghana",
   "Demonstrated leadership potential and community involvement",
   "Strong academic record",
   "Commitment to the 3-year program",

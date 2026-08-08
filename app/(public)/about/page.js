@@ -123,7 +123,7 @@ export default function AboutPage() {
             Founded on Presidential Excellence
           </h2>
           <p className="mt-6 max-w-3xl text-lg leading-relaxed text-gray-600">
-            The program is built on the legacy of His Excellency John A.
+            The program is built on the legacy of His Excellency John Agyekum
             Kufuor, former President of Ghana (2001–2009). President Kufuor&apos;s
             leadership exemplified integrity, vision, and a deep commitment to
             Ghana&apos;s development. The John A. Kufuor Foundation continues

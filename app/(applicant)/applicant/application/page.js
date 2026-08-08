@@ -24,7 +24,9 @@ import {
   validateForSubmit,
   STEP_VALIDATION_FIELDS,
   getLeadershipEvidencePaths,
+  normalizeDualCitizenshipFields,
 } from "@/lib/application-validation";
+import { normalizeYearOfStudy } from "@/lib/countries";
 import { getApplicantApplicationView } from "@/lib/application-status";
 import ApplicantProgressBar from "../components/ApplicantProgressBar";
 
@@ -49,8 +51,12 @@ function buildApplicationPayload(data, userId, status, submittedAt = null) {
   const leadership = Array.isArray(data.leadership_evidence_urls)
     ? data.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
     : [];
-  return {
+  const normalized = normalizeDualCitizenshipFields({
     ...data,
+    year_of_study: normalizeYearOfStudy(data.year_of_study) || data.year_of_study,
+  });
+  return {
+    ...normalized,
     leadership_evidence_urls: leadership,
     leadership_evidence_url: leadership[0] || null,
     user_id: userId,
@@ -183,6 +189,13 @@ export default function ApplicationPage() {
           region: existing.region || "",
           country_of_origin: existing.country_of_origin || "",
           nationality: existing.nationality || "",
+          has_dual_citizenship:
+            existing.has_dual_citizenship === true
+              ? true
+              : existing.has_dual_citizenship === false
+                ? false
+                : undefined,
+          second_citizenship_country: existing.second_citizenship_country || "",
           emergency_contact_name: existing.emergency_contact_name || "",
           emergency_contact_number: existing.emergency_contact_number || "",
           emergency_contact_2_name: existing.emergency_contact_2_name || "",
@@ -198,7 +211,7 @@ export default function ApplicationPage() {
           university: existing.university || "",
           student_id: existing.student_id || "",
           program: existing.program || "",
-          year_of_study: existing.year_of_study || "",
+          year_of_study: normalizeYearOfStudy(existing.year_of_study) || existing.year_of_study || "",
           grade_type: existing.grade_type || "",
           gpa: existing.gpa || "",
           confirms_ghana_enrollment: !!existing.confirms_ghana_enrollment,
@@ -295,13 +308,24 @@ export default function ApplicationPage() {
         "address",
         "country_of_origin",
         "nationality",
+        "has_dual_citizenship",
+        "second_citizenship_country",
         "emergency_contact_name",
         "emergency_contact_number",
         "emergency_contact_2_name",
         "emergency_contact_2_number",
         "linkedin_url",
       ];
-      const academicKeys = ["university", "program", "year_of_study", "grade_type", "gpa", "confirms_ghana_enrollment"];
+      const academicKeys = [
+        "junior_high_school",
+        "senior_high_school",
+        "university",
+        "program",
+        "year_of_study",
+        "grade_type",
+        "gpa",
+        "confirms_ghana_enrollment",
+      ];
       const docKeys = DOC_FIELDS;
       const errKeys = Object.keys(allErrors);
       if (errKeys.some((k) => personalKeys.includes(k))) setStep(0);

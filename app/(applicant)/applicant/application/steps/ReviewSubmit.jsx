@@ -58,6 +58,19 @@ export default function ReviewSubmit({
         <Field label="Country of Origin" value={data.country_of_origin} />
         <Field label="Nationality" value={data.nationality} />
         <Field
+          label="Dual citizenship"
+          value={
+            data.has_dual_citizenship === true || data.has_dual_citizenship === "true"
+              ? "Yes"
+              : data.has_dual_citizenship === false || data.has_dual_citizenship === "false"
+                ? "No"
+                : ""
+          }
+        />
+        {(data.has_dual_citizenship === true || data.has_dual_citizenship === "true") && (
+          <Field label="Second Country of Citizenship" value={data.second_citizenship_country} />
+        )}
+        <Field
           label="Emergency contact 1"
           value={
             data.emergency_contact_name
