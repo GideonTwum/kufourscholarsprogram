@@ -35,7 +35,9 @@ test("public Apply surfaces use shared ApplyNowCta or apply helpers", () => {
   const footer = readFileSync(resolve("components/landing/Footer.jsx"), "utf8");
   assert.match(navbar, /ApplyNowCta/);
   assert.match(hero, /ApplyNowCta/);
-  assert.match(hero, /pointer-events-none/);
+  assert.match(hero, /HeroBackground/);
+  const bg = readFileSync(resolve("components/landing/HeroBackground.jsx"), "utf8");
+  assert.match(bg, /pointer-events-none/);
   assert.match(footer, /applyNowHref/);
   assert.match(footer, /applicationsOpen/);
 });
