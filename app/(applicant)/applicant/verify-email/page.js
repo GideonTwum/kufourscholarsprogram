@@ -3,24 +3,43 @@
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Mail, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+
+const RESEND_KEY = "ksp_verify_resend_at";
+const EMAIL_KEY = "ksp_verify_email";
+
+function safeEmailFromQuery(raw) {
+  if (!raw || typeof raw !== "string") return "";
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed || trimmed.length > 254) return "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "";
+  return trimmed;
+}
+
+function applicantVerifyRedirectUrl() {
+  if (typeof window === "undefined") return undefined;
+  // After the link is opened, callback exchanges the code, signs out, and sends
+  // the applicant to Applicant Sign In — not the dashboard.
+  return `${window.location.origin}/auth/callback?next=/login`;
+}
 
 function VerifyEmailContent() {
   const supabase = createClient();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered") === "1";
+  const emailFromQuery = safeEmailFromQuery(searchParams.get("email"));
+
   const [loading, setLoading] = useState(true);
   const [resending, setResending] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailFromQuery);
   const [cooldownSec, setCooldownSec] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const raw = window.sessionStorage.getItem("ksp_verify_resend_at");
+    const raw = window.sessionStorage.getItem(RESEND_KEY);
     if (!raw) return;
     const elapsed = Math.floor((Date.now() - Number(raw)) / 1000);
     const left = 60 - elapsed;
@@ -37,22 +56,38 @@ function VerifyEmailContent() {
 
   useEffect(() => {
     async function run() {
+      let resolved = emailFromQuery;
+      if (!resolved && typeof window !== "undefined") {
+        try {
+          resolved = safeEmailFromQuery(window.sessionStorage.getItem(EMAIL_KEY) || "");
+        } catch {
+          /* ignore */
+        }
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
+
+      if (user?.email) {
+        resolved = user.email;
       }
-      setEmail(user.email ?? "");
-      if (user.email_confirmed_at) {
-        router.replace("/applicant");
-        return;
+
+      if (resolved) {
+        setEmail(resolved);
+        try {
+          window.sessionStorage.setItem(EMAIL_KEY, resolved);
+        } catch {
+          /* ignore */
+        }
       }
+
+      // Never auto-enter the Applicant Dashboard from this page.
+      // Verified applicants must use Applicant Sign In explicitly.
       setLoading(false);
     }
     run();
-  }, [router, supabase.auth]);
+  }, [emailFromQuery, supabase.auth]);
 
   async function handleResend() {
     setError(null);
@@ -61,31 +96,30 @@ function VerifyEmailContent() {
       setError(`Please wait ${cooldownSec}s before requesting another email.`);
       return;
     }
-    setResending(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.email) {
-      setError("You are not signed in.");
-      setResending(false);
+
+    const target = safeEmailFromQuery(email);
+    if (!target) {
+      setError("Enter the email you used to register, then try again.");
       return;
     }
+
+    setResending(true);
     const { error: err } = await supabase.auth.resend({
       type: "signup",
-      email: user.email,
+      email: target,
       options: {
-        emailRedirectTo:
-          typeof window !== "undefined"
-            ? `${window.location.origin}/auth/callback?next=/applicant`
-            : undefined,
+        emailRedirectTo: applicantVerifyRedirectUrl(),
       },
     });
     if (err) {
       setError("Could not resend verification email. Try again shortly.");
     } else {
-      setMessage("If verification is still pending, a new email has been sent. Check your inbox.");
+      setMessage(
+        "If verification is still pending, a new email has been sent. Check your inbox."
+      );
       try {
-        window.sessionStorage.setItem("ksp_verify_resend_at", String(Date.now()));
+        window.sessionStorage.setItem(RESEND_KEY, String(Date.now()));
+        window.sessionStorage.setItem(EMAIL_KEY, target);
       } catch {
         /* ignore */
       }
@@ -108,32 +142,36 @@ function VerifyEmailContent() {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-royal/10">
           <Mail size={24} className="text-royal" />
         </div>
-        <h1 className="mt-4 text-xl font-bold text-gray-900">Email Verification</h1>
+        <h1 className="mt-4 text-xl font-bold text-gray-900">Check your email</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Account verification is required before you can continue to the applicant portal.
-          Open the verification link we emailed you — this is not a typed code.
+          We&apos;ve sent a verification link to your email address.
+          Open the email and verify your account before signing in.
         </p>
-        {registered && (
+        {registered ? (
           <p className="mt-2 text-sm text-gray-500">
-            We sent a verification link to <strong>{email || "your address"}</strong>. Open
-            that email and tap the link to verify your account, then return here or sign in.
+            Your account was created. Verification is required before you can
+            access the applicant portal.
           </p>
-        )}
+        ) : null}
       </div>
 
-      {email && (
+      {email ? (
         <p className="mt-6 rounded-lg bg-gray-50 px-4 py-2 text-center text-sm text-gray-700">
-          Signed in as <span className="font-medium">{email}</span>
+          Verification email sent to <span className="font-medium">{email}</span>
         </p>
-      )}
-
-      {!email && (
-        <p className="mt-6 text-center text-sm text-gray-600">
-          <Link href="/login" className="font-semibold text-royal hover:text-gold">
-            Sign in
-          </Link>{" "}
-          after you have verified — or open the verification link from your email.
-        </p>
+      ) : (
+        <div className="mt-6">
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            Email address
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+          />
+        </div>
       )}
 
       {message && (
@@ -149,30 +187,23 @@ function VerifyEmailContent() {
         </div>
       )}
 
-      {email && (
-        <button
-          type="button"
-          onClick={handleResend}
-          disabled={resending || cooldownSec > 0}
-          className="mt-6 w-full rounded-lg bg-royal py-2.5 text-sm font-semibold text-white transition-colors hover:bg-royal/90 disabled:opacity-50"
-        >
-          {resending
-            ? "Sending…"
-            : cooldownSec > 0
-              ? `Resend available in ${cooldownSec}s`
-              : "Resend verification email"}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={handleResend}
+        disabled={resending || cooldownSec > 0}
+        className="mt-6 w-full rounded-lg bg-royal py-2.5 text-sm font-semibold text-white transition-colors hover:bg-royal/90 disabled:opacity-50"
+      >
+        {resending
+          ? "Sending…"
+          : cooldownSec > 0
+            ? `Resend available in ${cooldownSec}s`
+            : "Resend verification email"}
+      </button>
 
-      <p className="mt-6 text-center text-xs text-gray-400">
-        Wrong account?{" "}
-        <button
-          type="button"
-          onClick={() => supabase.auth.signOut().then(() => router.push("/login"))}
-          className="font-semibold text-royal hover:text-gold"
-        >
-          Sign out
-        </button>
+      <p className="mt-6 text-center text-sm text-gray-500">
+        <Link href="/login" className="font-semibold text-royal hover:text-gold">
+          Back to Sign In
+        </Link>
       </p>
     </div>
   );

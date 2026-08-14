@@ -241,7 +241,7 @@ test("Email verification wording uses confirmation link (not typed OTP)", () => 
     join(root, "app/(applicant)/applicant/verify-email/page.js"),
     "utf8"
   );
-  assert.match(verify, /Email Verification/);
+  assert.match(verify, /Check your email/);
   assert.match(verify, /verification link/i);
   assert.doesNotMatch(verify, /\bOTP\b/);
 });

@@ -7,12 +7,7 @@ import {
   isApplicantRole,
   loginPathForProtectedRoute,
 } from "@/lib/portal-auth";
-import {
-  isDirectorMfaPath,
-  MFA_CHALLENGE_PATH,
-  MFA_SETUP_PATH,
-  resolveDirectorMfaDestination,
-} from "@/lib/director-mfa";
+import { isDirectorMfaPath } from "@/lib/director-mfa";
 
 const protectedRoutes = ["/applicant", "/director", "/panel", "/assessor"];
 const authRoutes = [
@@ -54,52 +49,6 @@ async function fetchProfile(supabase, userId) {
   return profile;
 }
 
-async function enforceDirectorMfa(request, supabase, profile) {
-  const { pathname } = request.nextUrl;
-  // Hard gate: MFA destinations are Director-only. Never evaluate MFA for other roles.
-  if (!isDirectorRole(profile?.role)) return null;
-  if (profile?.is_active === false) return null;
-  // Only enforce while the user is on /director* (caller also checks; belt-and-suspenders).
-  if (!(pathname === "/director" || pathname.startsWith("/director/"))) return null;
-
-  // resolveDirectorMfaDestination returns "ok" when DIRECTOR_MFA_REQUIRED=false
-  // (including redirects away from setup/challenge pages).
-  const dest = await resolveDirectorMfaDestination(supabase);
-  const onMfa = isDirectorMfaPath(pathname);
-
-  if (dest === "setup") {
-    if (pathname === MFA_SETUP_PATH || pathname.startsWith(`${MFA_SETUP_PATH}/`)) {
-      return null;
-    }
-    const url = request.nextUrl.clone();
-    url.pathname = MFA_SETUP_PATH;
-    return NextResponse.redirect(url);
-  }
-
-  if (dest === "challenge") {
-    if (pathname === MFA_CHALLENGE_PATH || pathname.startsWith(`${MFA_CHALLENGE_PATH}/`)) {
-      return null;
-    }
-    const url = request.nextUrl.clone();
-    url.pathname = MFA_CHALLENGE_PATH;
-    return NextResponse.redirect(url);
-  }
-
-  if (dest === "ok" && onMfa) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/director";
-    return NextResponse.redirect(url);
-  }
-
-  if (dest === "error" && !onMfa) {
-    const url = request.nextUrl.clone();
-    url.pathname = MFA_CHALLENGE_PATH;
-    return NextResponse.redirect(url);
-  }
-
-  return null;
-}
-
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -114,8 +63,10 @@ export async function proxy(request) {
   const isAuthRoute = authRoutes.some((r) => pathname.startsWith(r));
   const verifyEmailPath =
     pathname === "/applicant/verify-email" || pathname.startsWith("/applicant/verify-email/");
+  // Check-email must be reachable after signup even when no session exists yet.
   const isProtected =
     !isAuthRoute &&
+    !verifyEmailPath &&
     !isRecoveryRoute(pathname) &&
     protectedRoutes.some((r) => pathname.startsWith(r));
 
@@ -132,6 +83,30 @@ export async function proxy(request) {
       return NextResponse.redirect(url);
     }
     return NextResponse.next({ request });
+  }
+
+  // Legacy MFA URLs are unreachable for enrollment — bounce only.
+  if (isDirectorMfaPath(pathname)) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/director-login";
+      return NextResponse.redirect(url);
+    }
+    const profile = await fetchProfile(supabase, user.id);
+    const role = typeof profile?.role === "string" ? profile.role : undefined;
+    if (isDirectorRole(role) && profile?.is_active !== false) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/director";
+      return NextResponse.redirect(url);
+    }
+    if (role) {
+      const url = request.nextUrl.clone();
+      url.pathname = dashboardPathForRole(role);
+      return NextResponse.redirect(url);
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/director-login";
+    return NextResponse.redirect(url);
   }
 
   if (isProtected) {
@@ -183,13 +158,11 @@ export async function proxy(request) {
 
     if (pathname.startsWith("/director")) {
       if (!isDirectorRole(role)) {
-        // Non-directors (including applicants) never enter Director MFA paths.
         const url = request.nextUrl.clone();
         url.pathname = dashboardPathForRole(role);
         return NextResponse.redirect(url);
       }
-      const mfaRedirect = await enforceDirectorMfa(request, supabase, profile);
-      if (mfaRedirect) return mfaRedirect;
+      // No MFA/TOTP/AAL2 gate — password + role + is_active is sufficient.
     } else if (pathname.startsWith("/panel")) {
       if (role !== "panel") {
         const url = request.nextUrl.clone();
@@ -234,6 +207,15 @@ export async function proxy(request) {
         pathname.startsWith("/assessor-login") ||
         pathname.startsWith("/director-login") ||
         pathname.startsWith("/login"))
+    ) {
+      return supabaseResponse;
+    }
+    // Unverified applicants must be able to open Applicant Sign In (and see
+    // verification errors) without bouncing to /applicant.
+    if (
+      pathname.startsWith("/login") &&
+      isApplicantRole(role) &&
+      applicantNeedsEmailVerification(user)
     ) {
       return supabaseResponse;
     }

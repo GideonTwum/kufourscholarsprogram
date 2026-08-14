@@ -42,7 +42,7 @@ function ForgotPasswordForm() {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), portal }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), portal }),
       });
       const json = await res.json().catch(() => ({}));
 
@@ -67,7 +67,7 @@ function ForgotPasswordForm() {
       // Client fallback if API is unavailable: still call Supabase without revealing outcome.
       if (!res.ok && res.status >= 500) {
         const supabase = createClient();
-        await supabase.auth.resetPasswordForEmail(email.trim(), {
+        await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
           redirectTo: passwordResetCallbackUrl(
             typeof window !== "undefined" ? window.location.origin : ""
           ),

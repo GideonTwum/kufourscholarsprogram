@@ -17,7 +17,7 @@ test("applicant entry auth paths are detected", () => {
   assert.equal(isApplicantEntryAuthPath("/director-login"), false);
 });
 
-test("Apply Now bounce: directors/staff never go to /director (MFA)", () => {
+test("Apply Now bounce: directors/staff never go to /director from register", () => {
   assert.equal(authRouteBouncePath("/applicant-register", "director"), "/");
   assert.equal(authRouteBouncePath("/applicant-register", "assessor"), "/");
   assert.equal(authRouteBouncePath("/applicant-register", "panel"), "/");
@@ -36,7 +36,7 @@ test("portal login bounce still sends directors to /director", () => {
   assert.equal(authRouteBouncePath("/forgot-password", "director"), null);
 });
 
-test("post-auth redirect never sends applicants to Director MFA", () => {
+test("post-auth redirect never sends applicants to Director MFA paths", () => {
   assert.equal(resolvePostAuthRedirect("applicant", MFA_SETUP_PATH), "/applicant");
   assert.equal(resolvePostAuthRedirect("applicant", MFA_CHALLENGE_PATH), "/applicant");
   assert.equal(resolvePostAuthRedirect("applicant", "/director"), "/applicant");
@@ -46,34 +46,34 @@ test("post-auth redirect never sends applicants to Director MFA", () => {
   assert.equal(resolvePostAuthRedirect("applicant", "/applicant/verify-email"), "/applicant/verify-email");
 });
 
-test("proxy uses authRouteBouncePath and role-gates MFA", () => {
+test("proxy role-gates Director portal and bounces unused MFA URLs", () => {
   const src = readFileSync(resolve("proxy.js"), "utf8");
   assert.match(src, /authRouteBouncePath/);
   assert.match(src, /isApplicantRole/);
-  assert.match(src, /!isDirectorRole\(profile\?\.role\)/);
-  assert.match(src, /pathname === "\/director" \|\| pathname\.startsWith\("\/director\/"\)/);
+  assert.match(src, /isDirectorMfaPath/);
+  assert.match(src, /verifyEmailPath/);
+  assert.doesNotMatch(src, /resolveDirectorMfaDestination/);
 });
 
-test("auth callback role-gates next parameter", () => {
+test("auth callback forces applicant verification to login without leaving session", () => {
   const src = readFileSync(resolve("app/auth/callback/route.js"), "utf8");
-  assert.match(src, /resolvePostAuthRedirect/);
+  assert.match(src, /exchangeCodeForSession/);
+  assert.match(src, /signOut/);
+  assert.match(src, /\/login\?verified=true/);
+  assert.match(src, /isApplicantEmailVerificationNext|isApplicantRole/);
+  assert.match(src, /reset-password/);
 });
 
-test("MFA pages do not force non-directors through director-login sign-out", () => {
+test("MFA pages redirect directors to /director without enrollment UI", () => {
   const setup = readFileSync(resolve("app/(director-mfa)/director/mfa-setup/page.js"), "utf8");
   const challenge = readFileSync(
     resolve("app/(director-mfa)/director/mfa-challenge/page.js"),
     "utf8"
   );
-  assert.match(setup, /dashboardPathForRole\(profile\.role\)/);
-  assert.match(challenge, /dashboardPathForRole\(profile\.role\)/);
-  // Boot path for non-directors must not sign them out into director-login.
-  assert.doesNotMatch(
-    setup,
-    /if \(!isDirectorRole\(profile\?\.role\)[\s\S]{0,200}?signOut\(/
-  );
-  assert.doesNotMatch(
-    challenge,
-    /if \(!isDirectorRole\(profile\?\.role\)[\s\S]{0,200}?signOut\(/
-  );
+  assert.match(setup, /\/director/);
+  assert.match(challenge, /\/director/);
+  assert.match(setup, /\/director-login/);
+  assert.match(challenge, /\/director-login/);
+  assert.doesNotMatch(setup, /mfa\.enroll/);
+  assert.doesNotMatch(challenge, /mfa\.verify/);
 });

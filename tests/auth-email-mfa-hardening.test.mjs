@@ -72,7 +72,7 @@ test("auth-email-health never returns secret values", () => {
   assert.equal(health.resend_api_key, "configured");
   assert.equal(health.service_role, "configured");
   assert.equal(health.email_from, "configured");
-  assert.equal(health.mfa_required_for_director, true);
+  assert.equal(health.mfa_required_for_director, false);
   assert.equal(serialized.includes("re_test_secret"), false);
   assert.equal(serialized.includes("service-role-secret"), false);
   assert.equal(serialized.includes("eyJhbGciOi.test"), false);

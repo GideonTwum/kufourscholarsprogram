@@ -104,7 +104,14 @@ async function main() {
       console.error(result.error);
       process.exit(1);
     }
-    console.log("Director created:", result.email, result.userId);
+    console.log("Director created:", result.email, `id=${result.userId}`);
+    console.log("projectHost:", new URL(url).hostname);
+    if (result.passwordRepaired) {
+      console.log("note: createUser password was repaired via updateUserById before success");
+    }
+    if (!result.passwordVerified) {
+      console.warn("warning: NEXT_PUBLIC_SUPABASE_ANON_KEY missing; login was not verified");
+    }
     return;
   }
 

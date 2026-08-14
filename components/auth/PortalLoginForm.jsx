@@ -7,6 +7,9 @@ import { useRouter } from "next/navigation";
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { assertLoginPortalRole, portalHomeForRole } from "@/lib/portal-auth";
 
+const UNVERIFIED_LOGIN_MESSAGE =
+  "Please verify your email before signing in. Check your inbox for the verification link.";
+
 const PROFILE_COLUMNS = "id, email, full_name, role, is_active";
 
 function isDev() {
@@ -54,22 +57,63 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
+  async function handleResendVerification() {
+    setResendMessage("");
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError("Enter your email address first, then resend verification.");
+      return;
+    }
+    setResending(true);
+    const { error: resendError } = await supabase.auth.resend({
+      type: "signup",
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/auth/callback?next=/login`
+            : undefined,
+      },
+    });
+    if (resendError) {
+      setResendMessage("Could not resend verification email. Try again shortly.");
+    } else {
+      setResendMessage("If verification is still pending, a new email has been sent.");
+    }
+    setResending(false);
+  }
+
   async function handleLogin(e) {
     e.preventDefault();
     setError("");
+    setNeedsVerification(false);
+    setResendMessage("");
     setLoading(true);
 
+    const normalizedEmail = email.trim().toLowerCase();
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizedEmail,
       password,
     });
 
     if (authError) {
-      setError(authError.message);
+      const msg = String(authError.message || "");
+      const code = String(authError.code || "");
+      if (/email not confirmed|not confirmed/i.test(msg) || code === "email_not_confirmed") {
+        setError(UNVERIFIED_LOGIN_MESSAGE);
+        setNeedsVerification(expectedRole === "applicant");
+      } else if (/invalid login credentials|invalid_credentials/i.test(msg) || code === "invalid_credentials") {
+        setError("Invalid email or password.");
+      } else {
+        setError(msg || "Sign-in failed. Try again.");
+      }
       setLoading(false);
       return;
     }
@@ -143,8 +187,7 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
       return;
     }
 
-    // Director MFA (when enabled) is enforced server-side in proxy via resolveDirectorMfaDestination.
-    // Do not branch on MFA here — DIRECTOR_MFA_REQUIRED is not available in the browser.
+    // Director MFA/TOTP is not part of the active auth flow (password + role + is_active).
     router.push(portalHomeForRole(role));
     router.refresh();
   }
@@ -163,9 +206,28 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
 
       <form onSubmit={handleLogin} className="mt-8 space-y-5">
         {error && (
-          <div className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-            <AlertCircle size={16} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
+          <div className="flex flex-col gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+            {needsVerification ? (
+              <div className="pl-6 text-xs text-red-700">
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  className="font-semibold underline hover:text-red-900 disabled:opacity-50"
+                >
+                  {resending ? "Sending…" : "Resend verification email"}
+                </button>
+                {" · "}
+                <Link href="/applicant/verify-email" className="font-semibold underline hover:text-red-900">
+                  Check your email page
+                </Link>
+                {resendMessage ? <p className="mt-1">{resendMessage}</p> : null}
+              </div>
+            ) : null}
           </div>
         )}
 

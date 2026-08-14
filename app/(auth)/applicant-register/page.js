@@ -35,17 +35,20 @@ export default function ApplicantRegisterPage() {
       return;
     }
 
+    // Confirmation link → /auth/callback → sign out → /login?verified=true
+    // (never auto-enter the Applicant Dashboard after verification alone).
     const redirectUrl =
       typeof window !== "undefined"
-        ? `${window.location.origin}/auth/callback?next=/applicant`
+        ? `${window.location.origin}/auth/callback?next=/login`
         : undefined;
 
+    const normalizedEmail = email.trim().toLowerCase();
     const { error: authError } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
-          full_name: fullName,
+          full_name: fullName.trim(),
           role: "applicant",
         },
         emailRedirectTo: redirectUrl,
@@ -58,7 +61,17 @@ export default function ApplicantRegisterPage() {
       return;
     }
 
-    router.push("/applicant/verify-email?registered=1");
+    try {
+      window.sessionStorage.setItem("ksp_verify_email", normalizedEmail);
+    } catch {
+      /* ignore */
+    }
+
+    const q = new URLSearchParams({
+      registered: "1",
+      email: normalizedEmail,
+    });
+    router.push(`/applicant/verify-email?${q.toString()}`);
     router.refresh();
   }
 
