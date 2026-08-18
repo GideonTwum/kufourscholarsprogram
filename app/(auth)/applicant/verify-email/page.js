@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 const RESEND_KEY = "ksp_verify_resend_at";
@@ -26,6 +26,7 @@ function applicantVerifyRedirectUrl() {
 
 function VerifyEmailContent() {
   const supabase = createClient();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered") === "1";
   const emailFromQuery = safeEmailFromQuery(searchParams.get("email"));
@@ -69,6 +70,12 @@ function VerifyEmailContent() {
         data: { user },
       } = await supabase.auth.getUser();
 
+      // Verified + signed-in applicants belong in the dashboard, not this auth page.
+      if (user?.email_confirmed_at) {
+        router.replace("/applicant");
+        return;
+      }
+
       if (user?.email) {
         resolved = user.email;
       }
@@ -82,12 +89,10 @@ function VerifyEmailContent() {
         }
       }
 
-      // Never auto-enter the Applicant Dashboard from this page.
-      // Verified applicants must use Applicant Sign In explicitly.
       setLoading(false);
     }
     run();
-  }, [emailFromQuery, supabase.auth]);
+  }, [emailFromQuery, router, supabase.auth]);
 
   async function handleResend() {
     setError(null);
@@ -130,20 +135,20 @@ function VerifyEmailContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center">
+      <div className="flex justify-center rounded-2xl bg-white p-12 shadow-xl">
         <Loader2 className="h-8 w-8 animate-spin text-royal" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
+    <div className="rounded-2xl bg-white p-6 shadow-xl sm:p-8">
       <div className="text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-royal/10">
           <Mail size={24} className="text-royal" />
         </div>
-        <h1 className="mt-4 text-xl font-bold text-gray-900">Check your email</h1>
-        <p className="mt-2 text-sm text-gray-600">
+        <h1 className="mt-4 text-2xl font-bold text-royal">Check your email</h1>
+        <p className="mt-2 text-sm text-gray-500">
           We&apos;ve sent a verification link to your email address.
           Open the email and verify your account before signing in.
         </p>
@@ -161,14 +166,19 @@ function VerifyEmailContent() {
         </p>
       ) : (
         <div className="mt-6">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="verify-email-address"
+            className="mb-1.5 block text-sm font-medium text-gray-700"
+          >
             Email address
           </label>
           <input
+            id="verify-email-address"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
+            autoComplete="email"
             className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
           />
         </div>
@@ -181,7 +191,7 @@ function VerifyEmailContent() {
         </div>
       )}
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+        <div className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">
           <AlertCircle size={18} className="mt-0.5 shrink-0" />
           {error}
         </div>
@@ -191,7 +201,7 @@ function VerifyEmailContent() {
         type="button"
         onClick={handleResend}
         disabled={resending || cooldownSec > 0}
-        className="mt-6 w-full rounded-lg bg-royal py-2.5 text-sm font-semibold text-white transition-colors hover:bg-royal/90 disabled:opacity-50"
+        className="mt-6 w-full rounded-lg bg-royal py-2.5 text-sm font-semibold text-white transition-colors hover:bg-royal-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-royal disabled:opacity-50"
       >
         {resending
           ? "Sending…"
@@ -213,7 +223,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[320px] items-center justify-center">
+        <div className="flex justify-center rounded-2xl bg-white p-12 shadow-xl">
           <Loader2 className="h-8 w-8 animate-spin text-royal" />
         </div>
       }

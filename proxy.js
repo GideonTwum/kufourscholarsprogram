@@ -109,6 +109,26 @@ export async function proxy(request) {
     return NextResponse.redirect(url);
   }
 
+  // Standalone check-email page (auth layout): allow unsigned / unverified access.
+  // Verified + signed-in applicants should use the dashboard instead.
+  if (verifyEmailPath) {
+    if (user && !applicantNeedsEmailVerification(user)) {
+      const profile = await fetchProfile(supabase, user.id);
+      const role = typeof profile?.role === "string" ? profile.role : undefined;
+      if (isApplicantRole(role)) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/applicant";
+        return NextResponse.redirect(url);
+      }
+      if (role) {
+        const url = request.nextUrl.clone();
+        url.pathname = dashboardPathForRole(role);
+        return NextResponse.redirect(url);
+      }
+    }
+    return supabaseResponse;
+  }
+
   if (isProtected) {
     if (!user) {
       const url = request.nextUrl.clone();

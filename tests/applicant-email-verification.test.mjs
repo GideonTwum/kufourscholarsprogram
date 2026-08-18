@@ -1,14 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const register = readFileSync(resolve("app/(auth)/applicant-register/page.js"), "utf8");
-const verify = readFileSync(resolve("app/(applicant)/applicant/verify-email/page.js"), "utf8");
+const verifyPath = resolve("app/(auth)/applicant/verify-email/page.js");
+const oldVerifyPath = resolve("app/(applicant)/applicant/verify-email/page.js");
+const verify = readFileSync(verifyPath, "utf8");
 const callback = readFileSync(resolve("app/auth/callback/route.js"), "utf8");
 const login = readFileSync(resolve("app/(auth)/login/page.js"), "utf8");
 const portalLogin = readFileSync(resolve("components/auth/PortalLoginForm.jsx"), "utf8");
 const proxy = readFileSync(resolve("proxy.js"), "utf8");
+const applicantLayout = readFileSync(resolve("app/(applicant)/layout.js"), "utf8");
+const authLayout = readFileSync(resolve("app/(auth)/layout.js"), "utf8");
 
 test("successful registration navigates to /applicant/verify-email", () => {
   assert.match(register, /router\.push\(`\/applicant\/verify-email\?\$\{q\.toString\(\)\}`\)/);
@@ -21,6 +25,16 @@ test("registration confirmation link targets callback next=/login", () => {
   assert.doesNotMatch(register, /auth\/callback\?next=\/applicant(?!\/)/);
 });
 
+test("verify-email lives under auth route group, not applicant dashboard layout", () => {
+  assert.equal(existsSync(verifyPath), true);
+  assert.equal(existsSync(oldVerifyPath), false);
+  assert.match(authLayout, /Kufuor Scholars/);
+  assert.match(authLayout, /from-royal-dark via-royal/);
+  assert.doesNotMatch(verify, /DashboardShell/);
+  assert.doesNotMatch(verify, /applicantNav|NotificationsBell|roleLabel/);
+  assert.doesNotMatch(verify, /My Application|Stage 2 Video|News & Updates/);
+});
+
 test("verify-email page is Check your email with resend + Back to Sign In", () => {
   assert.match(verify, /Check your email/);
   assert.match(verify, /verify your account before signing in/i);
@@ -28,8 +42,15 @@ test("verify-email page is Check your email with resend + Back to Sign In", () =
   assert.match(verify, /cooldownSec/);
   assert.match(verify, /Back to Sign In/);
   assert.match(verify, /auth\/callback\?next=\/login/);
-  assert.doesNotMatch(verify, /router\.replace\("\/applicant"\)/);
-  assert.doesNotMatch(verify, /router\.push\("\/applicant"\)/);
+  assert.match(verify, /rounded-2xl bg-white/);
+  assert.match(verify, /shadow-xl/);
+});
+
+test("verified signed-in applicant is redirected from verify-email to /applicant", () => {
+  assert.match(verify, /email_confirmed_at/);
+  assert.match(verify, /router\.replace\("\/applicant"\)/);
+  assert.match(proxy, /verifyEmailPath/);
+  assert.match(proxy, /!applicantNeedsEmailVerification\(user\)/);
 });
 
 test("verification callback exchanges code, signs out, redirects to /login?verified=true", () => {
@@ -71,9 +92,11 @@ test("verified applicant login still uses password and portal home", () => {
   assert.match(portalLogin, /email_confirmed_at == null/);
 });
 
-test("proxy allows verify-email without session and blocks unverified /applicant", () => {
+test("proxy and applicant layout block unverified dashboard access", () => {
   assert.match(proxy, /verifyEmailPath/);
-  assert.match(proxy, /!verifyEmailPath/);
   assert.match(proxy, /applicantNeedsEmailVerification/);
   assert.match(proxy, /\/applicant\/verify-email/);
+  assert.match(applicantLayout, /email_confirmed_at == null/);
+  assert.match(applicantLayout, /\/applicant\/verify-email/);
+  assert.match(applicantLayout, /DashboardShell/);
 });

@@ -238,7 +238,7 @@ test("Stage 1 payload allowlist includes dual citizenship fields", () => {
 
 test("Email verification wording uses confirmation link (not typed OTP)", () => {
   const verify = readFileSync(
-    join(root, "app/(applicant)/applicant/verify-email/page.js"),
+    join(root, "app/(auth)/applicant/verify-email/page.js"),
     "utf8"
   );
   assert.match(verify, /Check your email/);

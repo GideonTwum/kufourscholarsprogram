@@ -25,6 +25,7 @@ const applicantNav = [
 
 export default function ApplicantLayout({ children }) {
   const [profile, setProfile] = useState(null);
+  const [ready, setReady] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -33,21 +34,38 @@ export default function ApplicantLayout({ children }) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setReady(true);
+        return;
+      }
+      // Unverified sessions must never see the Applicant Dashboard shell.
+      if (user.email_confirmed_at == null) {
+        router.replace("/applicant/verify-email");
+        return;
+      }
       const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
       setProfile(data);
+      setReady(true);
     }
     loadProfile();
-  }, [supabase]);
+  }, [router, supabase]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-royal border-t-transparent" />
+      </div>
+    );
   }
 
   return (
