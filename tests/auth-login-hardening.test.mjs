@@ -43,6 +43,7 @@ test("applicant register normalizes email and does not mutate password", () => {
   assert.match(applicantRegister, /signUp\(\{[\s\S]*email:\s*normalizedEmail[\s\S]*password,/);
   assert.doesNotMatch(applicantRegister, /password\.trim\(/);
   assert.doesNotMatch(applicantRegister, /password\.toLowerCase\(/);
+  assert.match(applicantRegister, /validatePasswordPolicy/);
 });
 
 test("director manage script uses createStaffUserWithAdmin and .env.local URL", () => {

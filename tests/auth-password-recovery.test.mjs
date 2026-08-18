@@ -56,7 +56,12 @@ test("password policy rejects weak passwords", () => {
   assert.equal(validatePasswordPolicy("short").ok, false);
   assert.equal(validatePasswordPolicy("allletters").ok, false);
   assert.equal(validatePasswordPolicy("12345678").ok, false);
-  assert.equal(validatePasswordPolicy("GoodPass1").ok, true);
+  assert.equal(validatePasswordPolicy("GoodPass1").ok, false); // missing special char
+  assert.equal(validatePasswordPolicy("GoodPass1!").ok, true);
+  assert.match(
+    readFileSync(resolve("app/(auth)/reset-password/page.js"), "utf8"),
+    /validatePasswordPolicy/
+  );
 });
 
 test("successful reset returns portal-correct login paths", () => {
