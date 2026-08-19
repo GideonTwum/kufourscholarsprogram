@@ -11,11 +11,15 @@ test("keeps legitimate Stage 1 applicant fields", () => {
     full_name: "Test Applicant",
     university: "University of Ghana",
     leadership_evidence_urls: ["user/file.pdf"],
+    concept_note_title: "Improving Waste Management Among Households in Madina",
+    concept_note_path: "user/concept-note/a.pdf",
   });
 
   assert.equal(data.full_name, "Test Applicant");
   assert.equal(data.university, "University of Ghana");
   assert.deepEqual(data.leadership_evidence_urls, ["user/file.pdf"]);
+  assert.equal(data.concept_note_title, "Improving Waste Management Among Households in Madina");
+  assert.equal(data.concept_note_path, "user/concept-note/a.pdf");
   assert.deepEqual(ignoredDangerousFields, []);
 });
 

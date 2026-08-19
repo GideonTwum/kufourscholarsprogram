@@ -8,6 +8,7 @@ import { sanitizeStage1ApplicationData } from "@/lib/stage1-application-payload"
 import { assertStatusTransition } from "@/lib/application-status-transition.mjs";
 import {
   normalizeDualCitizenshipFields,
+  normalizeConceptNoteTitle,
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
 
@@ -20,6 +21,11 @@ function buildRow(applicationData, userId, overrides = {}) {
     user_id: userId,
     leadership_evidence_urls: leadership,
     leadership_evidence_url: leadership[0] || null,
+    concept_note_title: normalizeConceptNoteTitle(applicationData.concept_note_title) || null,
+    concept_note_path:
+      typeof applicationData.concept_note_path === "string"
+        ? applicationData.concept_note_path.trim() || null
+        : null,
     updated_at: new Date().toISOString(),
     ...overrides,
   };
@@ -52,6 +58,11 @@ export async function POST(request) {
   const normalized = normalizeDualCitizenshipFields({
     ...safeApplicationData,
     year_of_study: normalizeYearOfStudy(safeApplicationData.year_of_study) || safeApplicationData.year_of_study,
+    concept_note_title: normalizeConceptNoteTitle(safeApplicationData.concept_note_title),
+    concept_note_path:
+      typeof safeApplicationData.concept_note_path === "string"
+        ? safeApplicationData.concept_note_path.trim()
+        : "",
   });
 
   if (ignoredDangerousFields.length > 0) {

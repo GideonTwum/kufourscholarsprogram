@@ -128,6 +128,7 @@ export default function AssessorApplicantDetailPage() {
         transcript: application.academic_transcript_url,
         recommendation: application.recommendation_url,
         photo: application.photo_url,
+        conceptNote: application.concept_note_path,
       };
       const next = {};
       for (const [key, path] of Object.entries(fields)) {
@@ -258,6 +259,26 @@ export default function AssessorApplicantDetailPage() {
               {getLeadershipEvidencePaths(application).map((_, i) => (
                 <DocumentLink key={i} label={`Leadership evidence ${i + 1}`} url={docUrls.leadership?.[i]} loading />
               ))}
+            </div>
+          </Section>
+
+          <Section title="Concept Note" icon={FileText}>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Title</p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {application.concept_note_title?.trim() || "Not provided"}
+                </p>
+              </div>
+              {application.concept_note_path ? (
+                <DocumentLink
+                  label="Concept Note PDF"
+                  url={docUrls.conceptNote}
+                  loading={!!application.concept_note_path}
+                />
+              ) : (
+                <p className="text-sm text-gray-500">No Concept Note uploaded.</p>
+              )}
             </div>
           </Section>
 

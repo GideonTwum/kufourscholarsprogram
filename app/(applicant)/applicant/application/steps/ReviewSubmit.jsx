@@ -1,6 +1,6 @@
 "use client";
 
-import { User, GraduationCap, FileText, CheckCircle2, XCircle, Edit, ExternalLink } from "lucide-react";
+import { User, GraduationCap, FileText, Lightbulb, CheckCircle2, XCircle, Edit, ExternalLink } from "lucide-react";
 import { getLeadershipEvidencePaths } from "@/lib/application-validation";
 
 function Section({ title, icon: Icon, stepIndex, goToStep, readOnly, children }) {
@@ -15,7 +15,7 @@ function Section({ title, icon: Icon, stepIndex, goToStep, readOnly, children })
   );
 }
 
-function Field({ label, value, href }) {
+function Field({ label, value, href, hrefLabel = "View document" }) {
   const filled = !!value || !!href;
   return (
     <div className="flex min-w-0 items-start gap-2 text-sm">
@@ -24,7 +24,7 @@ function Field({ label, value, href }) {
         <span className="text-gray-500">{label}:</span>{" "}
         {href ? (
           <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 break-all text-royal hover:text-gold">
-            View document <ExternalLink size={10} />
+            {hrefLabel} <ExternalLink size={10} />
           </a>
         ) : (
           <span className={`break-words ${filled ? "text-gray-900" : "text-red-400 italic"}`}>{value || "Not provided"}</span>
@@ -127,6 +127,15 @@ export default function ReviewSubmit({
           />
         ))}
         <Field label="Recommendation Letter" value={data.recommendation_url ? "Uploaded" : ""} href={docUrls.recommendation_url} />
+      </Section>
+      <Section title="Concept Note" icon={Lightbulb} stepIndex={3} goToStep={goToStep} readOnly={readOnly}>
+        <Field label="Title" value={data.concept_note_title} />
+        <Field
+          label="Document"
+          value={data.concept_note_path ? "Uploaded" : ""}
+          href={docUrls.concept_note_path}
+          hrefLabel="View Concept Note"
+        />
       </Section>
     </div>
   );

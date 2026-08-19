@@ -18,6 +18,7 @@ import {
 import PersonalInfo from "./steps/PersonalInfo";
 import AcademicInfo from "./steps/AcademicInfo";
 import Documents from "./steps/Documents";
+import ConceptNote from "./steps/ConceptNote";
 import ReviewSubmit from "./steps/ReviewSubmit";
 import {
   validateStep,
@@ -25,12 +26,13 @@ import {
   STEP_VALIDATION_FIELDS,
   getLeadershipEvidencePaths,
   normalizeDualCitizenshipFields,
+  normalizeConceptNoteTitle,
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
 import { getApplicantApplicationView } from "@/lib/application-status";
 import ApplicantProgressBar from "../components/ApplicantProgressBar";
 
-const stepLabels = ["Personal", "Academic", "Documents", "Review"];
+const stepLabels = ["Personal", "Academic", "Documents", "Concept Note", "Review"];
 
 const DOC_FIELDS = [
   "cv_personal_statement_url",
@@ -39,6 +41,8 @@ const DOC_FIELDS = [
   "recommendation_url",
   "photo_url",
 ];
+
+const CONCEPT_FIELDS = ["concept_note_title", "concept_note_path"];
 
 function normalizeLeadershipFromExisting(existing) {
   const raw = existing.leadership_evidence_urls;
@@ -54,6 +58,9 @@ function buildApplicationPayload(data, userId, status, submittedAt = null) {
   const normalized = normalizeDualCitizenshipFields({
     ...data,
     year_of_study: normalizeYearOfStudy(data.year_of_study) || data.year_of_study,
+    concept_note_title: normalizeConceptNoteTitle(data.concept_note_title),
+    concept_note_path:
+      typeof data.concept_note_path === "string" ? data.concept_note_path.trim() : "",
   });
   return {
     ...normalized,
@@ -76,6 +83,7 @@ function useApplicationDocUrls(data) {
         cv_personal_statement_url: data.cv_personal_statement_url || data.cv_url,
         academic_transcript_url: data.academic_transcript_url,
         recommendation_url: data.recommendation_url,
+        concept_note_path: data.concept_note_path,
       };
       for (const [field, path] of Object.entries(pdfFields)) {
         if (!path) continue;
@@ -118,6 +126,7 @@ function useApplicationDocUrls(data) {
     data?.leadership_evidence_urls,
     data?.recommendation_url,
     data?.photo_url,
+    data?.concept_note_path,
   ]);
 
   return docUrls;
@@ -220,6 +229,8 @@ export default function ApplicationPage() {
           leadership_evidence_urls: normalizeLeadershipFromExisting(existing),
           recommendation_url: existing.recommendation_url || "",
           photo_url: existing.photo_url || "",
+          concept_note_title: existing.concept_note_title || "",
+          concept_note_path: existing.concept_note_path || "",
         });
       } else {
         setData({ full_name: profile?.full_name || "" });
@@ -327,10 +338,12 @@ export default function ApplicationPage() {
         "confirms_ghana_enrollment",
       ];
       const docKeys = DOC_FIELDS;
+      const conceptKeys = CONCEPT_FIELDS;
       const errKeys = Object.keys(allErrors);
       if (errKeys.some((k) => personalKeys.includes(k))) setStep(0);
       else if (errKeys.some((k) => academicKeys.includes(k))) setStep(1);
       else if (errKeys.some((k) => docKeys.includes(k))) setStep(2);
+      else if (errKeys.some((k) => conceptKeys.includes(k))) setStep(3);
       return;
     }
     setSubmitting(true);
@@ -506,7 +519,10 @@ export default function ApplicationPage() {
         {step === 0 && <PersonalInfo data={data} onChange={setData} errors={errors} />}
         {step === 1 && <AcademicInfo data={data} onChange={setData} errors={errors} />}
         {step === 2 && <Documents data={data} onChange={setData} userId={userId} errors={errors} />}
-        {step === 3 && <ReviewSubmit data={data} goToStep={setStep} errors={errors} docUrls={docUrls} />}
+        {step === 3 && (
+          <ConceptNote data={data} onChange={setData} userId={userId} errors={errors} />
+        )}
+        {step === 4 && <ReviewSubmit data={data} goToStep={setStep} errors={errors} docUrls={docUrls} />}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -520,7 +536,7 @@ export default function ApplicationPage() {
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Draft
           </button>
         </div>
-        {step < 3 ? (
+        {step < 4 ? (
           <button onClick={handleNext} disabled={saving} className="flex items-center gap-1 rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal/90 disabled:opacity-50">
             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
             Next <ChevronRight size={16} />

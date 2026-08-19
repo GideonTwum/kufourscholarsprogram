@@ -180,6 +180,7 @@ export default function PanelApplicantDetailPage() {
         cv_personal_statement_url: application.cv_personal_statement_url || application.cv_url,
         academic_transcript_url: application.academic_transcript_url,
         recommendation_url: application.recommendation_url,
+        concept_note_path: application.concept_note_path,
       };
       for (const [field, path] of Object.entries(pdfFields)) {
         if (!path) continue;
@@ -370,6 +371,28 @@ export default function PanelApplicantDetailPage() {
                   )}
                 </div>
               ))}
+            </div>
+          </Section>
+
+          <Section title="Concept Note" icon={FileText}>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Title</p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {application.concept_note_title?.trim() || "Not provided"}
+                </p>
+              </div>
+              {application.concept_note_path ? (
+                <DocCard
+                  label="Concept Note PDF"
+                  field="concept_note_path"
+                  application={application}
+                  docUrls={docUrls}
+                  icon={FileText}
+                />
+              ) : (
+                <p className="text-sm text-gray-500">No Concept Note uploaded.</p>
+              )}
             </div>
           </Section>
 

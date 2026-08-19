@@ -200,11 +200,25 @@ export default function Stage2Page() {
           <p className="mt-2 text-sm text-gray-700">{STAGE2_PROMPT}</p>
         </div>
 
+        {application.concept_note_title?.trim() ? (
+          <div className="mt-6 rounded-lg border border-royal/15 bg-royal/5 p-4">
+            <h3 className="text-sm font-semibold text-royal">Your Concept Note</h3>
+            <p className="mt-1 text-sm text-gray-900">{application.concept_note_title.trim()}</p>
+            <p className="mt-2 text-xs text-gray-600">
+              Use your Stage 1 Concept Note as the description of your YouTube video.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Use your Stage 1 Concept Note as the description of your YouTube video.
+          </div>
+        )}
+
         <div className="mt-6 space-y-3 rounded-lg border border-royal/15 bg-royal/5 p-4 text-sm text-gray-700">
           <h3 className="font-semibold text-royal">YouTube requirements</h3>
           <ol className="list-decimal space-y-2 pl-5">
             <li>
-              Use your <strong>concept note</strong> as the YouTube video{" "}
+              Use your Stage 1 <strong>Concept Note</strong> as the YouTube video{" "}
               <strong>description</strong>.
             </li>
             <li>
@@ -256,7 +270,7 @@ export default function Stage2Page() {
                 className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-royal focus:ring-gold"
               />
               <span>
-                I confirm that my <strong>concept note</strong> is used as the YouTube video
+                I confirm that my Stage 1 <strong>Concept Note</strong> is used as the YouTube video
                 description. <span className="text-red-500">*</span>
               </span>
             </label>
