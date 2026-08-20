@@ -197,10 +197,11 @@ export default function PersonalInfo({ data, onChange, errors = {} }) {
           </div>
           <div>
             <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700">
-              <Heart size={16} /> Emergency contact 2 <span className="text-red-500">*</span>
+              <Heart size={16} /> Emergency contact 2{" "}
+              <span className="font-normal text-gray-500">(Optional)</span>
             </label>
             <p className="mb-2 text-xs text-gray-500">
-              Provide a second person we can reach if the first contact is unavailable.
+              Optional. If you start filling Contact 2, provide both name and phone number.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>

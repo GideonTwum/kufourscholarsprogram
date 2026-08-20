@@ -125,9 +125,14 @@ test("Year of Study: First Year and Sophomore accepted; advanced years rejected"
     ...baseAcademic({ year_of_study: "3rd Year" }),
     cv_personal_statement_url: "a.pdf",
     academic_transcript_url: "b.pdf",
-    recommendation_url: "c.pdf",
+    recommendation_urls: ["c.pdf", "d.pdf"],
     photo_url: "photo.jpg",
-    leadership_evidence_urls: ["lead.pdf"],
+    student_id_path: "id.pdf",
+    ksp_tiktok_follow_screenshot_path: "t.webp",
+    ksp_linkedin_follow_screenshot_path: "l.png",
+    ksp_instagram_follow_screenshot_path: "i.jpg",
+    concept_note_title: "Improving Waste Management Among Households",
+    concept_note_path: "concept.pdf",
   });
   assert.equal(eligBad.ok, false);
   assert.match(eligBad.reason, /First Year|Sophomore/i);
@@ -155,18 +160,24 @@ test("Photo: 5MB limit", () => {
   const docs = validateDocuments({
     cv_personal_statement_url: "a.pdf",
     academic_transcript_url: "b.pdf",
-    leadership_evidence_urls: ["c.pdf"],
-    recommendation_url: "d.pdf",
+    recommendation_urls: ["c.pdf", "d.pdf"],
     photo_url: "photo.jpg",
+    student_id_path: "id.pdf",
+    ksp_tiktok_follow_screenshot_path: "t.webp",
+    ksp_linkedin_follow_screenshot_path: "l.png",
+    ksp_instagram_follow_screenshot_path: "i.jpg",
   });
   assert.equal(docs.photo_url, undefined);
   assert.match(
     validateDocuments({
       cv_personal_statement_url: "a.pdf",
       academic_transcript_url: "b.pdf",
-      leadership_evidence_urls: ["c.pdf"],
-      recommendation_url: "d.pdf",
+      recommendation_urls: ["c.pdf", "d.pdf"],
       photo_url: "",
+      student_id_path: "id.pdf",
+      ksp_tiktok_follow_screenshot_path: "t.webp",
+      ksp_linkedin_follow_screenshot_path: "l.png",
+      ksp_instagram_follow_screenshot_path: "i.jpg",
     }).photo_url,
     /5MB/
   );

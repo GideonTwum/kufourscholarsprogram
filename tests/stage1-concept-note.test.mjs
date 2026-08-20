@@ -38,8 +38,12 @@ const baseValid = {
   cv_personal_statement_url: "user/cv/a.pdf",
   academic_transcript_url: "user/transcript/a.pdf",
   leadership_evidence_urls: ["user/leadership/a.pdf"],
-  recommendation_url: "user/recommendation/a.pdf",
+  recommendation_urls: ["user/recommendation/a.pdf", "user/recommendation/b.pdf"],
   photo_url: "https://example.com/photo.jpg",
+  student_id_path: "user/student-id/id.pdf",
+  ksp_tiktok_follow_screenshot_path: "user/social/tiktok.webp",
+  ksp_linkedin_follow_screenshot_path: "user/social/linkedin.png",
+  ksp_instagram_follow_screenshot_path: "user/social/instagram.jpg",
   concept_note_title: "Improving Waste Management Among Households in Madina",
   concept_note_path: "user/concept-note/a.pdf",
 };

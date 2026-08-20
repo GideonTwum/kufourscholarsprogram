@@ -14,7 +14,7 @@ import {
   User,
   Video,
 } from "lucide-react";
-import { getLeadershipEvidencePaths } from "@/lib/application-validation";
+import { getLeadershipEvidencePaths, getRecommendationLetterPaths } from "@/lib/application-validation";
 import { assessmentStageForStatus } from "@/lib/assessor-workflow";
 
 const scoreFields = [
@@ -126,9 +126,12 @@ export default function AssessorApplicantDetailPage() {
       const fields = {
         cv: application.cv_personal_statement_url || application.cv_url,
         transcript: application.academic_transcript_url,
-        recommendation: application.recommendation_url,
+        studentId: application.student_id_path,
         photo: application.photo_url,
         conceptNote: application.concept_note_path,
+        tiktok: application.ksp_tiktok_follow_screenshot_path,
+        linkedin: application.ksp_linkedin_follow_screenshot_path,
+        instagram: application.ksp_instagram_follow_screenshot_path,
       };
       const next = {};
       for (const [key, path] of Object.entries(fields)) {
@@ -149,6 +152,14 @@ export default function AssessorApplicantDetailPage() {
         leadership.push(data.url || null);
       }
       next.leadership = leadership;
+
+      const recommendations = [];
+      for (const path of getRecommendationLetterPaths(application)) {
+        const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+        recommendations.push(data.url || null);
+      }
+      next.recommendations = recommendations;
       setDocUrls(next);
     }
     loadDocs();
@@ -255,10 +266,42 @@ export default function AssessorApplicantDetailPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <DocumentLink label="CV / Personal Statement" url={docUrls.cv} loading={!!(application.cv_personal_statement_url || application.cv_url)} />
               <DocumentLink label="Academic Transcript" url={docUrls.transcript} loading={!!application.academic_transcript_url} />
-              <DocumentLink label="Recommendation Letter" url={docUrls.recommendation} loading={!!application.recommendation_url} />
-              {getLeadershipEvidencePaths(application).map((_, i) => (
-                <DocumentLink key={i} label={`Leadership evidence ${i + 1}`} url={docUrls.leadership?.[i]} loading />
+              <DocumentLink label="Student ID" url={docUrls.studentId} loading={!!application.student_id_path} />
+              {getRecommendationLetterPaths(application).map((_, i) => (
+                <DocumentLink
+                  key={`rec-${i}`}
+                  label={`Recommendation Letter ${i + 1}`}
+                  url={docUrls.recommendations?.[i]}
+                  loading
+                />
               ))}
+              {getLeadershipEvidencePaths(application).length === 0 ? (
+                <p className="text-sm text-gray-500 sm:col-span-2">Evidence of Leadership: Not provided (optional)</p>
+              ) : (
+                getLeadershipEvidencePaths(application).map((_, i) => (
+                  <DocumentLink key={`lead-${i}`} label={`Leadership evidence ${i + 1}`} url={docUrls.leadership?.[i]} loading />
+                ))
+              )}
+            </div>
+          </Section>
+
+          <Section title="KSP Social Media Evidence" icon={FileText}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <DocumentLink
+                label="TikTok follow (@kufuorscholars)"
+                url={docUrls.tiktok}
+                loading={!!application.ksp_tiktok_follow_screenshot_path}
+              />
+              <DocumentLink
+                label="LinkedIn follow (Kufuor Scholars Program)"
+                url={docUrls.linkedin}
+                loading={!!application.ksp_linkedin_follow_screenshot_path}
+              />
+              <DocumentLink
+                label="Instagram follow (@kufuor_scholars_program)"
+                url={docUrls.instagram}
+                loading={!!application.ksp_instagram_follow_screenshot_path}
+              />
             </div>
           </Section>
 

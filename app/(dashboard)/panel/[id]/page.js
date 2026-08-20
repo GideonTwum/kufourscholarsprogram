@@ -16,7 +16,7 @@ import {
   ClipboardList,
   CheckCircle2,
 } from "lucide-react";
-import { getLeadershipEvidencePaths } from "@/lib/application-validation";
+import { getLeadershipEvidencePaths, getRecommendationLetterPaths } from "@/lib/application-validation";
 import {
   getApplicantDisplayName,
   getApplicantDisplayEmail,
@@ -103,7 +103,7 @@ export default function PanelApplicantDetailPage() {
   const docFields = [
     { label: "CV / Personal Statement", field: "cv_personal_statement_url" },
     { label: "Academic transcript", field: "academic_transcript_url" },
-    { label: "Recommendation letter", field: "recommendation_url" },
+    { label: "Student ID", field: "student_id_path" },
   ];
 
   useEffect(() => {
@@ -179,8 +179,11 @@ export default function PanelApplicantDetailPage() {
       const pdfFields = {
         cv_personal_statement_url: application.cv_personal_statement_url || application.cv_url,
         academic_transcript_url: application.academic_transcript_url,
-        recommendation_url: application.recommendation_url,
+        student_id_path: application.student_id_path,
         concept_note_path: application.concept_note_path,
+        ksp_tiktok_follow_screenshot_path: application.ksp_tiktok_follow_screenshot_path,
+        ksp_linkedin_follow_screenshot_path: application.ksp_linkedin_follow_screenshot_path,
+        ksp_instagram_follow_screenshot_path: application.ksp_instagram_follow_screenshot_path,
       };
       for (const [field, path] of Object.entries(pdfFields)) {
         if (!path) continue;
@@ -212,6 +215,17 @@ export default function PanelApplicantDetailPage() {
           urls.leadership.push(null);
         }
       }
+      const recommendations = getRecommendationLetterPaths(application);
+      urls.recommendations = [];
+      for (const path of recommendations) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const data = await res.json();
+          urls.recommendations.push(data.url || null);
+        } catch (_) {
+          urls.recommendations.push(null);
+        }
+      }
       setDocUrls(urls);
     };
     fetchUrls();
@@ -223,7 +237,13 @@ export default function PanelApplicantDetailPage() {
     application?.leadership_evidence_url,
     application?.leadership_evidence_urls,
     application?.recommendation_url,
+    application?.recommendation_urls,
+    application?.student_id_path,
+    application?.ksp_tiktok_follow_screenshot_path,
+    application?.ksp_linkedin_follow_screenshot_path,
+    application?.ksp_instagram_follow_screenshot_path,
     application?.photo_url,
+    application?.concept_note_path,
   ]);
 
   const weightedTotal = INTERVIEW_CRITERIA.reduce((sum, c) => {
@@ -356,6 +376,21 @@ export default function PanelApplicantDetailPage() {
               {docFields.map((doc) => (
                 <DocCard key={doc.field} label={doc.label} field={doc.field} application={appWithCv} docUrls={docUrls} icon={FileText} />
               ))}
+              {getRecommendationLetterPaths(application).map((path, i) => (
+                <div key={`rec-${i}`} className="min-w-0 rounded-lg border border-gray-100 p-4">
+                  <FileText size={20} className="mb-2 text-gray-400" />
+                  <p className="truncate text-sm font-medium text-gray-900">Recommendation Letter {i + 1}</p>
+                  {!path ? (
+                    <p className="mt-1 text-xs text-gray-400">Not uploaded</p>
+                  ) : docUrls.recommendations?.[i] ? (
+                    <a href={docUrls.recommendations[i]} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-royal hover:text-gold">
+                      <ExternalLink size={12} /> View Document
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-xs text-amber-600">Loading…</p>
+                  )}
+                </div>
+              ))}
               {getLeadershipEvidencePaths(application).map((path, i) => (
                 <div key={`lead-${i}`} className="min-w-0 rounded-lg border border-gray-100 p-4">
                   <FileText size={20} className="mb-2 text-gray-400" />
@@ -371,6 +406,9 @@ export default function PanelApplicantDetailPage() {
                   )}
                 </div>
               ))}
+              <DocCard label="TikTok follow (@kufuorscholars)" field="ksp_tiktok_follow_screenshot_path" application={application} docUrls={docUrls} icon={ImageIcon} />
+              <DocCard label="LinkedIn follow (Kufuor Scholars Program)" field="ksp_linkedin_follow_screenshot_path" application={application} docUrls={docUrls} icon={ImageIcon} />
+              <DocCard label="Instagram follow (@kufuor_scholars_program)" field="ksp_instagram_follow_screenshot_path" application={application} docUrls={docUrls} icon={ImageIcon} />
             </div>
           </Section>
 

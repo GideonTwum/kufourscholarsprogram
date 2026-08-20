@@ -20,7 +20,7 @@ import {
   ClipboardList,
   Clock,
 } from "lucide-react";
-import { getLeadershipEvidencePaths } from "@/lib/application-validation";
+import { getLeadershipEvidencePaths, getRecommendationLetterPaths } from "@/lib/application-validation";
 import { getDirectorStageActions } from "@/lib/director-stage-actions";
 import { evaluatorDisplayName } from "@/lib/staff-lifecycle";
 import DirectorStageActionBar from "../../components/DirectorStageActionBar";
@@ -318,15 +318,18 @@ export default function ApplicationReviewPage() {
   const docFields = [
     { label: "CV / Personal Statement", field: "cv_personal_statement_url" },
     { label: "Academic transcript", field: "academic_transcript_url" },
-    { label: "Recommendation letter", field: "recommendation_url" },
+    { label: "Student ID", field: "student_id_path" },
   ];
 
   // Fallback to legacy cv_url if cv_personal_statement_url is empty
   const effectiveDocPaths = {
     cv_personal_statement_url: application?.cv_personal_statement_url || application?.cv_url,
     academic_transcript_url: application?.academic_transcript_url,
-    recommendation_url: application?.recommendation_url,
+    student_id_path: application?.student_id_path,
     concept_note_path: application?.concept_note_path,
+    ksp_tiktok_follow_screenshot_path: application?.ksp_tiktok_follow_screenshot_path,
+    ksp_linkedin_follow_screenshot_path: application?.ksp_linkedin_follow_screenshot_path,
+    ksp_instagram_follow_screenshot_path: application?.ksp_instagram_follow_screenshot_path,
   };
 
   const [docUrls, setDocUrls] = useState({});
@@ -366,6 +369,17 @@ export default function ApplicationReviewPage() {
           urls.leadership.push(null);
         }
       }
+      const recommendations = getRecommendationLetterPaths(application);
+      urls.recommendations = [];
+      for (const path of recommendations) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const data = await res.json();
+          urls.recommendations.push(data.url || null);
+        } catch (_) {
+          urls.recommendations.push(null);
+        }
+      }
       setDocUrls(urls);
     };
     fetchSignedUrls();
@@ -377,6 +391,11 @@ export default function ApplicationReviewPage() {
     application?.leadership_evidence_url,
     application?.leadership_evidence_urls,
     application?.recommendation_url,
+    application?.recommendation_urls,
+    application?.student_id_path,
+    application?.ksp_tiktok_follow_screenshot_path,
+    application?.ksp_linkedin_follow_screenshot_path,
+    application?.ksp_instagram_follow_screenshot_path,
     application?.photo_url,
     application?.concept_note_path,
     application?.concept_note_title,
@@ -658,7 +677,35 @@ export default function ApplicationReviewPage() {
                     icon={FileText}
                   />
                 ))}
-                {getLeadershipEvidencePaths(application).map((path, i) => (
+                {getRecommendationLetterPaths(application).map((path, i) => (
+                  <div key={`rec-${i}-${path}`} className="min-w-0 rounded-lg border border-gray-100 p-4">
+                    <FileText size={20} className="mb-2 text-gray-400" />
+                    <p className="truncate text-sm font-medium text-gray-900">Recommendation Letter {i + 1}</p>
+                    {!path ? (
+                      <p className="mt-1 text-xs text-gray-400">Not uploaded</p>
+                    ) : docUrls.recommendations?.[i] ? (
+                      <a
+                        href={docUrls.recommendations[i]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs text-royal hover:text-gold"
+                      >
+                        <ExternalLink size={12} />
+                        View Document
+                      </a>
+                    ) : (
+                      <p className="mt-1 text-xs text-amber-600">Loading…</p>
+                    )}
+                  </div>
+                ))}
+                {getLeadershipEvidencePaths(application).length === 0 ? (
+                  <div className="min-w-0 rounded-lg border border-gray-100 p-4">
+                    <FileText size={20} className="mb-2 text-gray-400" />
+                    <p className="truncate text-sm font-medium text-gray-900">Evidence of Leadership</p>
+                    <p className="mt-1 text-xs text-gray-400">Not provided (optional)</p>
+                  </div>
+                ) : (
+                  getLeadershipEvidencePaths(application).map((path, i) => (
                   <div key={`lead-${i}-${path}`} className="min-w-0 rounded-lg border border-gray-100 p-4">
                     <FileText size={20} className="mb-2 text-gray-400" />
                     <p className="truncate text-sm font-medium text-gray-900">Leadership evidence {i + 1}</p>
@@ -678,7 +725,36 @@ export default function ApplicationReviewPage() {
                       <p className="mt-1 text-xs text-amber-600">Loading…</p>
                     )}
                   </div>
-                ))}
+                  ))
+                )}
+              </div>
+            </Section>
+          </div>
+
+          <div className="lg:col-span-2">
+            <Section title="KSP Social Media Evidence" icon={FileText}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <DocCard
+                  label="TikTok follow (@kufuorscholars)"
+                  field="ksp_tiktok_follow_screenshot_path"
+                  application={application}
+                  docUrls={docUrls}
+                  icon={ImageIcon}
+                />
+                <DocCard
+                  label="LinkedIn follow (Kufuor Scholars Program)"
+                  field="ksp_linkedin_follow_screenshot_path"
+                  application={application}
+                  docUrls={docUrls}
+                  icon={ImageIcon}
+                />
+                <DocCard
+                  label="Instagram follow (@kufuor_scholars_program)"
+                  field="ksp_instagram_follow_screenshot_path"
+                  application={application}
+                  docUrls={docUrls}
+                  icon={ImageIcon}
+                />
               </div>
             </Section>
           </div>

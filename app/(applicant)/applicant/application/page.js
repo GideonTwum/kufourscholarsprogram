@@ -25,11 +25,13 @@ import {
   validateForSubmit,
   STEP_VALIDATION_FIELDS,
   getLeadershipEvidencePaths,
+  getRecommendationLetterPaths,
   normalizeDualCitizenshipFields,
   normalizeConceptNoteTitle,
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
 import { getApplicantApplicationView } from "@/lib/application-status";
+import { scrollStage1ContentToTop } from "@/lib/stage1-scroll";
 import ApplicantProgressBar from "../components/ApplicantProgressBar";
 
 const stepLabels = ["Personal", "Academic", "Documents", "Concept Note", "Review"];
@@ -38,8 +40,13 @@ const DOC_FIELDS = [
   "cv_personal_statement_url",
   "academic_transcript_url",
   "leadership_evidence_urls",
+  "recommendation_urls",
   "recommendation_url",
   "photo_url",
+  "student_id_path",
+  "ksp_tiktok_follow_screenshot_path",
+  "ksp_linkedin_follow_screenshot_path",
+  "ksp_instagram_follow_screenshot_path",
 ];
 
 const CONCEPT_FIELDS = ["concept_note_title", "concept_note_path"];
@@ -51,10 +58,15 @@ function normalizeLeadershipFromExisting(existing) {
   return leg ? [leg] : [];
 }
 
+function normalizeRecommendationsFromExisting(existing) {
+  return getRecommendationLetterPaths(existing);
+}
+
 function buildApplicationPayload(data, userId, status, submittedAt = null) {
   const leadership = Array.isArray(data.leadership_evidence_urls)
     ? data.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
     : [];
+  const recommendations = getRecommendationLetterPaths(data);
   const normalized = normalizeDualCitizenshipFields({
     ...data,
     year_of_study: normalizeYearOfStudy(data.year_of_study) || data.year_of_study,
@@ -66,6 +78,8 @@ function buildApplicationPayload(data, userId, status, submittedAt = null) {
     ...normalized,
     leadership_evidence_urls: leadership,
     leadership_evidence_url: leadership[0] || null,
+    recommendation_urls: recommendations,
+    recommendation_url: recommendations[0] || null,
     user_id: userId,
     status,
     updated_at: new Date().toISOString(),
@@ -79,13 +93,16 @@ function useApplicationDocUrls(data) {
   useEffect(() => {
     async function fetchUrls() {
       const urls = {};
-      const pdfFields = {
+      const pathFields = {
         cv_personal_statement_url: data.cv_personal_statement_url || data.cv_url,
         academic_transcript_url: data.academic_transcript_url,
-        recommendation_url: data.recommendation_url,
         concept_note_path: data.concept_note_path,
+        student_id_path: data.student_id_path,
+        ksp_tiktok_follow_screenshot_path: data.ksp_tiktok_follow_screenshot_path,
+        ksp_linkedin_follow_screenshot_path: data.ksp_linkedin_follow_screenshot_path,
+        ksp_instagram_follow_screenshot_path: data.ksp_instagram_follow_screenshot_path,
       };
-      for (const [field, path] of Object.entries(pdfFields)) {
+      for (const [field, path] of Object.entries(pathFields)) {
         if (!path) continue;
         try {
           const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
@@ -102,6 +119,17 @@ function useApplicationDocUrls(data) {
           urls.leadership.push(json.url || null);
         } catch (_) {
           urls.leadership.push(null);
+        }
+      }
+      const recommendations = getRecommendationLetterPaths(data);
+      urls.recommendations = [];
+      for (const path of recommendations) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const json = await res.json();
+          urls.recommendations.push(json.url || null);
+        } catch (_) {
+          urls.recommendations.push(null);
         }
       }
       const p = data.photo_url;
@@ -125,8 +153,13 @@ function useApplicationDocUrls(data) {
     data?.leadership_evidence_url,
     data?.leadership_evidence_urls,
     data?.recommendation_url,
+    data?.recommendation_urls,
     data?.photo_url,
     data?.concept_note_path,
+    data?.student_id_path,
+    data?.ksp_tiktok_follow_screenshot_path,
+    data?.ksp_linkedin_follow_screenshot_path,
+    data?.ksp_instagram_follow_screenshot_path,
   ]);
 
   return docUrls;
@@ -227,7 +260,12 @@ export default function ApplicationPage() {
           cv_personal_statement_url: existing.cv_personal_statement_url || existing.cv_url || "",
           academic_transcript_url: existing.academic_transcript_url || "",
           leadership_evidence_urls: normalizeLeadershipFromExisting(existing),
-          recommendation_url: existing.recommendation_url || "",
+          recommendation_urls: normalizeRecommendationsFromExisting(existing),
+          recommendation_url: normalizeRecommendationsFromExisting(existing)[0] || "",
+          student_id_path: existing.student_id_path || "",
+          ksp_tiktok_follow_screenshot_path: existing.ksp_tiktok_follow_screenshot_path || "",
+          ksp_linkedin_follow_screenshot_path: existing.ksp_linkedin_follow_screenshot_path || "",
+          ksp_instagram_follow_screenshot_path: existing.ksp_instagram_follow_screenshot_path || "",
           photo_url: existing.photo_url || "",
           concept_note_title: existing.concept_note_title || "",
           concept_note_path: existing.concept_note_path || "",
@@ -305,7 +343,15 @@ export default function ApplicationPage() {
       return;
     }
     setErrors({});
-    saveDraft().then(() => setStep((s) => s + 1));
+    saveDraft().then(() => {
+      setStep((s) => s + 1);
+      scrollStage1ContentToTop();
+    });
+  }
+
+  function handleBack() {
+    setStep((s) => Math.max(0, s - 1));
+    scrollStage1ContentToTop();
   }
 
   async function handleSubmit() {
@@ -528,7 +574,7 @@ export default function ApplicationPage() {
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {step > 0 && (
-            <button onClick={() => setStep(step - 1)} className="flex items-center gap-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
+            <button onClick={handleBack} className="flex items-center gap-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
               <ChevronLeft size={16} /> Back
             </button>
           )}

@@ -9,6 +9,8 @@ import { assertStatusTransition } from "@/lib/application-status-transition.mjs"
 import {
   normalizeDualCitizenshipFields,
   normalizeConceptNoteTitle,
+  validateForSubmit,
+  getRecommendationLetterPaths,
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
 
@@ -16,11 +18,14 @@ function buildRow(applicationData, userId, overrides = {}) {
   const leadership = Array.isArray(applicationData.leadership_evidence_urls)
     ? applicationData.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
     : [];
+  const recommendations = getRecommendationLetterPaths(applicationData);
   return {
     ...applicationData,
     user_id: userId,
     leadership_evidence_urls: leadership,
     leadership_evidence_url: leadership[0] || null,
+    recommendation_urls: recommendations,
+    recommendation_url: recommendations[0] || null,
     concept_note_title: normalizeConceptNoteTitle(applicationData.concept_note_title) || null,
     concept_note_path:
       typeof applicationData.concept_note_path === "string"
@@ -70,6 +75,15 @@ export async function POST(request) {
       userId: user.id,
       fields: ignoredDangerousFields,
     });
+  }
+
+  const submitErrors = validateForSubmit(normalized);
+  if (Object.keys(submitErrors).length > 0) {
+    const first = Object.values(submitErrors)[0];
+    return NextResponse.json(
+      { error: first || "Application is incomplete.", field_errors: submitErrors },
+      { status: 400 }
+    );
   }
 
   const eligibility = evaluateEligibilityForAutoReject(normalized);
