@@ -26,6 +26,13 @@ import {
   getLeadershipEvidencePaths,
   getRecommendationLetterPaths,
 } from "@/lib/application-validation";
+import {
+  APPLICATIONS_BUCKET,
+  APPLICANT_UPLOAD_USER_MESSAGE,
+  buildApplicantStoragePath,
+  resolveAuthenticatedUploadUser,
+  toApplicantUploadErrorMessage,
+} from "@/lib/applicant-storage-upload";
 
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp"];
 const STUDENT_ID_EXTS = ["pdf", ...IMAGE_EXTS];
@@ -86,7 +93,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
   }
 
   async function uploadToApplications(file, fieldKey, folder, allowedExts, pdfOnlyMessage) {
-    if (!file || !userId) return;
+    if (!file) return;
     if (file.size > MAX_FILE_SIZE_DOCS) {
       setUploadErrors((prev) => ({
         ...prev,
@@ -104,10 +111,45 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
     }
     setUploading((prev) => ({ ...prev, [fieldKey]: true }));
     clearUploadError(fieldKey);
-    const filePath = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error } = await supabase.storage.from("applications").upload(filePath, file, { upsert: true });
+
+    const user = await resolveAuthenticatedUploadUser(supabase);
+    const sessionUserId = user?.id || null;
+    if (!sessionUserId) {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [fieldKey]: APPLICANT_UPLOAD_USER_MESSAGE,
+      }));
+      setUploading((prev) => ({ ...prev, [fieldKey]: false }));
+      return;
+    }
+    if (userId && userId !== sessionUserId) {
+      console.error("[applicant-upload] path userId mismatch vs session", {
+        propUserId: userId,
+        sessionUserId,
+      });
+    }
+
+    let filePath;
+    try {
+      filePath = buildApplicantStoragePath(sessionUserId, folder, ext);
+    } catch (e) {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [fieldKey]: toApplicantUploadErrorMessage(e),
+      }));
+      setUploading((prev) => ({ ...prev, [fieldKey]: false }));
+      return;
+    }
+
+    // Unique paths → insert; upsert:true still requires UPDATE RLS when Storage uses upsert path.
+    const { error } = await supabase.storage
+      .from(APPLICATIONS_BUCKET)
+      .upload(filePath, file, { upsert: true });
     if (error) {
-      setUploadErrors((prev) => ({ ...prev, [fieldKey]: error.message || "Upload failed." }));
+      setUploadErrors((prev) => ({
+        ...prev,
+        [fieldKey]: toApplicantUploadErrorMessage(error),
+      }));
     } else if (fieldKey === "leadership_add") {
       onChange((prev) => {
         const cur = getLeadershipEvidencePaths(prev);
@@ -133,7 +175,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
 
   async function uploadPassportImage(file) {
     const fieldKey = "photo_url";
-    if (!file || !userId) return;
+    if (!file) return;
     if (file.size > MAX_FILE_SIZE_PHOTO) {
       setUploadErrors((prev) => ({ ...prev, [fieldKey]: "Image must be under 5MB." }));
       return;
@@ -145,10 +187,22 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
     }
     setUploading((prev) => ({ ...prev, [fieldKey]: true }));
     clearUploadError(fieldKey);
-    const path = `${userId}/passport-${Date.now()}.${ext}`;
+
+    const user = await resolveAuthenticatedUploadUser(supabase);
+    const sessionUserId = user?.id || null;
+    if (!sessionUserId) {
+      setUploadErrors((prev) => ({ ...prev, [fieldKey]: APPLICANT_UPLOAD_USER_MESSAGE }));
+      setUploading((prev) => ({ ...prev, [fieldKey]: false }));
+      return;
+    }
+
+    const path = `${sessionUserId}/passport-${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
     if (error) {
-      setUploadErrors((prev) => ({ ...prev, [fieldKey]: error.message || "Upload failed." }));
+      setUploadErrors((prev) => ({
+        ...prev,
+        [fieldKey]: toApplicantUploadErrorMessage(error, "[applicant-avatar-upload]"),
+      }));
     } else {
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
       const publicUrl = pub?.publicUrl;

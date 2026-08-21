@@ -18,6 +18,13 @@ import {
   MAX_FILE_SIZE_DOCS,
   normalizeConceptNoteTitle,
 } from "@/lib/application-validation";
+import {
+  APPLICATIONS_BUCKET,
+  APPLICANT_UPLOAD_USER_MESSAGE,
+  buildApplicantStoragePath,
+  resolveAuthenticatedUploadUser,
+  toApplicantUploadErrorMessage,
+} from "@/lib/applicant-storage-upload";
 
 export default function ConceptNote({ data, onChange, userId, errors = {}, readOnly = false }) {
   const [uploading, setUploading] = useState(false);
@@ -54,7 +61,7 @@ export default function ConceptNote({ data, onChange, userId, errors = {}, readO
   }, [path]);
 
   async function uploadPdf(file) {
-    if (readOnly || !file || !userId) return;
+    if (readOnly || !file) return;
     if (file.size > MAX_FILE_SIZE_DOCS) {
       setUploadError("File too large. Max 5MB. PDF only.");
       return;
@@ -66,14 +73,35 @@ export default function ConceptNote({ data, onChange, userId, errors = {}, readO
     }
     setUploading(true);
     setUploadError("");
-    const filePath = `${userId}/concept-note/${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}.pdf`;
+
+    const user = await resolveAuthenticatedUploadUser(supabase);
+    const sessionUserId = user?.id || null;
+    if (!sessionUserId) {
+      setUploadError(APPLICANT_UPLOAD_USER_MESSAGE);
+      setUploading(false);
+      return;
+    }
+    if (userId && userId !== sessionUserId) {
+      console.error("[applicant-upload] concept-note path userId mismatch vs session", {
+        propUserId: userId,
+        sessionUserId,
+      });
+    }
+
+    let filePath;
+    try {
+      filePath = buildApplicantStoragePath(sessionUserId, "concept-note", "pdf");
+    } catch (e) {
+      setUploadError(toApplicantUploadErrorMessage(e));
+      setUploading(false);
+      return;
+    }
+
     const { error } = await supabase.storage
-      .from("applications")
+      .from(APPLICATIONS_BUCKET)
       .upload(filePath, file, { upsert: true });
     if (error) {
-      setUploadError(error.message || "Upload failed.");
+      setUploadError(toApplicantUploadErrorMessage(error));
     } else {
       onChange((prev) => ({ ...prev, concept_note_path: filePath }));
     }

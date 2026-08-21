@@ -523,12 +523,6 @@ export default function ApplicationPage() {
             />
           </div>
         ) : null}
-        <Link
-          href="/apply"
-          className="mt-4 inline-flex rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-royal hover:bg-gold/20"
-        >
-          New to the program? Apply now
-        </Link>
       </div>
 
       <div className="mb-8">
