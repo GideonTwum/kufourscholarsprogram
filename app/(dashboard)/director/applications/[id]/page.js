@@ -651,6 +651,9 @@ export default function ApplicationReviewPage() {
               <Field label="Junior High School" value={application.junior_high_school} />
               <Field label="Senior High School" value={application.senior_high_school} />
               <Field label="Student ID Number" value={application.student_id} />
+              {application.application_class_name ? (
+                <Field label="Application Class" value={application.application_class_name} />
+              ) : null}
             </dl>
           </Section>
 
@@ -1196,11 +1199,11 @@ export default function ApplicationReviewPage() {
           <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-gray-900">Accept into Programme</h3>
             <p className="mt-1 text-sm text-gray-500">
-              Final scholarship acceptance. Select the cohort class for this scholar. They will become a
+              Final scholarship acceptance. Select the class for this scholar. They will become a
               Scholar upon acceptance.
             </p>
             <div className="mt-4">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Assign to Cohort</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Assign to Class</label>
               <div className="relative">
                 <select
                   value={selectedClass}

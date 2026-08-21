@@ -19,6 +19,7 @@ import {
 import ApplicantProgressBar from "./components/ApplicantProgressBar";
 import { normalizeApplicationStatus } from "@/lib/application-status";
 import { isValidWhatsAppGroupUrl } from "@/lib/countries";
+import { formatClassApplicationLabel, formatClassProgramName } from "@/lib/application-class";
 
 function InterviewScheduledCard({ slot, onFirstView }) {
   useEffect(() => {
@@ -245,6 +246,9 @@ export default function ApplicantDashboard() {
     ? normalizeApplicationStatus(application.status)
     : "draft";
   const firstName = profile?.full_name?.split(" ")[0] || "";
+  const applicationClassLabel = application?.application_class_name
+    ? formatClassApplicationLabel(application.application_class_name)
+    : null;
 
   return (
     <div>
@@ -253,8 +257,15 @@ export default function ApplicantDashboard() {
           Welcome, {firstName || "Applicant"}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Track your application progress and stay updated.
+          {applicationClassLabel
+            ? `${formatClassProgramName(application.application_class_name)} — track your progress and stay updated.`
+            : "Track your application progress and stay updated."}
         </p>
+        {applicationClassLabel ? (
+          <p className="mt-2 inline-flex rounded-full border border-royal/15 bg-royal/5 px-3 py-1 text-xs font-semibold text-royal">
+            {applicationClassLabel}
+          </p>
+        ) : null}
       </div>
 
       <div className="mb-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">

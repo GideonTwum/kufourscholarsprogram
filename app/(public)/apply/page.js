@@ -8,11 +8,17 @@ import {
   ArrowRight,
   Clock,
 } from "lucide-react";
+import {
+  DEFAULT_APPLICATION_CLASS_NAME,
+  formatApplicationsForClass,
+  formatClassProgramName,
+  normalizeApplicationClassName,
+} from "@/lib/application-class";
 
 export const metadata = {
-  title: "Apply | Kufuor Scholars Program",
+  title: "Apply | Kufuor Scholars Program 11th Class",
   description:
-    "Learn about eligibility, application timeline, and tips for applying to the Kufuor Scholars Program.",
+    "Learn about eligibility, application timeline, and tips for applying to the Kufuor Scholars Program 11th Class.",
 };
 
 const eligibility = [
@@ -42,6 +48,7 @@ const tips = [
 export default async function ApplyPage() {
   let applicationsOpen = false;
   let applicationDeadline = null;
+  let applicationClassName = DEFAULT_APPLICATION_CLASS_NAME;
 
   try {
     const supabase = await createClient();
@@ -61,10 +68,18 @@ export default async function ApplyPage() {
       const d = new Date(deadlineSetting.value);
       if (!isNaN(d.getTime())) applicationDeadline = deadlineSetting.value;
     }
+
+    const { data: classSetting } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", "application_class_name")
+      .maybeSingle();
+    const resolved = normalizeApplicationClassName(classSetting?.value);
+    if (resolved) applicationClassName = resolved;
   } catch {}
 
   return (
-    <div className="pt-24">
+    <div className="pt-8">
       {/* Hero */}
       <div className="bg-royal">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -75,11 +90,10 @@ export default async function ApplyPage() {
             ← Back to Home
           </Link>
           <h1 className="text-4xl font-bold text-white sm:text-5xl">
-            Apply to the Program
+            Apply for the {applicationClassName}
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-white/70">
-            Everything you need to know before submitting your application for
-            the Kufuor Scholars Program.
+            Begin your application for the {formatClassProgramName(applicationClassName)}.
           </p>
           {applicationsOpen && applicationDeadline && (
             <div className="mt-6 flex items-center gap-2 text-white/80">
@@ -184,8 +198,8 @@ export default async function ApplyPage() {
             </h2>
             <p className="mt-4 text-lg text-gray-600">
               {applicationsOpen
-                ? "Create an account and submit your application before the deadline."
-                : "Applications are currently closed. Check back later for the next cohort."}
+                ? `Create an account and submit your application for the ${applicationClassName} before the deadline.`
+                : `${formatApplicationsForClass(applicationClassName)} are currently closed. Check back later for the next class.`}
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               {applicationsOpen ? (

@@ -29,7 +29,7 @@ export default async function NewsPage() {
   const categoryColor = (cat) => categoryColors[cat] || getCategoryColor(cat);
 
   return (
-    <div className="pt-24">
+    <div className="pt-8">
       <div className="min-h-screen bg-gray-50">
         <div className="bg-royal">
           <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">

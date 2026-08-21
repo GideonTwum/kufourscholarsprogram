@@ -53,7 +53,7 @@ export default async function AlumniPage({ searchParams }) {
   } catch {}
 
   return (
-    <div className="pt-24">
+    <div className="pt-8">
       <div className="bg-royal">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <Link
@@ -105,7 +105,7 @@ export default async function AlumniPage({ searchParams }) {
             Alumni Directory
           </h2>
           <p className="mb-8 text-gray-600">
-            Connect with graduates from across our cohorts.
+            Connect with graduates from across our classes.
           </p>
           <AlumniDirectory
             alumni={alumni}

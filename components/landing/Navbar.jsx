@@ -163,10 +163,10 @@ function MobileAccordion({ item, open, onToggle, onNavigate }) {
   );
 }
 
-export default function Navbar({ applicationsOpen = false }) {
+export default function Navbar({ applicationsOpen = false, embedded = false }) {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled, setScrolled] = useState(embedded);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [openMobileGroup, setOpenMobileGroup] = useState(null);
@@ -177,12 +177,15 @@ export default function Navbar({ applicationsOpen = false }) {
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || embedded) {
+      if (embedded) setScrolled(true);
+      return;
+    }
     const onScroll = () => setScrolled(window.scrollY > 20);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [mounted]);
+  }, [mounted, embedded]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -203,15 +206,24 @@ export default function Navbar({ applicationsOpen = false }) {
 
   if (!mounted) {
     return (
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-transparent" aria-hidden="true">
+      <nav
+        className={
+          embedded
+            ? "border-b border-gray-100 bg-white"
+            : "fixed top-0 left-0 right-0 z-50 bg-transparent"
+        }
+        aria-hidden="true"
+      >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-royal text-sm font-bold text-gold">
               KS
             </div>
-            <span className="text-base font-bold text-white sm:text-lg">Kufuor Scholars</span>
+            <span className={`text-base font-bold sm:text-lg ${embedded ? "text-royal" : "text-white"}`}>
+              Kufuor Scholars
+            </span>
           </div>
-          <div className="h-9 w-24 rounded-lg bg-white/10" />
+          <div className="h-9 w-24 rounded-lg bg-gray-100" />
         </div>
       </nav>
     );
@@ -219,9 +231,14 @@ export default function Navbar({ applicationsOpen = false }) {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-white/95 shadow-md backdrop-blur-md" : "bg-transparent"
-      }`}
+      className={
+        embedded
+          ? "border-b border-gray-100 bg-white/95 backdrop-blur-md"
+          : `fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+              scrolled ? "bg-white/95 shadow-md backdrop-blur-md" : "bg-transparent"
+            }`
+      }
+      data-navbar="true"
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
         <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">

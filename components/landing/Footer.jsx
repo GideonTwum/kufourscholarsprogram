@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Facebook, Twitter, Instagram, Youtube, Linkedin } from "lucide-react";
+import { Instagram, Linkedin, Youtube } from "lucide-react";
 import TiktokIcon from "@/components/icons/TiktokIcon";
-import { getSocialLinks } from "@/lib/social-links";
+import {
+  getSocialLinks,
+  KSP_PUBLIC_SOCIAL_PLATFORMS,
+} from "@/lib/social-links";
 import { applyNowHref, APPLY_PREP_HREF } from "@/lib/apply-cta";
 
 const quickLinks = [
@@ -14,9 +17,28 @@ const quickLinks = [
   { label: "Alumni", href: "/alumni" },
   { label: "FAQ", href: "/#faq" },
   { label: "News", href: "/news" },
-  { label: "Gallery", href: "/#gallery" },
+  { label: "Gallery", href: "/gallery" },
   { label: "Contact", href: "/#contact" },
 ];
+
+const SOCIAL_META = {
+  instagram: {
+    icon: Instagram,
+    ariaLabel: "Kufuor Scholars Program on Instagram",
+  },
+  tiktok: {
+    icon: TiktokIcon,
+    ariaLabel: "Kufuor Scholars Program on TikTok",
+  },
+  linkedin: {
+    icon: Linkedin,
+    ariaLabel: "Kufuor Scholars Program on LinkedIn",
+  },
+  youtube: {
+    icon: Youtube,
+    ariaLabel: "Kufuor Scholars Program on YouTube",
+  },
+};
 
 export default function Footer({ applicationsOpen = false }) {
   const programLinks = [
@@ -29,14 +51,12 @@ export default function Footer({ applicationsOpen = false }) {
     { label: "Community Service", href: "/about#program" },
   ];
   const socialUrls = getSocialLinks();
-  const socials = [
-    { icon: Facebook, href: socialUrls.facebook, label: "Facebook" },
-    { icon: Twitter, href: socialUrls.twitter, label: "X (Twitter)" },
-    { icon: Instagram, href: socialUrls.instagram, label: "Instagram" },
-    { icon: Youtube, href: socialUrls.youtube, label: "YouTube" },
-    { icon: TiktokIcon, href: socialUrls.tiktok, label: "TikTok" },
-    { icon: Linkedin, href: socialUrls.linkedin, label: "LinkedIn" },
-  ];
+  const socials = KSP_PUBLIC_SOCIAL_PLATFORMS.map((key) => ({
+    key,
+    href: socialUrls[key],
+    ...SOCIAL_META[key],
+  }));
+
   return (
     <footer className="bg-royal-dark">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -52,15 +72,17 @@ export default function Footer({ applicationsOpen = false }) {
               An initiative of The John A. Kufuor Foundation, grooming the next generation of
               African leaders.
             </p>
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               {socials.map((social) => (
                 <a
-                  key={social.label}
+                  key={social.key}
                   href={social.href}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-white/50 transition-colors hover:bg-gold/20 hover:text-gold"
-                  aria-label={social.label}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg bg-white/5 text-white/50 transition-colors hover:bg-gold/20 hover:text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                  aria-label={social.ariaLabel}
                 >
-                  <social.icon size={16} />
+                  <social.icon size={16} aria-hidden="true" />
                 </a>
               ))}
             </div>

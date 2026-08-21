@@ -53,7 +53,7 @@ export default function AlumniDirectory({
             }}
             className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-gold"
           >
-            <option value="">All Cohorts</option>
+            <option value="">All Classes</option>
             {cohorts.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -114,7 +114,7 @@ export default function AlumniDirectory({
                     {person.full_name}
                   </h3>
                   <p className="mt-1 text-sm text-gold font-medium">
-                    Cohort {person.cohort_year}
+                    Class {person.cohort_year}
                   </p>
                   <p className="mt-1 text-sm text-gray-600">
                     {[person.university, person.field_of_study]

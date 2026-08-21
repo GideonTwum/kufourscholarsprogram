@@ -32,7 +32,10 @@ const reasons = [
   },
 ];
 
-export default function WhyApply({ applicationsOpen = false }) {
+export default function WhyApply({
+  applicationsOpen = false,
+  applicationClassName = "11th Class",
+}) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -48,7 +51,8 @@ export default function WhyApply({ applicationsOpen = false }) {
           </h2>
           <p className="mt-5 text-lg leading-relaxed text-gray-600">
             The Kufuor Scholars Program is built for students who want to be
-            tested, mentored, and prepared for responsible leadership.
+            tested, mentored, and prepared for responsible leadership
+            {applicationClassName ? ` — including the ${applicationClassName}` : ""}.
           </p>
         </div>
 

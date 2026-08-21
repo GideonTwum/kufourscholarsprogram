@@ -81,7 +81,7 @@ export default async function ArticlePage({ params }) {
   const categoryColor = categoryColors[article.category] || getCategoryColor(article.category);
 
   return (
-    <div className="pt-24">
+    <div className="pt-8">
       <div className="relative h-64 sm:h-80 md:h-96">
         <Image
           src={article.image}

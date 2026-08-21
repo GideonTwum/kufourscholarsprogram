@@ -259,6 +259,9 @@ export default function AssessorApplicantDetailPage() {
               <Field label="Year of study" value={application.year_of_study} />
               <Field label="Grade type" value={application.grade_type} />
               <Field label="Grade" value={application.gpa} />
+              {application.application_class_name ? (
+                <Field label="Application Class" value={application.application_class_name} />
+              ) : null}
             </dl>
           </Section>
 

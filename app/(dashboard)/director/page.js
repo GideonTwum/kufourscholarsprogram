@@ -7,7 +7,7 @@ import { Users, FileText, Megaphone, MessageSquare, CalendarDays, UserCheck, Loa
 const quickActions = [
   {
     title: "Manage Scholars",
-    description: "Manage scholar profiles and cohorts",
+    description: "Manage scholar profiles and classes",
     icon: Users,
     href: "/director/scholars",
   },
@@ -105,7 +105,7 @@ export default function DirectorDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Director Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Welcome back. Live Cohort operations overview for the Kufuor Scholars Program.
+            Welcome back. Live programme operations overview for the Kufuor Scholars Program.
           </p>
         </div>
         <button

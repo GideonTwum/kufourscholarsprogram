@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Video, Send, Loader2, CheckCircle2, ArrowLeft, AlertCircle } from "lucide-react";
 import { validateStage2Video } from "@/lib/application-validation";
+import {
+  formatStage2VideoTitle,
+  resolveApplicationClassName,
+  stage2TitleConfirmationMessage,
+} from "@/lib/application-class";
 
 const STAGE2_PROMPT =
   "Create a 3-minute video on a community problem, outlining the identified problem, cause, effect, intervention, and expected outcome.";
@@ -16,7 +21,7 @@ export default function Stage2Page() {
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState(null);
   const [videoUrl, setVideoUrl] = useState("");
-  const [cohortYear, setCohortYear] = useState(String(new Date().getFullYear()));
+  const [applicationClassName, setApplicationClassName] = useState("");
   const [confirmsPublic, setConfirmsPublic] = useState(false);
   const [confirmsTitle, setConfirmsTitle] = useState(false);
   const [confirmsDescription, setConfirmsDescription] = useState(false);
@@ -35,13 +40,13 @@ export default function Stage2Page() {
         return;
       }
 
-      const { data: yearSetting } = await supabase
+      let globalClass = "";
+      const { data: classSetting } = await supabase
         .from("site_settings")
         .select("value")
-        .eq("key", "application_cohort_year")
+        .eq("key", "application_class_name")
         .maybeSingle();
-      const y = String(yearSetting?.value || "").trim();
-      if (y && /^\d{4}$/.test(y)) setCohortYear(y);
+      if (classSetting?.value) globalClass = String(classSetting.value).trim();
 
       const { data: app } = await supabase
         .from("applications")
@@ -56,6 +61,8 @@ export default function Stage2Page() {
         setLoading(false);
         return;
       }
+
+      setApplicationClassName(resolveApplicationClassName(app, globalClass));
 
       if (app.status !== "stage_1_approved") {
         setApplication(app);
@@ -85,6 +92,7 @@ export default function Stage2Page() {
       confirms_youtube_public: confirmsPublic,
       confirms_youtube_title_format: confirmsTitle,
       confirms_youtube_description_concept: confirmsDescription,
+      application_class_name: applicationClassName,
     };
     const errors = validateStage2Video(payload);
     if (Object.keys(errors).length > 0) {
@@ -182,7 +190,13 @@ export default function Stage2Page() {
     );
   }
 
-  const titleExample = `${application.full_name || "Your Full Name"} - KSP Application ${cohortYear}`;
+  const titleExample = formatStage2VideoTitle(
+    application.full_name || "Your Full Name",
+    applicationClassName
+  );
+  const titleFormatLabel = applicationClassName
+    ? `Full Name - KSP ${applicationClassName} Application`
+    : "Full Name - KSP Application";
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -223,7 +237,7 @@ export default function Stage2Page() {
             </li>
             <li>
               Set the video <strong>title</strong> exactly in this format:{" "}
-              <strong>Full Name - KSP Application {cohortYear}</strong>
+              <strong>{titleFormatLabel}</strong>
               <span className="mt-1 block text-xs text-gray-500">Example: {titleExample}</span>
             </li>
             <li>
@@ -285,8 +299,7 @@ export default function Stage2Page() {
                 className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-royal focus:ring-gold"
               />
               <span>
-                I confirm my video title follows:{" "}
-                <strong>Full Name - KSP Application {cohortYear}</strong>.{" "}
+                I confirm my video title follows: <strong>{titleFormatLabel}</strong>.{" "}
                 <span className="text-red-500">*</span>
               </span>
             </label>

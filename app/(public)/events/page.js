@@ -32,14 +32,14 @@ export default async function EventsPage() {
 
   const placeholderEvents = [
     { id: "1", title: "Leadership Summit 2026", event_date: "2026-03-15", event_time: "9:00 AM", location: "Accra, Ghana", description: "Annual gathering of scholars, alumni, and partners to discuss leadership in Africa." },
-    { id: "2", title: "Mentorship Bootcamp", event_date: "2026-04-10", event_time: "2:00 PM", location: "Virtual", description: "Intensive mentorship training for new scholar cohorts." },
+    { id: "2", title: "Mentorship Bootcamp", event_date: "2026-04-10", event_time: "2:00 PM", location: "Virtual", description: "Intensive mentorship training for new scholar classes." },
     { id: "3", title: "Community Impact Showcase", event_date: "2026-05-20", event_time: "10:00 AM", location: "Kumasi", description: "Scholars present their community projects and impact metrics." },
   ];
 
   const displayEvents = events.length > 0 ? events : placeholderEvents;
 
   return (
-    <div className="pt-24">
+    <div className="pt-8">
       <div className="bg-royal">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <Link

@@ -68,7 +68,7 @@ export default function StaffApplyNotice() {
   return (
     <div
       role="status"
-      className="relative z-[60] border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+      className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
     >
       <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p>

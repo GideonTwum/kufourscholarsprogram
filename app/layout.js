@@ -14,9 +14,10 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Kufuor Scholars Program | Grooming Future Leaders of Africa",
   description:
-    "The Kufuor Scholars Program, an initiative of the John A. Kufuor Foundation, identifies and nurtures exceptional Africans studying in Ghana with leadership potential through a transformational 3-year program.",
+    "The Kufuor Scholars Program, an initiative of the John A. Kufuor Foundation, identifies and nurtures exceptional Africans studying in Ghana with leadership potential through a transformational 3-year program. Applications for the 11th Class.",
   keywords: [
     "Kufuor Scholars",
+    "11th Class",
     "John A. Kufuor Foundation",
     "Leadership Development",
     "Study in Ghana",

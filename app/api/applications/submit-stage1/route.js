@@ -182,15 +182,27 @@ export async function POST(request) {
     appId = ins?.id;
   }
 
+  let persistedClass = null;
+  if (appId) {
+    const { data: stamped } = await admin
+      .from("applications")
+      .select("application_class_name")
+      .eq("id", appId)
+      .maybeSingle();
+    persistedClass = stamped?.application_class_name || null;
+  }
+
   if (userEmail) {
     await sendKspEmail({
       event: "stage_1_submitted",
       to: userEmail,
       subject: "Kufuor Scholars — Stage 1 application received",
-      html: stage1SubmittedEmailHtml(profileName || "Applicant"),
-      text: "Your Stage 1 application was received and is pending review.",
+      html: stage1SubmittedEmailHtml(profileName || "Applicant", persistedClass),
+      text: persistedClass
+        ? `Your Stage 1 application to the Kufuor Scholars Program ${persistedClass} was received and is pending review.`
+        : "Your Stage 1 application was received and is pending review.",
       template: "stage1_submitted",
-      meta: { applicantName: profileName || "Applicant" },
+      meta: { applicantName: profileName || "Applicant", applicationClassName: persistedClass },
     });
   }
 

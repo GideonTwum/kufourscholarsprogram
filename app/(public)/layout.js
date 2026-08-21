@@ -1,11 +1,14 @@
-import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import Navbar from "@/components/landing/Navbar";
+import SiteHeader from "@/components/landing/SiteHeader";
 import Footer from "@/components/landing/Footer";
-import StaffApplyNotice from "@/components/landing/StaffApplyNotice";
+import {
+  DEFAULT_APPLICATION_CLASS_NAME,
+  normalizeApplicationClassName,
+} from "@/lib/application-class";
 
 export default async function PublicLayout({ children }) {
   let applicationsOpen = false;
+  let applicationClassName = DEFAULT_APPLICATION_CLASS_NAME;
   try {
     const supabase = await createClient();
     const { data } = await supabase
@@ -14,14 +17,22 @@ export default async function PublicLayout({ children }) {
       .eq("key", "applications_open")
       .single();
     if (data) applicationsOpen = data.value === "true";
+
+    const { data: classSetting } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", "application_class_name")
+      .maybeSingle();
+    const resolved = normalizeApplicationClassName(classSetting?.value);
+    if (resolved) applicationClassName = resolved;
   } catch {}
 
   return (
     <div className="min-h-screen bg-white font-sans">
-      <Suspense fallback={null}>
-        <StaffApplyNotice />
-      </Suspense>
-      <Navbar applicationsOpen={applicationsOpen} />
+      <SiteHeader
+        applicationsOpen={applicationsOpen}
+        applicationClassName={applicationClassName}
+      />
       {children}
       <Footer applicationsOpen={applicationsOpen} />
     </div>

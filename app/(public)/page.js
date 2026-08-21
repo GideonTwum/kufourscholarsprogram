@@ -6,16 +6,26 @@ import ProgramHighlights from "@/components/landing/ProgramHighlights";
 import Stats from "@/components/landing/Stats";
 import ScholarSpotlight from "@/components/landing/ScholarSpotlight";
 import ScholarVideos from "@/components/landing/ScholarVideos";
-import Gallery from "@/components/landing/Gallery";
 import Testimonials from "@/components/landing/Testimonials";
 import FAQ from "@/components/landing/FAQ";
 import YoutubeSpotlights from "@/components/landing/YoutubeSpotlights";
 import Events from "@/components/landing/Events";
 import Contact from "@/components/landing/Contact";
+import {
+  DEFAULT_APPLICATION_CLASS_NAME,
+  normalizeApplicationClassName,
+} from "@/lib/application-class";
+
+export const metadata = {
+  title: "Kufuor Scholars Program",
+  description:
+    "Applications for the Kufuor Scholars Program 11th Class — leadership development for Africans studying in Ghana.",
+};
 
 export default async function Home() {
   let applicationsOpen = false;
   let applicationDeadline = null;
+  let applicationClassName = DEFAULT_APPLICATION_CLASS_NAME;
   let featuredScholars = [];
   let upcomingEvents = [];
   let scholarVideos = [];
@@ -39,6 +49,14 @@ export default async function Home() {
       const d = new Date(deadlineSetting.value);
       if (!isNaN(d.getTime())) applicationDeadline = deadlineSetting.value;
     }
+
+    const { data: classSetting } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", "application_class_name")
+      .maybeSingle();
+    const resolved = normalizeApplicationClassName(classSetting?.value);
+    if (resolved) applicationClassName = resolved;
 
     const { data: scholars } = await supabase
       .from("scholars")
@@ -76,15 +94,18 @@ export default async function Home() {
 
   return (
     <main>
-      <Hero applicationsOpen={applicationsOpen} applicationDeadline={applicationDeadline} />
-      <WhyApply applicationsOpen={applicationsOpen} />
+      <Hero
+        applicationsOpen={applicationsOpen}
+        applicationDeadline={applicationDeadline}
+        applicationClassName={applicationClassName}
+      />
+      <WhyApply applicationsOpen={applicationsOpen} applicationClassName={applicationClassName} />
       <About />
       <ProgramHighlights />
       <Stats />
       <ScholarSpotlight scholars={featuredScholars} />
       <ScholarVideos videos={scholarVideos} />
       <YoutubeSpotlights videos={youtubeSpotlights} />
-      <Gallery />
       <Testimonials />
       <Events events={upcomingEvents} />
       <FAQ />

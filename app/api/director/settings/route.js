@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
 import { recordDirectorAudit } from "@/lib/audit/director-audit";
 import { isValidWhatsAppGroupUrl } from "@/lib/countries";
+import {
+  DEFAULT_APPLICATION_CLASS_NAME,
+  validateApplicationClassName,
+} from "@/lib/application-class";
 
 const ALLOWED_KEYS = new Set([
   "applications_open",
   "application_deadline",
   "accepted_whatsapp_group_url",
+  "application_class_name",
+  // Legacy — accept updates for compatibility but do not use for user-facing Class copy.
   "application_cohort_year",
 ]);
 
@@ -36,6 +42,7 @@ function validateWhatsAppUrl(value) {
   return { ok: true, value: withProto };
 }
 
+/** @deprecated Legacy year field — kept for backward compatibility only. */
 function validateCohortYear(value) {
   if (value === null || value === "") return { ok: true, value: "" };
   if (typeof value !== "string" && typeof value !== "number") {
@@ -50,6 +57,17 @@ function validateCohortYear(value) {
     return { ok: false, error: "application_cohort_year out of range" };
   }
   return { ok: true, value: s };
+}
+
+function settingsResponse(map) {
+  return {
+    applications_open: map.applications_open === "true",
+    application_deadline: map.application_deadline || null,
+    accepted_whatsapp_group_url: map.accepted_whatsapp_group_url || "",
+    application_class_name:
+      map.application_class_name?.trim() || DEFAULT_APPLICATION_CLASS_NAME,
+    application_cohort_year: map.application_cohort_year || "",
+  };
 }
 
 export async function GET() {
@@ -71,10 +89,7 @@ export async function GET() {
 
   const map = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
   return NextResponse.json({
-    applications_open: map.applications_open === "true",
-    application_deadline: map.application_deadline || null,
-    accepted_whatsapp_group_url: map.accepted_whatsapp_group_url || "",
-    application_cohort_year: map.application_cohort_year || "",
+    ...settingsResponse(map),
     rows: data || [],
   });
 }
@@ -95,7 +110,7 @@ export async function PATCH(request) {
     return NextResponse.json(
       {
         error:
-          "No allowed settings provided. Allowed: applications_open, application_deadline, accepted_whatsapp_group_url, application_cohort_year",
+          "No allowed settings provided. Allowed: applications_open, application_deadline, accepted_whatsapp_group_url, application_class_name",
       },
       { status: 400 }
     );
@@ -148,6 +163,16 @@ export async function PATCH(request) {
     });
   }
 
+  if ("application_class_name" in body) {
+    const v = validateApplicationClassName(body.application_class_name);
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+    updates.push({
+      key: "application_class_name",
+      value: v.value,
+      updated_at: nowIso,
+    });
+  }
+
   if ("application_cohort_year" in body) {
     const v = validateCohortYear(body.application_cohort_year);
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
@@ -175,26 +200,10 @@ export async function PATCH(request) {
     critical: true,
   });
 
+  const merged = { ...oldMap, ...newMap };
   return NextResponse.json({
     success: true,
-    settings: {
-      applications_open:
-        "applications_open" in newMap
-          ? newMap.applications_open === "true"
-          : oldMap.applications_open === "true",
-      application_deadline:
-        "application_deadline" in newMap
-          ? newMap.application_deadline || null
-          : oldMap.application_deadline || null,
-      accepted_whatsapp_group_url:
-        "accepted_whatsapp_group_url" in newMap
-          ? newMap.accepted_whatsapp_group_url || ""
-          : oldMap.accepted_whatsapp_group_url || "",
-      application_cohort_year:
-        "application_cohort_year" in newMap
-          ? newMap.application_cohort_year || ""
-          : oldMap.application_cohort_year || "",
-    },
+    settings: settingsResponse(merged),
     audit_logged: audit.ok,
     audit_warning: audit.ok ? null : audit.error,
   });

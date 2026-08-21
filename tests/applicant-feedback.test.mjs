@@ -232,7 +232,7 @@ test("WhatsApp URL validation and settings allowlist", () => {
 
   const settingsSrc = readFileSync(join(root, "app/api/director/settings/route.js"), "utf8");
   assert.match(settingsSrc, /accepted_whatsapp_group_url/);
-  assert.match(settingsSrc, /application_cohort_year/);
+  assert.match(settingsSrc, /application_class_name/);
   assert.match(settingsSrc, /isValidWhatsAppGroupUrl/);
 });
 

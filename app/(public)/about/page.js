@@ -23,7 +23,7 @@ const pillars = [
 ];
 
 const timeline = [
-  { year: "Year 1", title: "Foundation", items: ["Orientation and cohort bonding", "Core leadership workshops", "Mentor matching", "Community project initiation"] },
+  { year: "Year 1", title: "Foundation", items: ["Orientation and class bonding", "Core leadership workshops", "Mentor matching", "Community project initiation"] },
   { year: "Year 2", title: "Deepening", items: ["Advanced leadership modules", "Public speaking and advocacy", "Community project execution", "Networking events"] },
   { year: "Year 3", title: "Graduation", items: ["Capstone projects", "Alumni transition", "Leadership showcase", "Ongoing network engagement"] },
 ];
@@ -40,7 +40,7 @@ const outcomes = [
 
 export default function AboutPage() {
   return (
-    <div className="pt-24">
+    <div className="pt-8">
       {/* Hero */}
       <div className="bg-royal">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">

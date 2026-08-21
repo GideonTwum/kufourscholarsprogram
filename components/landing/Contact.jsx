@@ -7,14 +7,15 @@ import {
   Phone,
   Mail,
   Clock,
-  Facebook,
-  Twitter,
   Instagram,
   Linkedin,
   Youtube,
 } from "lucide-react";
 import TiktokIcon from "@/components/icons/TiktokIcon";
-import { getSocialLinks } from "@/lib/social-links";
+import {
+  getSocialLinks,
+  KSP_PUBLIC_SOCIAL_PLATFORMS,
+} from "@/lib/social-links";
 
 const contactInfo = [
   {
@@ -39,16 +40,32 @@ const contactInfo = [
   },
 ];
 
+const SOCIAL_META = {
+  instagram: {
+    icon: Instagram,
+    ariaLabel: "Kufuor Scholars Program on Instagram",
+  },
+  tiktok: {
+    icon: TiktokIcon,
+    ariaLabel: "Kufuor Scholars Program on TikTok",
+  },
+  linkedin: {
+    icon: Linkedin,
+    ariaLabel: "Kufuor Scholars Program on LinkedIn",
+  },
+  youtube: {
+    icon: Youtube,
+    ariaLabel: "Kufuor Scholars Program on YouTube",
+  },
+};
+
 export default function Contact() {
   const socialUrls = getSocialLinks();
-  const socials = [
-    { icon: Facebook, href: socialUrls.facebook, label: "Facebook" },
-    { icon: Twitter, href: socialUrls.twitter, label: "X (Twitter)" },
-    { icon: Instagram, href: socialUrls.instagram, label: "Instagram" },
-    { icon: Youtube, href: socialUrls.youtube, label: "YouTube" },
-    { icon: TiktokIcon, href: socialUrls.tiktok, label: "TikTok" },
-    { icon: Linkedin, href: socialUrls.linkedin, label: "LinkedIn" },
-  ];
+  const socials = KSP_PUBLIC_SOCIAL_PLATFORMS.map((key) => ({
+    key,
+    href: socialUrls[key],
+    ...SOCIAL_META[key],
+  }));
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -121,15 +138,17 @@ export default function Contact() {
             <p className="mt-2 text-sm text-white/60">
               Stay connected with the latest updates
             </p>
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               {socials.map((social) => (
                 <a
-                  key={social.label}
+                  key={social.key}
                   href={social.href}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-gold hover:text-royal"
-                  aria-label={social.label}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-gold hover:text-royal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                  aria-label={social.ariaLabel}
                 >
-                  <social.icon size={18} />
+                  <social.icon size={18} aria-hidden="true" />
                 </a>
               ))}
             </div>

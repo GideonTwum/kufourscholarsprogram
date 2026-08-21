@@ -68,7 +68,7 @@ const faqs = [
     questions: [
       {
         q: "What happens after I graduate?",
-        a: "Graduates become part of the Kufuor Scholars alumni network. Alumni continue to benefit from networking opportunities, mentorship, and engagement with new cohorts.",
+        a: "Graduates become part of the Kufuor Scholars alumni network. Alumni continue to benefit from networking opportunities, mentorship, and engagement with new classes.",
       },
       {
         q: "Can I contact current scholars or alumni?",
@@ -80,7 +80,7 @@ const faqs = [
 
 export default function FAQPage() {
   return (
-    <div className="pt-24">
+    <div className="pt-8">
       {/* Hero */}
       <div className="bg-royal">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">

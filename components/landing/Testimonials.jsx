@@ -9,28 +9,28 @@ const testimonials = [
     quote:
       "The Kufuor Scholars Program transformed my perspective on leadership. The mentorship and exposure I received have been instrumental in shaping my career in public service.",
     name: "Ama Mensah",
-    cohort: "Cohort 2018",
+    classLabel: "Class of 2018",
     role: "Policy Analyst, Ministry of Finance",
   },
   {
     quote:
       "Being a Kufuor Scholar opened doors I never knew existed. The network of alumni and mentors continues to be a valuable resource years after graduation.",
     name: "Kwame Asante",
-    cohort: "Cohort 2019",
+    classLabel: "Class of 2019",
     role: "Social Entrepreneur",
   },
   {
     quote:
       "The program's emphasis on community service instilled in me a deep sense of responsibility. Today, I lead initiatives that impact thousands of young people across Ghana.",
     name: "Efua Owusu",
-    cohort: "Cohort 2020",
+    classLabel: "Class of 2020",
     role: "NGO Director",
   },
   {
     quote:
       "From reading circles to mentorship with industry leaders, every aspect of the program was designed to stretch our thinking and build our capacity for leadership.",
     name: "Kofi Boateng",
-    cohort: "Cohort 2021",
+    classLabel: "Class of 2021",
     role: "Technology Consultant",
   },
 ];
@@ -105,7 +105,7 @@ export default function Testimonials() {
                     </p>
                     <p className="text-sm text-gray-500">
                       {testimonials[current].role} &middot;{" "}
-                      {testimonials[current].cohort}
+                      {testimonials[current].classLabel}
                     </p>
                   </div>
                 </div>

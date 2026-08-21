@@ -6,6 +6,10 @@ import { ArrowRight, ChevronDown, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
 import ApplyNowCta from "@/components/landing/ApplyNowCta";
 import HeroBackground from "@/components/landing/HeroBackground";
+import {
+  formatHeroBadge,
+  formatSearchCampaign,
+} from "@/lib/application-class";
 
 function Countdown({ deadline }) {
   const [remaining, setRemaining] = useState(null);
@@ -83,12 +87,16 @@ function Countdown({ deadline }) {
   );
 }
 
-export default function Hero({ applicationsOpen = false, applicationDeadline = null }) {
+export default function Hero({
+  applicationsOpen = false,
+  applicationDeadline = null,
+  applicationClassName = "11th Class",
+}) {
   return (
     <section className="relative flex min-h-[min(100svh,920px)] items-center overflow-hidden bg-royal-dark lg:min-h-[100svh]">
       <HeroBackground />
 
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-28 sm:px-6 sm:pt-32 lg:px-8 lg:pb-28 lg:pt-36">
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-24 pt-10 sm:px-6 sm:pt-12 lg:px-8 lg:pb-28 lg:pt-16">
         {/* Left content column — stays over solid green; does not extend into photo */}
         <div className="w-full max-w-[42rem] text-left lg:max-w-[46rem]">
           <motion.div
@@ -107,16 +115,19 @@ export default function Hero({ applicationsOpen = false, applicationDeadline = n
                   : "border border-white/30 bg-white/10 text-white/90"
               }`}
             >
-              {applicationsOpen ? (
-                <>Applications Open</>
-              ) : (
-                <>
-                  <XCircle size={14} />
-                  Applications Currently Closed
-                </>
-              )}
+              {applicationsOpen ? null : <XCircle size={14} />}
+              {formatHeroBadge(applicationClassName, applicationsOpen)}
             </span>
           </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.06, ease: "easeOut" }}
+            className="mb-3 text-sm font-semibold tracking-wide text-gold sm:text-base"
+          >
+            {formatSearchCampaign(applicationClassName)}
+          </motion.p>
 
           <motion.h1
             initial={{ opacity: 0, y: 24 }}

@@ -52,7 +52,7 @@ export default function ScholarsDirectory({
             }}
             className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-gold"
           >
-            <option value="">All Cohorts</option>
+            <option value="">All Classes</option>
             {cohorts.map((c) => (
               <option key={c} value={c}>
                 {c}

@@ -175,7 +175,7 @@ export default function DirectorScholarsPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Cohort Year *</label>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Class Year *</label>
                 <input
                   type="text"
                   value={form.cohort_year}
