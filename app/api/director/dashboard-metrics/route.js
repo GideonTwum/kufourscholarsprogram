@@ -1,20 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
-
-const STATUS_KEYS = [
-  "draft",
-  "stage_1_submitted",
-  "review_pending",
-  "stage_1_approved",
-  "stage_2_submitted",
-  "stage_2_review_pending",
-  "stage_2_approved",
-  "interview_review_pending",
-  "called_for_interview",
-  "interview",
-  "accepted",
-  "rejected",
-];
+import { summarizeDirectorApplicationCounts } from "@/lib/director-application-scope";
+import { VALID_APPLICATION_STATUSES } from "@/lib/application-status-transition.mjs";
 
 export async function GET() {
   const gate = await requireActiveDirector();
@@ -24,7 +11,7 @@ export async function GET() {
   if (adminGate.error) return adminGate.error;
   const admin = adminGate.admin;
 
-  const emptyCounts = Object.fromEntries(STATUS_KEYS.map((k) => [k, 0]));
+  const emptyCounts = Object.fromEntries(VALID_APPLICATION_STATUSES.map((k) => [k, 0]));
 
   const [
     { data: statusRows },
@@ -38,6 +25,7 @@ export async function GET() {
     { data: slots },
     { data: openSetting },
     { data: deadlineSetting },
+    { data: classSetting },
     { data: recentAudit },
   ] = await Promise.all([
     admin.from("applications").select("status"),
@@ -70,6 +58,7 @@ export async function GET() {
     admin.from("interview_slots").select("id, status, interview_date"),
     admin.from("site_settings").select("value").eq("key", "applications_open").maybeSingle(),
     admin.from("site_settings").select("value").eq("key", "application_deadline").maybeSingle(),
+    admin.from("site_settings").select("value").eq("key", "application_class_name").maybeSingle(),
     admin
       .from("director_audit_events")
       .select("id, action, entity_type, entity_id, actor_name_snapshot, actor_email_snapshot, created_at")
@@ -78,12 +67,12 @@ export async function GET() {
   ]);
 
   const byStatus = { ...emptyCounts };
-  let total = 0;
   for (const row of statusRows || []) {
     const s = row.status || "unknown";
     if (byStatus[s] != null) byStatus[s] += 1;
-    total += 1;
   }
+
+  const summary = summarizeDirectorApplicationCounts(statusRows || []);
 
   const stage1Pending = (byStatus.stage_1_submitted || 0) + (byStatus.review_pending || 0);
   const stage2Pending =
@@ -101,12 +90,16 @@ export async function GET() {
 
   return NextResponse.json({
     totals: {
-      total_applications: total,
+      // Matches /director/applications "All" (excludes drafts)
+      total_applications: summary.all,
+      draft_applications: summary.draft,
+      total_including_drafts: summary.total_including_drafts,
       stage_1_pending: stage1Pending,
       stage_2_pending: stage2Pending,
       interviews,
-      accepted: byStatus.accepted || 0,
-      rejected: byStatus.rejected || 0,
+      accepted: summary.accepted,
+      rejected: summary.rejected,
+      pending: summary.pending,
     },
     by_status: byStatus,
     staff: {
@@ -127,6 +120,7 @@ export async function GET() {
     settings: {
       applications_open: openSetting?.value === "true",
       application_deadline: deadlineSetting?.value || null,
+      application_class_name: classSetting?.value || null,
     },
     recent_activity: recentAudit || [],
   });

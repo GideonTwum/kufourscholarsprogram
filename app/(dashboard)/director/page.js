@@ -132,7 +132,11 @@ export default function DirectorDashboard() {
       ) : metrics ? (
         <>
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <MetricCard label="Total applications" value={t.total_applications} href="/director/applications" />
+            <MetricCard
+              label="Submitted applications"
+              value={t.total_applications}
+              href="/director/applications"
+            />
             <MetricCard
               label="Stage 1 pending"
               value={t.stage_1_pending}
@@ -149,6 +153,14 @@ export default function DirectorDashboard() {
             <MetricCard label="Accepted" value={t.accepted} href="/director/applications?status=accepted" tone="green" />
             <MetricCard label="Rejected" value={t.rejected} href="/director/applications?status=rejected" tone="red" />
           </div>
+
+          {(t.draft_applications ?? 0) > 0 ? (
+            <p className="mb-6 text-xs text-gray-500">
+              {t.draft_applications} draft application{t.draft_applications === 1 ? "" : "s"} in
+              progress (excluded from Submitted applications / Applications list until Stage 1 is
+              submitted).
+            </p>
+          ) : null}
 
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard label="Active assessors" value={staff.active_assessors} href="/director/assessors" />

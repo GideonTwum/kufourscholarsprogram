@@ -15,20 +15,12 @@ import {
   Search,
 } from "lucide-react";
 import DirectorWorkflowGuide from "../components/DirectorWorkflowGuide";
-
-/** In-progress statuses (not accepted / rejected / draft). */
-const PENDING_STATUSES = [
-  "stage_1_submitted",
-  "pending",
-  "review_pending",
-  "stage_1_approved",
-  "stage_2_submitted",
-  "stage_2_review_pending",
-  "stage_2_approved",
-  "interview_review_pending",
-  "called_for_interview",
-  "interview",
-];
+import {
+  DIRECTOR_PRIMARY_FILTERS,
+  applyDirectorOperationalScope,
+  applyDirectorStatusFilter,
+  summarizeDirectorApplicationCounts,
+} from "@/lib/director-application-scope";
 
 const statusConfig = {
   pending: {
@@ -98,32 +90,15 @@ const statusConfig = {
   },
 };
 
-const primaryFilters = [
-  { key: "", label: "All" },
-  { key: "pending", label: "Pending" },
-  { key: "accepted", label: "Accepted" },
-  { key: "rejected", label: "Rejected" },
-];
-
-function applyStatusFilter(query, statusFilter) {
-  if (statusFilter === "pending") {
-    return query.in("status", PENDING_STATUSES);
-  }
-  if (statusFilter === "accepted" || statusFilter === "rejected") {
-    return query.eq("status", statusFilter);
-  }
-  return query;
-}
-
 async function fetchWithAdmin(statusFilter) {
   const admin = createAdminClient();
   let query = admin
     .from("applications")
     .select("*, profiles!applications_user_id_fkey(full_name, email, class_name)")
-    .neq("status", "draft")
     .order("submitted_at", { ascending: false, nullsFirst: false });
 
-  query = applyStatusFilter(query, statusFilter);
+  query = applyDirectorOperationalScope(query);
+  query = applyDirectorStatusFilter(query, statusFilter);
 
   const { data, error } = await query;
   if (!error) return { applications: data || [], loadError: null };
@@ -131,10 +106,10 @@ async function fetchWithAdmin(statusFilter) {
   let fallbackQuery = admin
     .from("applications")
     .select("*")
-    .neq("status", "draft")
     .order("submitted_at", { ascending: false, nullsFirst: false });
 
-  fallbackQuery = applyStatusFilter(fallbackQuery, statusFilter);
+  fallbackQuery = applyDirectorOperationalScope(fallbackQuery);
+  fallbackQuery = applyDirectorStatusFilter(fallbackQuery, statusFilter);
 
   const { data: fallbackData, error: fallbackError } = await fallbackQuery;
   return {
@@ -147,10 +122,10 @@ async function fetchWithSession(supabase, statusFilter) {
   let query = supabase
     .from("applications")
     .select("*")
-    .neq("status", "draft")
     .order("submitted_at", { ascending: false, nullsFirst: false });
 
-  query = applyStatusFilter(query, statusFilter);
+  query = applyDirectorOperationalScope(query);
+  query = applyDirectorStatusFilter(query, statusFilter);
 
   const { data, error } = await query;
   return {
@@ -169,36 +144,34 @@ async function loadApplications(statusFilter) {
 }
 
 async function loadCounts() {
-  const empty = { all: 0, pending: 0, accepted: 0, rejected: 0 };
+  const empty = { all: 0, pending: 0, accepted: 0, rejected: 0, draft: 0 };
   try {
     const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("applications")
-      .select("status")
-      .neq("status", "draft");
+    const { data, error } = await admin.from("applications").select("status");
 
     if (error || !data) return empty;
 
+    const summary = summarizeDirectorApplicationCounts(data);
     return {
-      all: data.length,
-      pending: data.filter((r) => PENDING_STATUSES.includes(r.status)).length,
-      accepted: data.filter((r) => r.status === "accepted").length,
-      rejected: data.filter((r) => r.status === "rejected").length,
+      all: summary.all,
+      pending: summary.pending,
+      accepted: summary.accepted,
+      rejected: summary.rejected,
+      draft: summary.draft,
     };
   } catch {
     const supabase = await createClient();
-    const { data } = await supabase
-      .from("applications")
-      .select("status")
-      .neq("status", "draft");
+    const { data } = await supabase.from("applications").select("status");
 
     if (!data) return empty;
 
+    const summary = summarizeDirectorApplicationCounts(data);
     return {
-      all: data.length,
-      pending: data.filter((r) => PENDING_STATUSES.includes(r.status)).length,
-      accepted: data.filter((r) => r.status === "accepted").length,
-      rejected: data.filter((r) => r.status === "rejected").length,
+      all: summary.all,
+      pending: summary.pending,
+      accepted: summary.accepted,
+      rejected: summary.rejected,
+      draft: summary.draft,
     };
   }
 }
@@ -287,7 +260,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Review and manage applicant submissions.
+          Review submitted applications (drafts in progress are not listed here).
         </p>
       </div>
 
@@ -307,7 +280,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
           <Filter size={14} className="text-gray-400" />
           <span className="text-xs font-medium text-gray-500">Filter:</span>
         </div>
-        {primaryFilters.map(({ key, label }) => (
+        {DIRECTOR_PRIMARY_FILTERS.map(({ key, label }) => (
           <Link
             key={key || "all"}
             href={key ? `/director/applications?status=${key}` : "/director/applications"}
@@ -321,6 +294,13 @@ export default async function DirectorApplicationsPage({ searchParams }) {
           </Link>
         ))}
       </div>
+
+      {counts.draft > 0 ? (
+        <p className="mb-4 text-xs text-gray-500">
+          {counts.draft} draft application{counts.draft === 1 ? "" : "s"} in progress (not shown
+          until Stage 1 is submitted).
+        </p>
+      ) : null}
 
       {/* Application list */}
       {!applications || applications.length === 0 ? (
