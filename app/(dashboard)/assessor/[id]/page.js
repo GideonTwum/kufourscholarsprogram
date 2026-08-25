@@ -267,9 +267,10 @@ export default function AssessorApplicantDetailPage() {
 
           <Section title="Documents" icon={FileText}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <DocumentLink label="Passport Picture" url={docUrls.photo} loading={!!application.photo_url} />
               <DocumentLink label="CV / Personal Statement" url={docUrls.cv} loading={!!(application.cv_personal_statement_url || application.cv_url)} />
               <DocumentLink label="Academic Transcript" url={docUrls.transcript} loading={!!application.academic_transcript_url} />
-              <DocumentLink label="Student ID" url={docUrls.studentId} loading={!!application.student_id_path} />
+              <DocumentLink label="National ID" url={docUrls.studentId} loading={!!application.student_id_path} />
               {getRecommendationLetterPaths(application).map((_, i) => (
                 <DocumentLink
                   key={`rec-${i}`}

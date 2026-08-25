@@ -103,7 +103,7 @@ export default function PanelApplicantDetailPage() {
   const docFields = [
     { label: "CV / Personal Statement", field: "cv_personal_statement_url" },
     { label: "Academic transcript", field: "academic_transcript_url" },
-    { label: "Student ID", field: "student_id_path" },
+    { label: "National ID", field: "student_id_path" },
   ];
 
   useEffect(() => {
@@ -371,7 +371,7 @@ export default function PanelApplicantDetailPage() {
           <Section title="Stage 1 Documents" icon={FileText}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {application.photo_url && (
-                <DocCard label="Passport / profile photo" field="photo_url" application={application} docUrls={docUrls} icon={ImageIcon} />
+                <DocCard label="Passport Picture" field="photo_url" application={application} docUrls={docUrls} icon={ImageIcon} />
               )}
               {docFields.map((doc) => (
                 <DocCard key={doc.field} label={doc.label} field={doc.field} application={appWithCv} docUrls={docUrls} icon={FileText} />

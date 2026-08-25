@@ -318,7 +318,7 @@ export default function ApplicationReviewPage() {
   const docFields = [
     { label: "CV / Personal Statement", field: "cv_personal_statement_url" },
     { label: "Academic transcript", field: "academic_transcript_url" },
-    { label: "Student ID", field: "student_id_path" },
+    { label: "National ID", field: "student_id_path" },
   ];
 
   // Fallback to legacy cv_url if cv_personal_statement_url is empty
@@ -663,7 +663,7 @@ export default function ApplicationReviewPage() {
                 {application.photo_url && (
                   <DocCard
                     key="photo"
-                    label="Passport / profile photo"
+                    label="Passport Picture"
                     field="photo_url"
                     application={application}
                     docUrls={docUrls}

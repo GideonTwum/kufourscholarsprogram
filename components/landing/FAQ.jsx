@@ -13,7 +13,7 @@ const faqs = [
   },
   {
     q: "Who can apply?",
-    a: "African nationals (not limited to Ghanaian citizens), aged 25 or under, who are currently enrolled in a tertiary institution in Ghana, with demonstrated leadership potential and community involvement.",
+    a: "African nationals (not limited to Ghanaian citizens), aged 23 years or younger, who are currently enrolled in a tertiary institution in Ghana, with demonstrated leadership potential and community involvement.",
   },
   {
     q: "Is there an application fee?",

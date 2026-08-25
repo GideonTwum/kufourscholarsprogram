@@ -153,9 +153,10 @@ export default function ReviewSubmit({
       </Section>
       <Section title="Documents" icon={FileText} stepIndex={2} goToStep={goToStep} readOnly={readOnly}>
         <Field
-          label="Passport photograph (profile)"
-          value={data.photo_url ? "Uploaded — used as your profile photo" : ""}
+          label="Passport Picture"
+          value={data.photo_url ? "Uploaded — used as your profile picture" : ""}
           href={docUrls.photo_url || (/^https?:\/\//i.test(data.photo_url || "") ? data.photo_url : undefined)}
+          hrefLabel="View Passport Picture"
         />
         <Field
           label="CV / Personal Statement"
@@ -169,10 +170,10 @@ export default function ReviewSubmit({
           href={docUrls.academic_transcript_url}
         />
         <Field
-          label="Student ID"
+          label="National ID"
           value={data.student_id_path ? "Uploaded" : ""}
           href={docUrls.student_id_path}
-          hrefLabel="View Student ID"
+          hrefLabel="View National ID"
         />
         {recommendations.length === 0 ? (
           <Field label="Recommendation Letters" value="" />

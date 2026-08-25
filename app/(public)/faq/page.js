@@ -30,7 +30,7 @@ const faqs = [
     questions: [
       {
         q: "Who can apply?",
-        a: "African nationals (not limited to Ghanaian citizens), aged 25 or under, who are currently enrolled in a tertiary institution in Ghana. Applicants must demonstrate leadership potential, community involvement, and a strong academic record.",
+        a: "African nationals (not limited to Ghanaian citizens), aged 23 years or younger, who are currently enrolled in a tertiary institution in Ghana. Applicants must demonstrate leadership potential, community involvement, and a strong academic record.",
       },
       {
         q: "When do applications open?",

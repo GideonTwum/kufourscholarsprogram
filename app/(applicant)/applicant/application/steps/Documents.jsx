@@ -384,14 +384,14 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
       <div>
         <h2 className="text-lg font-bold text-gray-900">Stage 1 Documents</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Passport photo: JPG/PNG/WebP, max 5MB. Documents: PDF (or image where noted), max 5MB each.
-          This passport photo will be used as your profile picture.
+          Passport Picture: JPG/PNG/WebP, max 5MB. Documents: PDF (or image where noted), max 5MB each.
+          This Passport Picture will be used as your profile picture.
         </p>
       </div>
 
       <div>
         <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700">
-          <ImageIcon size={16} /> Passport photograph <span className="text-red-500">*</span>
+          <ImageIcon size={16} /> Passport Picture <span className="text-red-500">*</span>
         </label>
         <div
           className={`flex flex-col gap-2 rounded-lg border-2 border-dashed p-4 transition-colors ${hasPhoto ? "border-green-200 bg-green-50" : photoErr ? "border-red-200 bg-red-50/30" : "border-gray-200 hover:border-gold hover:bg-gold/5"}`}
@@ -402,13 +402,13 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
                 <Loader2 size={20} className="animate-spin text-royal" />
               ) : hasPhoto ? (
                 <div className="flex items-center gap-3">
-                  <img src={data.photo_url} alt="Passport preview" className="h-16 w-16 rounded-lg object-cover ring-2 ring-green-200" />
-                  <span className="text-sm font-medium text-green-700">Photo uploaded</span>
+                  <img src={data.photo_url} alt="Passport Picture preview" className="h-16 w-16 rounded-lg object-cover ring-2 ring-green-200" />
+                  <span className="text-sm font-medium text-green-700">Passport Picture uploaded</span>
                 </div>
               ) : (
                 <>
                   <FileUp size={20} className="text-gray-400" />
-                  <span className="text-sm text-gray-500">Recent passport-style photo (face visible, plain background)</span>
+                  <span className="text-sm text-gray-500">Recent Passport Picture (face visible, plain background)</span>
                 </>
               )}
               <input
@@ -427,7 +427,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
                 type="button"
                 onClick={() => removeFile(photoField)}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-600"
-                title="Remove photo"
+                title="Remove Passport Picture"
               >
                 <X size={14} />
               </button>
@@ -460,9 +460,9 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
       <div>
         <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700">
           <IdCard size={16} />
-          Student ID <span className="text-red-500">*</span>
+          National ID <span className="text-red-500">*</span>
         </label>
-        <p className="mb-2 text-xs text-gray-500">Upload a clear PDF or image of your student ID card.</p>
+        <p className="mb-2 text-xs text-gray-500">Upload a clear copy of your National ID.</p>
         <div
           className={`flex flex-col gap-2 rounded-lg border-2 border-dashed p-4 ${
             data.student_id_path
@@ -479,7 +479,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
               ) : data.student_id_path ? (
                 <>
                   <CheckCircle2 size={20} className="text-green-600" />
-                  <span className="text-sm font-medium text-green-700">Student ID uploaded</span>
+                  <span className="text-sm font-medium text-green-700">National ID uploaded</span>
                 </>
               ) : (
                 <>
@@ -513,7 +513,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
                   type="button"
                   onClick={() => removeFile("student_id_path")}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-600"
-                  title="Remove Student ID"
+                  title="Remove National ID"
                 >
                   <X size={14} />
                 </button>

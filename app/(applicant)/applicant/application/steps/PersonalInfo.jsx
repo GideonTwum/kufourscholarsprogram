@@ -1,7 +1,7 @@
 "use client";
 
 import { User, Calendar, Phone, MapPin, Globe, Heart, Share2 } from "lucide-react";
-import { MAX_APPLICANT_AGE } from "@/lib/application-validation";
+import { AGE_ELIGIBILITY_MESSAGE } from "@/lib/application-validation";
 import { AFRICAN_COUNTRIES, WORLD_COUNTRIES } from "@/lib/countries";
 import CountrySelect from "@/components/applicant/CountrySelect";
 
@@ -55,7 +55,7 @@ export default function PersonalInfo({ data, onChange, errors = {} }) {
             <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="date" value={data.date_of_birth || ""} onChange={(e) => update("date_of_birth", e.target.value)} className={fieldClass("date_of_birth")} />
           </div>
-          <p className="mt-1 text-xs text-gray-500">You must be {MAX_APPLICANT_AGE} or under when you apply.</p>
+          <p className="mt-1 text-xs text-gray-500">{AGE_ELIGIBILITY_MESSAGE}</p>
           {errors.date_of_birth && <p className="mt-1 text-xs text-red-600">{errors.date_of_birth}</p>}
         </div>
         <div>

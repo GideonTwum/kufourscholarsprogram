@@ -120,9 +120,9 @@ test("social screenshots: missing one blocks; all three pass", () => {
   assert.deepEqual(validateDocuments(baseDocs()), {});
 });
 
-test("Student ID document is required", () => {
+test("National ID document is required", () => {
   const missing = validateDocuments(baseDocs({ student_id_path: "" }));
-  assert.match(missing.student_id_path, /Student ID/);
+  assert.match(missing.student_id_path, /National ID/);
   assert.equal(validateDocuments(baseDocs()).student_id_path, undefined);
 });
 
@@ -276,13 +276,15 @@ test("Director and Assessor surfaces include new Stage 1 evidence", () => {
     resolve("app/(dashboard)/director/applications/[id]/page.js"),
     "utf8"
   );
-  assert.match(director, /Student ID/);
+  assert.match(director, /National ID/);
+  assert.match(director, /Passport Picture/);
   assert.match(director, /Recommendation Letter/);
   assert.match(director, /KSP Social Media Evidence/);
   assert.match(director, /@kufuorscholars/);
 
   const assessor = readFileSync(resolve("app/(dashboard)/assessor/[id]/page.js"), "utf8");
-  assert.match(assessor, /Student ID/);
+  assert.match(assessor, /National ID/);
+  assert.match(assessor, /Passport Picture/);
   assert.match(assessor, /Recommendation Letter/);
   assert.match(assessor, /KSP Social Media Evidence/);
   assert.match(assessor, /getRecommendationLetterPaths/);
@@ -306,7 +308,8 @@ test("Review & Submit shows social evidence and optional leadership wording", ()
     "utf8"
   );
   assert.match(review, /KSP Social Media Evidence/);
-  assert.match(review, /View Student ID/);
+  assert.match(review, /View National ID/);
+  assert.match(review, /View Passport Picture/);
   assert.match(review, /Not provided \(optional\)/);
   assert.match(review, /Recommendation Letter/);
 });
