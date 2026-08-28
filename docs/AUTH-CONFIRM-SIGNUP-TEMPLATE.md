@@ -20,6 +20,8 @@ The TokenHash flow uses `verifyOtp({ token_hash, type })` on `/auth/confirm` and
      - `https://kufuorscholarapplication.com/**` (if apex is used)
      - `https://www.kufuorscholarapplication.com/auth/confirm`
      - `https://www.kufuorscholarapplication.com/auth/callback`
+
+Note: Application `signUp` / resend `emailRedirectTo` uses the **Site URL origin** (allowlist-safe). The Confirm signup **email body** still links to `/auth/confirm` via TokenHash.
 5. **Confirm email** remains **enabled**
 
 ## Exact confirmation link (paste into Confirm signup)

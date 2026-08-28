@@ -21,9 +21,36 @@ import {
   validatePasswordPolicy,
 } from "@/lib/password-policy";
 import { isValidEmailFormat } from "@/lib/auth-recovery";
-import { toFriendlyAuthError } from "@/lib/friendly-auth-error";
+import {
+  AUTH_REGISTER_EXISTING_HINT,
+  classifySignupAuthFailure,
+  isLikelyExistingUnconfirmedSignup,
+  toFriendlyAuthError,
+} from "@/lib/friendly-auth-error";
 import { applicantEmailConfirmRedirectTo } from "@/lib/auth-email-confirm";
 import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
+
+function emailDomainOnly(email) {
+  const at = String(email || "").indexOf("@");
+  if (at < 0) return null;
+  return String(email)
+    .slice(at + 1)
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]/g, "")
+    .slice(0, 80);
+}
+
+async function reportSignupDiagnostic(payload) {
+  try {
+    await fetch("/api/auth/signup-diagnostic", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    /* ignore network failures */
+  }
+}
 
 
 export default function ApplicantRegisterPage() {
@@ -71,18 +98,15 @@ export default function ApplicantRegisterPage() {
 
     setLoading(true);
 
-    // Confirmation link → /auth/confirm (token_hash) → sign out → /login?verified=true
-    // (never auto-enter the Applicant Dashboard after verification alone).
-    // Prefer NEXT_PUBLIC_SITE_URL so email links do not depend on signup browser origin.
+    const normalizedEmail = email.trim().toLowerCase();
     const redirectUrl =
       typeof window !== "undefined"
         ? applicantEmailConfirmRedirectTo(window.location.origin)
         : applicantEmailConfirmRedirectTo();
 
-
-    const normalizedEmail = email.trim().toLowerCase();
     // Password is passed exactly as typed — never trimmed or lowercased.
-    const { error: authError } = await supabase.auth.signUp({
+    // Profile row is created by DB trigger handle_new_user (not client-side).
+    const { data, error: authError } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
@@ -95,9 +119,51 @@ export default function ApplicantRegisterPage() {
     });
 
     if (authError) {
-      console.error("[applicant-register]", authError.message || authError);
-      setError(toFriendlyAuthError(authError, "register"));
+      const classified = classifySignupAuthFailure(authError);
+      console.error("[applicant-register]", {
+        stage: classified.stage,
+        code: classified.code,
+        status: classified.status,
+        message: classified.message,
+        redirectTo: redirectUrl,
+        ts: new Date().toISOString(),
+      });
+      await reportSignupDiagnostic({
+        stage: classified.stage,
+        code: classified.code,
+        status: classified.status,
+        message: classified.message,
+        emailDomain: emailDomainOnly(normalizedEmail),
+      });
+      setError(classified.friendly || toFriendlyAuthError(authError, "register"));
       setLoading(false);
+      return;
+    }
+
+    // Supabase may return a user with empty identities when the email already exists
+    // (anti-enumeration). Do not pretend a new account was created.
+    if (isLikelyExistingUnconfirmedSignup(data)) {
+      console.error("[applicant-register]", {
+        stage: "USER_ALREADY_EXISTS",
+        code: "empty_identities",
+        status: null,
+        message: "Signup returned empty identities",
+        ts: new Date().toISOString(),
+      });
+      await reportSignupDiagnostic({
+        stage: "USER_ALREADY_EXISTS",
+        code: "empty_identities",
+        status: null,
+        message: "Signup returned empty identities",
+        emailDomain: emailDomainOnly(normalizedEmail),
+      });
+      setError(AUTH_REGISTER_EXISTING_HINT);
+      setLoading(false);
+      try {
+        window.sessionStorage.setItem("ksp_verify_email", normalizedEmail);
+      } catch {
+        /* ignore */
+      }
       return;
     }
 

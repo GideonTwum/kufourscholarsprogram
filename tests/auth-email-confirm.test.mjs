@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  applicantEmailConfirmBaseUrl,
   applicantEmailConfirmRedirectTo,
   isEmailConfirmOtpType,
   normalizeEmailConfirmOtpType,
@@ -31,9 +32,13 @@ test("verified and error login paths never embed raw errors", () => {
   assert.doesNotMatch(verificationErrorLoginPath("https://x.test"), /error\.|token|jwt/i);
 });
 
-test("applicantEmailConfirmRedirectTo points at /auth/confirm", () => {
+test("applicantEmailConfirmRedirectTo uses Site URL origin (allowlist-safe)", () => {
   assert.equal(
     applicantEmailConfirmRedirectTo("https://www.kufuorscholarapplication.com"),
+    "https://www.kufuorscholarapplication.com"
+  );
+  assert.equal(
+    applicantEmailConfirmBaseUrl("https://www.kufuorscholarapplication.com"),
     "https://www.kufuorscholarapplication.com/auth/confirm"
   );
 });
