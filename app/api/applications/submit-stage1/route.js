@@ -15,6 +15,12 @@ import {
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
 import { assertOwnedApplicationsPath } from "@/lib/storage-path";
+import {
+  evaluateApplicationsOpenGate,
+  supabaseProjectHostFromUrl,
+} from "@/lib/applications-open-gate";
+
+export const dynamic = "force-dynamic";
 
 const APPLICANT_SAVE_ERROR =
   "We couldn't save your application. Please try again. If the problem continues, contact KSP support.";
@@ -73,26 +79,48 @@ function validateOwnedDocumentPaths(data, userId) {
 }
 
 async function assertApplicationsOpen(admin) {
-  const { data: openSetting } = await admin
+  const serverNowMs = Date.now();
+  const serverNowIso = new Date(serverNowMs).toISOString();
+  const supabaseProjectHost = supabaseProjectHostFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+  const { data: openSetting, error: openError } = await admin
     .from("site_settings")
     .select("value")
     .eq("key", "applications_open")
     .maybeSingle();
-  if (openSetting && openSetting.value !== "true") {
-    return "Applications are currently closed.";
-  }
-  const { data: deadlineSetting } = await admin
+
+  const { data: deadlineSetting, error: deadlineError } = await admin
     .from("site_settings")
     .select("value")
     .eq("key", "application_deadline")
     .maybeSingle();
-  if (deadlineSetting?.value) {
-    const d = new Date(deadlineSetting.value);
-    if (!Number.isNaN(d.getTime()) && Date.now() > d.getTime()) {
-      return "The application deadline has passed.";
-    }
-  }
-  return null;
+
+  const applicationsOpen = openSetting?.value ?? null;
+  const deadlineRaw = deadlineSetting?.value ?? null;
+  const gate = evaluateApplicationsOpenGate({
+    applicationsOpen,
+    deadlineRaw,
+    nowMs: serverNowMs,
+  });
+
+  // Temporary production incident diagnostics — no PII / tokens / secrets.
+  console.info("[stage1-deadline-diagnostic]", {
+    applicationsOpen,
+    deadlineRaw,
+    deadlineParsedIso: gate.deadlineParsedIso,
+    deadlineMs: gate.deadlineMs,
+    serverNowIso,
+    serverNowMs,
+    isExpired: gate.isExpired,
+    allowed: gate.allowed,
+    reason: gate.reason,
+    openQueryError: openError?.code || openError?.message || null,
+    deadlineQueryError: deadlineError?.code || deadlineError?.message || null,
+    supabaseProjectHost,
+    requestStage: "submit-stage1",
+  });
+
+  return gate.reason;
 }
 
 export async function POST(request) {
