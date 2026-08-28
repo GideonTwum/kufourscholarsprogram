@@ -80,8 +80,9 @@ supabase functions deploy send-email
 | Setting | Expected |
 |---------|----------|
 | Site URL | Same origin as `NEXT_PUBLIC_SITE_URL` |
-| Redirect allowlist | Include `{SITE}/auth/callback` and production/staging origins |
+| Redirect allowlist | Include `{SITE}/auth/confirm`, `{SITE}/auth/callback`, and production/staging origins |
 | Confirm email | Enabled for applicant self-registration |
+| Confirm signup template | TokenHash link to `/auth/confirm` — see `docs/AUTH-CONFIRM-SIGNUP-TEMPLATE.md` |
 | Password recovery | Enabled; recovery redirects through `/auth/callback?next=/reset-password` |
 | MFA (TOTP) | Enabled in Supabase Auth. App enforcement via `DIRECTOR_MFA_REQUIRED` (see below) |
 | Rate limits | Keep Supabase defaults (or stricter); app adds best-effort cooldowns only |
@@ -100,7 +101,8 @@ Auth SMTP is separate from the Next/Edge Resend API path. Do not confuse Auth SM
 
 ## Application behavior notes
 
-- Applicant verification uses a **confirmation email link**, not typed OTP and not SMS OTP.
+- Applicant verification uses **token_hash** confirmation via `/auth/confirm` (`verifyOtp`), not same-browser PKCE.
+  See `docs/AUTH-CONFIRM-SIGNUP-TEMPLATE.md`. Legacy `/auth/callback?code=` remains for recovery/OAuth.
 - Director MFA remains **implemented** (`/director/mfa-setup`, `/director/mfa-challenge`, AAL2 helpers).
   Enforcement is controlled by server-side **`DIRECTOR_MFA_REQUIRED`** (not `NEXT_PUBLIC_*`):
   - `true` or unset → Directors must complete TOTP MFA (AAL2) before `/director` and privileged APIs.

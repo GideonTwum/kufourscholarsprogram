@@ -22,6 +22,8 @@ import {
 } from "@/lib/password-policy";
 import { isValidEmailFormat } from "@/lib/auth-recovery";
 import { toFriendlyAuthError } from "@/lib/friendly-auth-error";
+import { applicantEmailConfirmRedirectTo } from "@/lib/auth-email-confirm";
+
 
 export default function ApplicantRegisterPage() {
   const [fullName, setFullName] = useState("");
@@ -68,12 +70,14 @@ export default function ApplicantRegisterPage() {
 
     setLoading(true);
 
-    // Confirmation link → /auth/callback → sign out → /login?verified=true
+    // Confirmation link → /auth/confirm (token_hash) → sign out → /login?verified=true
     // (never auto-enter the Applicant Dashboard after verification alone).
+    // Prefer NEXT_PUBLIC_SITE_URL so email links do not depend on signup browser origin.
     const redirectUrl =
       typeof window !== "undefined"
-        ? `${window.location.origin}/auth/callback?next=/login`
-        : undefined;
+        ? applicantEmailConfirmRedirectTo(window.location.origin)
+        : applicantEmailConfirmRedirectTo();
+
 
     const normalizedEmail = email.trim().toLowerCase();
     // Password is passed exactly as typed — never trimmed or lowercased.

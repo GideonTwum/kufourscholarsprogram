@@ -22,7 +22,10 @@ function VerifiedBanner() {
 
 function VerificationErrorBanner() {
   const searchParams = useSearchParams();
-  if (searchParams.get("error") !== "verification_failed") return null;
+  const failed =
+    searchParams.get("verification_error") === "1" ||
+    searchParams.get("error") === "verification_failed";
+  if (!failed) return null;
   return (
     <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">
       Email verification failed or the link expired. Request a new verification email from the

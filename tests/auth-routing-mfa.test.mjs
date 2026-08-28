@@ -58,8 +58,9 @@ test("proxy role-gates Director portal and bounces unused MFA URLs", () => {
 test("auth callback forces applicant verification to login without leaving session", () => {
   const src = readFileSync(resolve("app/auth/callback/route.js"), "utf8");
   assert.match(src, /exchangeCodeForSession/);
+  assert.match(src, /verifyOtp/);
   assert.match(src, /signOut/);
-  assert.match(src, /\/login\?verified=true/);
+  assert.match(src, /verifiedLoginPath|\/login\?verified=true/);
   assert.match(src, /isApplicantEmailVerificationNext|isApplicantRole/);
   assert.match(src, /reset-password/);
 });

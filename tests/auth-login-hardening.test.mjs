@@ -29,7 +29,7 @@ test("portal login normalizes email and maps auth errors distinctly", () => {
   const friendly = readFileSync(resolve("lib/friendly-auth-error.js"), "utf8");
   assert.match(portalLogin, /email\.trim\(\)\.toLowerCase\(\)/);
   assert.match(portalLogin, /toFriendlyAuthError/);
-  assert.match(friendly, /Please verify your email before signing in/);
+  assert.match(friendly, /Please verify your email address before signing in/);
   assert.match(friendly, /Invalid email or password/);
   assert.doesNotMatch(portalLogin, /password\.trim\(/);
   assert.doesNotMatch(portalLogin, /password\.toLowerCase\(/);
@@ -37,7 +37,8 @@ test("portal login normalizes email and maps auth errors distinctly", () => {
 
 test("applicant register confirmation redirects to verify-email not dashboard", () => {
   assert.match(applicantRegister, /\/applicant\/verify-email/);
-  assert.match(applicantRegister, /auth\/callback\?next=\/login/);
+  assert.match(applicantRegister, /applicantEmailConfirmRedirectTo/);
+  assert.doesNotMatch(applicantRegister, /auth\/callback\?next=\/applicant(?!\/)/);
 });
 
 test("applicant register normalizes email and does not mutate password", () => {

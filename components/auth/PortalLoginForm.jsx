@@ -10,6 +10,7 @@ import {
   AUTH_EMAIL_NOT_CONFIRMED,
   toFriendlyAuthError,
 } from "@/lib/friendly-auth-error";
+import { applicantEmailConfirmRedirectTo } from "@/lib/auth-email-confirm";
 
 const UNVERIFIED_LOGIN_MESSAGE = AUTH_EMAIL_NOT_CONFIRMED;
 
@@ -81,12 +82,12 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
       options: {
         emailRedirectTo:
           typeof window !== "undefined"
-            ? `${window.location.origin}/auth/callback?next=/login`
-            : undefined,
+            ? applicantEmailConfirmRedirectTo(window.location.origin)
+            : applicantEmailConfirmRedirectTo(),
       },
     });
     if (resendError) {
-      setResendMessage("Could not resend verification email. Try again shortly.");
+      setResendMessage(toFriendlyAuthError(resendError, "resend"));
     } else {
       setResendMessage("If verification is still pending, a new email has been sent.");
     }

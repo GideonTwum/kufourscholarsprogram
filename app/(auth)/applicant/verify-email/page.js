@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { applicantEmailConfirmRedirectTo } from "@/lib/auth-email-confirm";
+import { toFriendlyAuthError } from "@/lib/friendly-auth-error";
 
 const RESEND_KEY = "ksp_verify_resend_at";
 const EMAIL_KEY = "ksp_verify_email";
@@ -18,10 +20,10 @@ function safeEmailFromQuery(raw) {
 }
 
 function applicantVerifyRedirectUrl() {
-  if (typeof window === "undefined") return undefined;
-  // After the link is opened, callback exchanges the code, signs out, and sends
-  // the applicant to Applicant Sign In — not the dashboard.
-  return `${window.location.origin}/auth/callback?next=/login`;
+  if (typeof window === "undefined") return applicantEmailConfirmRedirectTo();
+  // Token-hash Confirm signup template targets /auth/confirm (cross-browser).
+  // emailRedirectTo remains for legacy ConfirmationURL templates.
+  return applicantEmailConfirmRedirectTo(window.location.origin);
 }
 
 function VerifyEmailContent() {
@@ -117,7 +119,7 @@ function VerifyEmailContent() {
       },
     });
     if (err) {
-      setError("Could not resend verification email. Try again shortly.");
+      setError(toFriendlyAuthError(err, "resend"));
     } else {
       setMessage(
         "If verification is still pending, a new email has been sent. Check your inbox."

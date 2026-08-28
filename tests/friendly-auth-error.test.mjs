@@ -20,6 +20,7 @@ test("maps common auth codes", () => {
     toFriendlyAuthError({ code: "email_not_confirmed", message: "Email not confirmed" }, "login"),
     AUTH_EMAIL_NOT_CONFIRMED
   );
+  assert.match(AUTH_EMAIL_NOT_CONFIRMED, /verify your email address before signing in/i);
   assert.equal(
     toFriendlyAuthError({ code: "invalid_credentials", message: "Invalid login credentials" }, "login"),
     AUTH_INVALID_CREDENTIALS

@@ -8,11 +8,13 @@ const verifyPath = resolve("app/(auth)/applicant/verify-email/page.js");
 const oldVerifyPath = resolve("app/(applicant)/applicant/verify-email/page.js");
 const verify = readFileSync(verifyPath, "utf8");
 const callback = readFileSync(resolve("app/auth/callback/route.js"), "utf8");
+const confirm = readFileSync(resolve("app/auth/confirm/route.js"), "utf8");
 const login = readFileSync(resolve("app/(auth)/login/page.js"), "utf8");
 const portalLogin = readFileSync(resolve("components/auth/PortalLoginForm.jsx"), "utf8");
 const proxy = readFileSync(resolve("proxy.js"), "utf8");
 const applicantLayout = readFileSync(resolve("app/(applicant)/layout.js"), "utf8");
 const authLayout = readFileSync(resolve("app/(auth)/layout.js"), "utf8");
+const templateDoc = readFileSync(resolve("docs/AUTH-CONFIRM-SIGNUP-TEMPLATE.md"), "utf8");
 
 test("successful registration navigates to /applicant/verify-email", () => {
   assert.match(register, /router\.push\(`\/applicant\/verify-email\?\$\{q\.toString\(\)\}`\)/);
@@ -20,8 +22,8 @@ test("successful registration navigates to /applicant/verify-email", () => {
   assert.match(register, /ksp_verify_email/);
 });
 
-test("registration confirmation link targets callback next=/login", () => {
-  assert.match(register, /auth\/callback\?next=\/login/);
+test("registration confirmation targets /auth/confirm (token_hash flow)", () => {
+  assert.match(register, /applicantEmailConfirmRedirectTo/);
   assert.doesNotMatch(register, /auth\/callback\?next=\/applicant(?!\/)/);
 });
 
@@ -41,7 +43,7 @@ test("verify-email page is Check your email with resend + Back to Sign In", () =
   assert.match(verify, /Resend verification email/);
   assert.match(verify, /cooldownSec/);
   assert.match(verify, /Back to Sign In/);
-  assert.match(verify, /auth\/callback\?next=\/login/);
+  assert.match(verify, /applicantEmailConfirmRedirectTo/);
   assert.match(verify, /rounded-2xl bg-white/);
   assert.match(verify, /shadow-xl/);
 });
@@ -53,19 +55,27 @@ test("verified signed-in applicant is redirected from verify-email to /applicant
   assert.match(proxy, /!applicantNeedsEmailVerification\(user\)/);
 });
 
-test("verification callback exchanges code, signs out, redirects to /login?verified=true", () => {
+test("auth/confirm verifies token_hash, signs out, redirects to /login?verified=true", () => {
+  assert.match(confirm, /verifyOtp/);
+  assert.match(confirm, /token_hash/);
+  assert.match(confirm, /await supabase\.auth\.signOut\(\)/);
+  assert.match(confirm, /verifiedLoginPath|verified=true/);
+  assert.match(confirm, /verificationErrorLoginPath|verification_error=1/);
+  assert.doesNotMatch(confirm, /encodeURIComponent\(error\.message\)/);
+  assert.doesNotMatch(confirm, /exchangeCodeForSession/);
+});
+
+test("auth/callback keeps PKCE code exchange for recovery and accepts token_hash fallback", () => {
   assert.match(callback, /exchangeCodeForSession/);
+  assert.match(callback, /verifyOtp/);
+  assert.match(callback, /token_hash/);
   assert.match(callback, /await supabase\.auth\.signOut\(\)/);
-  assert.match(callback, /\/login\?verified=true/);
   assert.match(callback, /isApplicantEmailVerificationNext/);
 });
 
 test("callback preserves password recovery session path", () => {
   assert.match(callback, /\/reset-password/);
-  assert.doesNotMatch(
-    callback,
-    /reset-password[\s\S]{0,200}signOut/
-  );
+  assert.doesNotMatch(callback, /reset-password[\s\S]{0,200}signOut/);
 });
 
 test("login?verified=true shows display-only success banner", () => {
@@ -75,14 +85,21 @@ test("login?verified=true shows display-only success banner", () => {
   assert.doesNotMatch(login, /signInWithPassword/);
 });
 
+test("login shows verification_error without raw Supabase errors", () => {
+  assert.match(login, /verification_error/);
+  assert.match(login, /Email verification failed or the link expired/);
+  assert.doesNotMatch(login, /error\.message/);
+});
+
 test("unverified login shows verification-specific error and resend", () => {
   const friendly = readFileSync(resolve("lib/friendly-auth-error.js"), "utf8");
   assert.match(
     friendly,
-    /Please verify your email before signing in\. Check your inbox for the verification link\./
+    /Please verify your email address before signing in\. Check your inbox or request a new verification email\./
   );
   assert.match(friendly, /email_not_confirmed/);
   assert.match(portalLogin, /toFriendlyAuthError/);
+  assert.match(portalLogin, /applicantEmailConfirmRedirectTo/);
   assert.match(portalLogin, /Resend verification email/);
   assert.match(portalLogin, /needsVerification/);
   assert.doesNotMatch(portalLogin, /Invalid login credentials/);
@@ -102,4 +119,11 @@ test("proxy and applicant layout block unverified dashboard access", () => {
   assert.match(applicantLayout, /email_confirmed_at == null/);
   assert.match(applicantLayout, /\/applicant\/verify-email/);
   assert.match(applicantLayout, /DashboardShell/);
+});
+
+test("Confirm signup template doc requires TokenHash and /auth/confirm", () => {
+  assert.match(templateDoc, /\{\{\s*\.TokenHash\s*\}\}/);
+  assert.match(templateDoc, /\/auth\/confirm\?token_hash=/);
+  assert.match(templateDoc, /type=email/);
+  assert.match(templateDoc, /SiteURL/);
 });
