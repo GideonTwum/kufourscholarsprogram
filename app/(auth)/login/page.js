@@ -20,10 +20,22 @@ function VerifiedBanner() {
   );
 }
 
+function VerificationErrorBanner() {
+  const searchParams = useSearchParams();
+  if (searchParams.get("error") !== "verification_failed") return null;
+  return (
+    <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+      Email verification failed or the link expired. Request a new verification email from the
+      sign-in page, or try registering again if you have not created an account.
+    </div>
+  );
+}
+
 function LoginContent() {
   return (
     <>
       <VerifiedBanner />
+      <VerificationErrorBanner />
       <PortalLoginForm
         expectedRole="applicant"
         title="Applicant Sign In"

@@ -7,9 +7,12 @@ import Image from "next/image";
  * Decorative only — never use AI-generated design comps as runtime assets.
  */
 export const HERO_PHOTO = {
-  src: "/hero/scholars-formal-1.png",
-  /** Keep seated leaders + scholars visible in the right panel crop */
-  objectPosition: "55% 38%",
+  src: "/images/ksp-11th-class-hero.png",
+  /**
+   * Bias toward center-right so President Kufuor + scholars stay in the
+   * visible right panel; left of the photo sits under the green blend.
+   */
+  objectPosition: "72% 42%",
 };
 
 /**
@@ -37,11 +40,11 @@ export default function HeroBackground() {
           fill
           priority
           sizes="(min-width: 1024px) 58vw, (min-width: 768px) 52vw, 100vw"
-          quality={75}
+          quality={90}
           className="object-cover"
           style={{ objectPosition }}
         />
-        {/* Light brand tint — faces stay clear */}
+        {/* Light brand tint — faces stay clear (no blur/filter on the photo) */}
         <div className="pointer-events-none absolute inset-0 bg-royal/15" />
         {/* Photo-edge blend into green (no hard vertical cut) */}
         <div

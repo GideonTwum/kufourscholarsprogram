@@ -21,6 +21,7 @@ import {
   validatePasswordPolicy,
 } from "@/lib/password-policy";
 import { isValidEmailFormat } from "@/lib/auth-recovery";
+import { toFriendlyAuthError } from "@/lib/friendly-auth-error";
 
 export default function ApplicantRegisterPage() {
   const [fullName, setFullName] = useState("");
@@ -89,7 +90,8 @@ export default function ApplicantRegisterPage() {
     });
 
     if (authError) {
-      setError(authError.message);
+      console.error("[applicant-register]", authError.message || authError);
+      setError(toFriendlyAuthError(authError, "register"));
       setLoading(false);
       return;
     }

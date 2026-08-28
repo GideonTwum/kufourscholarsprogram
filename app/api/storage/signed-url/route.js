@@ -75,8 +75,9 @@ export async function GET(request) {
     .createSignedUrl(path, EXPIRE_SECONDS);
 
   if (error) {
+    console.error("[storage/signed-url]", error.message);
     return NextResponse.json(
-      { error: error.message || "Failed to create signed URL" },
+      { error: "Failed to create a secure document link. Please try again." },
       { status: 500 }
     );
   }

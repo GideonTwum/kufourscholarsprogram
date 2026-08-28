@@ -54,7 +54,7 @@ async function main() {
       imgCount: imgs.length,
       overlayCount: overlays.length,
       srcs,
-      usesFormalPhoto: srcs.some((s) => s.includes("scholars-formal-1")),
+      usesFormalPhoto: srcs.some((s) => s.includes("ksp-11th-class-hero")),
       usesMockup: srcs.some((s) => /ksp-group-hero|ChatGPT/i.test(s)),
     };
   });
@@ -65,7 +65,7 @@ async function main() {
 
   if (!headline) throw new Error("Headline not visible");
   if (!mobileOk) throw new Error("Headline not visible at 375px");
-  if (!meta.usesFormalPhoto) throw new Error("Real scholars-formal-1 photo not rendered");
+  if (!meta.usesFormalPhoto) throw new Error("Real ksp-11th-class-hero photo not rendered");
   if (meta.usesMockup) throw new Error("Mockup image must not be used at runtime");
   if (meta.overlayCount < 1) throw new Error("No pointer-events-none overlay layers");
   if (errors.length) throw new Error(`Page errors: ${errors.join(" | ")}`);

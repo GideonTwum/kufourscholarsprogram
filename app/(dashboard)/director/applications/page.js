@@ -19,7 +19,8 @@ import {
   DIRECTOR_PRIMARY_FILTERS,
   applyDirectorOperationalScope,
   applyDirectorStatusFilter,
-  summarizeDirectorApplicationCounts,
+  fetchAllApplicationPages,
+  fetchDirectorApplicationCountSummary,
 } from "@/lib/director-application-scope";
 
 const statusConfig = {
@@ -92,26 +93,30 @@ const statusConfig = {
 
 async function fetchWithAdmin(statusFilter) {
   const admin = createAdminClient();
-  let query = admin
-    .from("applications")
-    .select("*, profiles!applications_user_id_fkey(full_name, email, class_name)")
-    .order("submitted_at", { ascending: false, nullsFirst: false });
+  const build = () => {
+    let query = admin
+      .from("applications")
+      .select("*, profiles!applications_user_id_fkey(full_name, email, class_name)")
+      .order("submitted_at", { ascending: false, nullsFirst: false });
+    query = applyDirectorOperationalScope(query);
+    query = applyDirectorStatusFilter(query, statusFilter);
+    return query;
+  };
 
-  query = applyDirectorOperationalScope(query);
-  query = applyDirectorStatusFilter(query, statusFilter);
-
-  const { data, error } = await query;
+  const { data, error } = await fetchAllApplicationPages(build);
   if (!error) return { applications: data || [], loadError: null };
 
-  let fallbackQuery = admin
-    .from("applications")
-    .select("*")
-    .order("submitted_at", { ascending: false, nullsFirst: false });
+  const buildFallback = () => {
+    let fallbackQuery = admin
+      .from("applications")
+      .select("*")
+      .order("submitted_at", { ascending: false, nullsFirst: false });
+    fallbackQuery = applyDirectorOperationalScope(fallbackQuery);
+    fallbackQuery = applyDirectorStatusFilter(fallbackQuery, statusFilter);
+    return fallbackQuery;
+  };
 
-  fallbackQuery = applyDirectorOperationalScope(fallbackQuery);
-  fallbackQuery = applyDirectorStatusFilter(fallbackQuery, statusFilter);
-
-  const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+  const { data: fallbackData, error: fallbackError } = await fetchAllApplicationPages(buildFallback);
   return {
     applications: fallbackData || [],
     loadError: fallbackError?.message || error.message,
@@ -119,15 +124,17 @@ async function fetchWithAdmin(statusFilter) {
 }
 
 async function fetchWithSession(supabase, statusFilter) {
-  let query = supabase
-    .from("applications")
-    .select("*")
-    .order("submitted_at", { ascending: false, nullsFirst: false });
+  const build = () => {
+    let query = supabase
+      .from("applications")
+      .select("*")
+      .order("submitted_at", { ascending: false, nullsFirst: false });
+    query = applyDirectorOperationalScope(query);
+    query = applyDirectorStatusFilter(query, statusFilter);
+    return query;
+  };
 
-  query = applyDirectorOperationalScope(query);
-  query = applyDirectorStatusFilter(query, statusFilter);
-
-  const { data, error } = await query;
+  const { data, error } = await fetchAllApplicationPages(build);
   return {
     applications: data || [],
     loadError: error?.message ?? null,
@@ -147,11 +154,7 @@ async function loadCounts() {
   const empty = { all: 0, pending: 0, accepted: 0, rejected: 0, draft: 0 };
   try {
     const admin = createAdminClient();
-    const { data, error } = await admin.from("applications").select("status");
-
-    if (error || !data) return empty;
-
-    const summary = summarizeDirectorApplicationCounts(data);
+    const { summary } = await fetchDirectorApplicationCountSummary(admin);
     return {
       all: summary.all,
       pending: summary.pending,
@@ -160,19 +163,19 @@ async function loadCounts() {
       draft: summary.draft,
     };
   } catch {
-    const supabase = await createClient();
-    const { data } = await supabase.from("applications").select("status");
-
-    if (!data) return empty;
-
-    const summary = summarizeDirectorApplicationCounts(data);
-    return {
-      all: summary.all,
-      pending: summary.pending,
-      accepted: summary.accepted,
-      rejected: summary.rejected,
-      draft: summary.draft,
-    };
+    try {
+      const supabase = await createClient();
+      const { summary } = await fetchDirectorApplicationCountSummary(supabase);
+      return {
+        all: summary.all,
+        pending: summary.pending,
+        accepted: summary.accepted,
+        rejected: summary.rejected,
+        draft: summary.draft,
+      };
+    } catch {
+      return empty;
+    }
   }
 }
 

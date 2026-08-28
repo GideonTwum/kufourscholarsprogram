@@ -6,9 +6,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { assertLoginPortalRole, portalHomeForRole } from "@/lib/portal-auth";
+import {
+  AUTH_EMAIL_NOT_CONFIRMED,
+  toFriendlyAuthError,
+} from "@/lib/friendly-auth-error";
 
-const UNVERIFIED_LOGIN_MESSAGE =
-  "Please verify your email before signing in. Check your inbox for the verification link.";
+const UNVERIFIED_LOGIN_MESSAGE = AUTH_EMAIL_NOT_CONFIRMED;
 
 const PROFILE_COLUMNS = "id, email, full_name, role, is_active";
 
@@ -104,15 +107,10 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
     });
 
     if (authError) {
-      const msg = String(authError.message || "");
-      const code = String(authError.code || "");
-      if (/email not confirmed|not confirmed/i.test(msg) || code === "email_not_confirmed") {
-        setError(UNVERIFIED_LOGIN_MESSAGE);
+      const friendly = toFriendlyAuthError(authError, "login");
+      setError(friendly);
+      if (friendly === UNVERIFIED_LOGIN_MESSAGE) {
         setNeedsVerification(expectedRole === "applicant");
-      } else if (/invalid login credentials|invalid_credentials/i.test(msg) || code === "invalid_credentials") {
-        setError("Invalid email or password.");
-      } else {
-        setError(msg || "Sign-in failed. Try again.");
       }
       setLoading(false);
       return;

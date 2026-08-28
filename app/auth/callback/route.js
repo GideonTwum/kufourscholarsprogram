@@ -37,7 +37,7 @@ export async function GET(request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       return NextResponse.redirect(
-        new URL(`/login?error=${encodeURIComponent(error.message)}`, requestUrl.origin)
+        new URL("/login?error=verification_failed", requestUrl.origin)
       );
     }
     exchanged = true;

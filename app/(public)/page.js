@@ -10,11 +10,13 @@ import Testimonials from "@/components/landing/Testimonials";
 import FAQ from "@/components/landing/FAQ";
 import YoutubeSpotlights from "@/components/landing/YoutubeSpotlights";
 import Events from "@/components/landing/Events";
+import News from "@/components/landing/News";
 import Contact from "@/components/landing/Contact";
 import {
   DEFAULT_APPLICATION_CLASS_NAME,
   normalizeApplicationClassName,
 } from "@/lib/application-class";
+import { selectPublicArticles } from "@/lib/news";
 
 export const metadata = {
   title: "Kufuor Scholars Program",
@@ -30,6 +32,7 @@ export default async function Home() {
   let upcomingEvents = [];
   let scholarVideos = [];
   let youtubeSpotlights = [];
+  let newsArticles = [];
 
   try {
     const supabase = await createClient();
@@ -90,6 +93,28 @@ export default async function Home() {
       .order("display_order", { ascending: true })
       .limit(6);
     scholarVideos = sv || [];
+
+    const nowIso = new Date().toISOString();
+    let newsRows = null;
+    const { data: publishedNews, error: newsErr } = await supabase
+      .from("news_articles")
+      .select("*")
+      .eq("is_published", true)
+      .lte("published_at", nowIso)
+      .order("published_at", { ascending: false })
+      .limit(8);
+    if (newsErr) {
+      const { data: legacyNews } = await supabase
+        .from("news_articles")
+        .select("*")
+        .lte("published_at", nowIso)
+        .order("published_at", { ascending: false })
+        .limit(8);
+      newsRows = legacyNews;
+    } else {
+      newsRows = publishedNews;
+    }
+    newsArticles = selectPublicArticles(newsRows || [], { limit: 4 });
   } catch {}
 
   return (
@@ -108,6 +133,7 @@ export default async function Home() {
       <YoutubeSpotlights videos={youtubeSpotlights} />
       <Testimonials />
       <Events events={upcomingEvents} />
+      <News articles={newsArticles} />
       <FAQ />
       <Contact />
     </main>

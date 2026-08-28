@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
-import { summarizeDirectorApplicationCounts } from "@/lib/director-application-scope";
+import { fetchDirectorApplicationCountSummary } from "@/lib/director-application-scope";
 import { VALID_APPLICATION_STATUSES } from "@/lib/application-status-transition.mjs";
 
 export async function GET() {
@@ -14,7 +14,7 @@ export async function GET() {
   const emptyCounts = Object.fromEntries(VALID_APPLICATION_STATUSES.map((k) => [k, 0]));
 
   const [
-    { data: statusRows },
+    countBundle,
     { count: activeAssessors },
     { count: inactiveAssessors },
     { count: activePanel },
@@ -28,7 +28,7 @@ export async function GET() {
     { data: classSetting },
     { data: recentAudit },
   ] = await Promise.all([
-    admin.from("applications").select("status"),
+    fetchDirectorApplicationCountSummary(admin),
     admin
       .from("profiles")
       .select("id", { count: "exact", head: true })
@@ -66,13 +66,8 @@ export async function GET() {
       .limit(12),
   ]);
 
-  const byStatus = { ...emptyCounts };
-  for (const row of statusRows || []) {
-    const s = row.status || "unknown";
-    if (byStatus[s] != null) byStatus[s] += 1;
-  }
-
-  const summary = summarizeDirectorApplicationCounts(statusRows || []);
+  const byStatus = { ...emptyCounts, ...countBundle.byStatus };
+  const summary = countBundle.summary;
 
   const stage1Pending = (byStatus.stage_1_submitted || 0) + (byStatus.review_pending || 0);
   const stage2Pending =

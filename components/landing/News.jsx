@@ -2,17 +2,22 @@
 
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Calendar, ArrowRight, Clock, Tag } from "lucide-react";
+import { Calendar, ArrowRight, Clock, Tag, Newspaper } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { articles as defaultArticles, categoryColors } from "@/lib/news-data";
+import { categoryColors } from "@/lib/news-data";
 import { getCategoryColor } from "@/lib/news";
 
-export default function News({ articles: passedArticles }) {
+export default function News({ articles: passedArticles = [] }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
-  const articles = passedArticles?.length ? passedArticles : defaultArticles;
+  // Never fall back to fabricated/demo articles — empty is an intentional empty state.
+  const articles = Array.isArray(passedArticles) ? passedArticles : [];
+  if (articles.length === 0) {
+    return null;
+  }
+
   const featured = articles.find((a) => a.featured) || articles[0];
   const rest = articles.filter((a) => a?.slug !== featured?.slug).slice(0, 3);
   const categoryColor = (cat) => categoryColors[cat] || getCategoryColor(cat);
@@ -59,17 +64,23 @@ export default function News({ articles: passedArticles }) {
                 className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
               >
                 <div className="relative aspect-[16/9] overflow-hidden">
-                  <Image
-                    src={featured.image}
-                    alt={featured.title}
-                    fill
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
+                  {featured.image ? (
+                    <Image
+                      src={featured.image}
+                      alt={featured.title}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-royal/5">
+                      <Newspaper className="text-royal/30" size={40} />
+                    </div>
+                  )}
                   <div className="absolute left-4 top-4">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${categoryColor(featured.category)}`}
-                  >
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${categoryColor(featured.category)}`}
+                    >
                       {featured.category}
                     </span>
                   </div>

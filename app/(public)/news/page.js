@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { articles as fallbackArticles, categoryColors } from "@/lib/news-data";
-import { formatArticle, getCategoryColor } from "@/lib/news";
+import { categoryColors } from "@/lib/news-data";
+import { getCategoryColor, selectPublicArticles } from "@/lib/news";
 import Image from "next/image";
 import Link from "next/link";
-import { Calendar, Clock, ArrowLeft, ArrowRight } from "lucide-react";
+import { Calendar, Clock, ArrowLeft, ArrowRight, Newspaper } from "lucide-react";
 
 export const metadata = {
   title: "News & Updates | Kufuor Scholars Program",
@@ -11,19 +11,32 @@ export const metadata = {
     "Stay up to date with the latest news, events, and updates from the Kufuor Scholars Program.",
 };
 
-export default async function NewsPage() {
-  let articles = [];
+async function loadPublicArticles() {
   try {
     const supabase = await createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("news_articles")
       .select("*")
+      .eq("is_published", true)
+      .lte("published_at", new Date().toISOString())
       .order("published_at", { ascending: false });
-    articles = (data || []).map(formatArticle);
-  } catch {}
+    if (error) {
+      // Column may not exist until migration is applied — fall back without is_published filter
+      const { data: fallback } = await supabase
+        .from("news_articles")
+        .select("*")
+        .lte("published_at", new Date().toISOString())
+        .order("published_at", { ascending: false });
+      return selectPublicArticles(fallback || []);
+    }
+    return selectPublicArticles(data || []);
+  } catch {
+    return [];
+  }
+}
 
-  if (articles.length === 0) articles = fallbackArticles;
-
+export default async function NewsPage() {
+  const articles = await loadPublicArticles();
   const featured = articles.find((a) => a.featured) || articles[0];
   const rest = articles.filter((a) => a.slug !== featured?.slug).slice(0, 11);
   const categoryColor = (cat) => categoryColors[cat] || getCategoryColor(cat);
@@ -52,110 +65,122 @@ export default async function NewsPage() {
         </div>
 
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          {featured && (
-            <Link
-              href={`/news/${featured.slug}`}
-              className="group mb-12 grid overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg md:grid-cols-2"
-            >
-              <div className="relative aspect-[16/9] overflow-hidden md:aspect-auto md:min-h-[360px]">
-                <Image
-                  src={featured.image}
-                  alt={featured.title}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute left-4 top-4">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${categoryColor(featured.category)}`}
-                  >
-                    {featured.category}
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-col justify-center p-8 md:p-10">
-                <span className="mb-2 text-xs font-semibold uppercase tracking-widest text-gold">
-                  Featured
-                </span>
-                <div className="flex items-center gap-3 text-xs text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <Calendar size={12} />
-                    {featured.date}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock size={12} />
-                    {featured.readTime}
-                  </span>
-                </div>
-                <h2 className="mt-3 text-2xl font-bold text-royal transition-colors group-hover:text-gold sm:text-3xl">
-                  {featured.title}
-                </h2>
-                <p className="mt-4 text-sm leading-relaxed text-gray-500 sm:text-base">
-                  {featured.excerpt}
-                </p>
-                <span className="mt-6 flex items-center gap-1 text-sm font-semibold text-royal transition-colors group-hover:text-gold">
-                  Read full article
-                  <ArrowRight
-                    size={14}
-                    className="transition-transform group-hover:translate-x-1"
-                  />
-                </span>
-              </div>
-            </Link>
-          )}
-
-          <h2 className="mb-8 text-2xl font-bold text-royal">All Articles</h2>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {rest.map((article) => (
-              <Link
-                key={article.slug}
-                href={`/news/${article.slug}`}
-                className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className="relative aspect-[16/9] overflow-hidden">
-                  <Image
-                    src={article.image}
-                    alt={article.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute left-3 top-3">
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${categoryColor(article.category)}`}
-                    >
-                      {article.category}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="flex items-center gap-3 text-xs text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <Calendar size={11} />
-                      {article.date}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} />
-                      {article.readTime}
-                    </span>
-                  </div>
-                  <h3 className="mt-2 text-base font-bold text-royal transition-colors group-hover:text-gold sm:text-lg">
-                    {article.title}
-                  </h3>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-gray-500">
-                    {article.excerpt}
-                  </p>
-                  <span className="mt-4 flex items-center gap-1 text-sm font-semibold text-royal transition-colors group-hover:text-gold">
-                    Read more
-                    <ArrowRight
-                      size={14}
-                      className="transition-transform group-hover:translate-x-1"
+          {articles.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-16 text-center">
+              <Newspaper size={36} className="mx-auto text-gray-300" />
+              <p className="mt-4 text-base font-medium text-gray-700">No news published yet</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Check back soon for programme updates from the Kufuor Scholars Program.
+              </p>
+            </div>
+          ) : (
+            <>
+              {featured && (
+                <Link
+                  href={`/news/${featured.slug}`}
+                  className="group mb-12 grid overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg md:grid-cols-2"
+                >
+                  <div className="relative aspect-[16/9] overflow-hidden md:aspect-auto md:min-h-[360px]">
+                    <Image
+                      src={featured.image}
+                      alt={featured.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+                    <div className="absolute left-4 top-4">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${categoryColor(featured.category)}`}
+                      >
+                        {featured.category}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col justify-center p-8 md:p-10">
+                    <span className="mb-2 text-xs font-semibold uppercase tracking-widest text-gold">
+                      Featured
+                    </span>
+                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={12} />
+                        {featured.date}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} />
+                        {featured.readTime}
+                      </span>
+                    </div>
+                    <h2 className="mt-3 text-2xl font-bold text-royal transition-colors group-hover:text-gold sm:text-3xl">
+                      {featured.title}
+                    </h2>
+                    <p className="mt-4 text-sm leading-relaxed text-gray-500 sm:text-base">
+                      {featured.excerpt}
+                    </p>
+                    <span className="mt-6 flex items-center gap-1 text-sm font-semibold text-royal transition-colors group-hover:text-gold">
+                      Read full article
+                      <ArrowRight
+                        size={14}
+                        className="transition-transform group-hover:translate-x-1"
+                      />
+                    </span>
+                  </div>
+                </Link>
+              )}
+
+              <h2 className="mb-8 text-2xl font-bold text-royal">All Articles</h2>
+              <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                {rest.map((article) => (
+                  <Link
+                    key={article.slug}
+                    href={`/news/${article.slug}`}
+                    className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    <div className="relative aspect-[16/9] overflow-hidden">
+                      <Image
+                        src={article.image}
+                        alt={article.title}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute left-3 top-3">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${categoryColor(article.category)}`}
+                        >
+                          {article.category}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-1 flex-col p-5">
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={11} />
+                          {article.date}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} />
+                          {article.readTime}
+                        </span>
+                      </div>
+                      <h3 className="mt-2 text-base font-bold text-royal transition-colors group-hover:text-gold sm:text-lg">
+                        {article.title}
+                      </h3>
+                      <p className="mt-2 flex-1 text-sm leading-relaxed text-gray-500">
+                        {article.excerpt}
+                      </p>
+                      <span className="mt-4 flex items-center gap-1 text-sm font-semibold text-royal transition-colors group-hover:text-gold">
+                        Read more
+                        <ArrowRight
+                          size={14}
+                          className="transition-transform group-hover:translate-x-1"
+                        />
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

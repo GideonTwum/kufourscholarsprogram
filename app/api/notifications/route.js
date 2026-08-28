@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
+const NOTIFICATIONS_ERROR = "Unable to update notifications. Please try again.";
+
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -18,7 +20,11 @@ export async function GET() {
     .limit(100);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[notifications] list failed", error.message);
+    return NextResponse.json(
+      { error: "Unable to load notifications. Please try again." },
+      { status: 500 }
+    );
   }
 
   const unread = (data || []).filter((n) => !n.is_read).length;
@@ -50,7 +56,8 @@ export async function PATCH(request) {
       .eq("user_id", user.id)
       .eq("is_read", false);
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("[notifications] markAllRead failed", error.message);
+      return NextResponse.json({ error: NOTIFICATIONS_ERROR }, { status: 500 });
     }
     return NextResponse.json({ success: true });
   }
@@ -62,7 +69,8 @@ export async function PATCH(request) {
       .eq("id", id)
       .eq("user_id", user.id);
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("[notifications] markOneRead failed", error.message);
+      return NextResponse.json({ error: NOTIFICATIONS_ERROR }, { status: 500 });
     }
     return NextResponse.json({ success: true });
   }

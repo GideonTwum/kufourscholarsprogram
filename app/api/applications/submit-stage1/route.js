@@ -11,8 +11,13 @@ import {
   normalizeConceptNoteTitle,
   validateForSubmit,
   getRecommendationLetterPaths,
+  getLeadershipEvidencePaths,
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
+import { assertOwnedApplicationsPath } from "@/lib/storage-path";
+
+const APPLICANT_SAVE_ERROR =
+  "We couldn't save your application. Please try again. If the problem continues, contact KSP support.";
 
 function buildRow(applicationData, userId, overrides = {}) {
   const leadership = Array.isArray(applicationData.leadership_evidence_urls)
@@ -36,6 +41,60 @@ function buildRow(applicationData, userId, overrides = {}) {
   };
 }
 
+/** Ensure private document paths belong to this applicant (IDOR / fake-path guard). */
+function validateOwnedDocumentPaths(data, userId) {
+  const errors = {};
+  const checks = [
+    ["academic_transcript_url", "Academic Transcript"],
+    ["cv_personal_statement_url", "CV / Personal Statement"],
+    ["student_id_path", "National ID"],
+    ["concept_note_path", "Concept Note"],
+    ["ksp_tiktok_follow_screenshot_path", "TikTok follow screenshot"],
+    ["ksp_linkedin_follow_screenshot_path", "LinkedIn follow screenshot"],
+    ["ksp_instagram_follow_screenshot_path", "Instagram follow screenshot"],
+  ];
+  // Passport Picture is stored as a public avatars URL (not applications path).
+  if (!data.photo_url?.trim()) {
+    errors.photo_url = "Passport Picture is required";
+  }
+  for (const [field, label] of checks) {
+    const err = assertOwnedApplicationsPath(data[field], userId, label);
+    if (err) errors[field] = err;
+  }
+  getRecommendationLetterPaths(data).forEach((path, i) => {
+    const err = assertOwnedApplicationsPath(path, userId, `Recommendation Letter ${i + 1}`);
+    if (err) errors.recommendation_urls = err;
+  });
+  getLeadershipEvidencePaths(data).forEach((path, i) => {
+    const err = assertOwnedApplicationsPath(path, userId, `Leadership evidence ${i + 1}`);
+    if (err) errors.leadership_evidence_urls = err;
+  });
+  return errors;
+}
+
+async function assertApplicationsOpen(admin) {
+  const { data: openSetting } = await admin
+    .from("site_settings")
+    .select("value")
+    .eq("key", "applications_open")
+    .maybeSingle();
+  if (openSetting && openSetting.value !== "true") {
+    return "Applications are currently closed.";
+  }
+  const { data: deadlineSetting } = await admin
+    .from("site_settings")
+    .select("value")
+    .eq("key", "application_deadline")
+    .maybeSingle();
+  if (deadlineSetting?.value) {
+    const d = new Date(deadlineSetting.value);
+    if (!Number.isNaN(d.getTime()) && Date.now() > d.getTime()) {
+      return "The application deadline has passed.";
+    }
+  }
+  return null;
+}
+
 export async function POST(request) {
   const supabase = await createClient();
   const {
@@ -43,6 +102,13 @@ export async function POST(request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!user.email_confirmed_at) {
+    return NextResponse.json(
+      { error: "Please verify your email before submitting your application." },
+      { status: 403 }
+    );
   }
 
   let body;
@@ -86,18 +152,32 @@ export async function POST(request) {
     );
   }
 
-  const eligibility = evaluateEligibilityForAutoReject(normalized);
-  const submitted_at = new Date().toISOString();
+  const ownershipErrors = validateOwnedDocumentPaths(normalized, user.id);
+  if (Object.keys(ownershipErrors).length > 0) {
+    const first = Object.values(ownershipErrors)[0];
+    return NextResponse.json(
+      { error: first || "One or more documents are invalid.", field_errors: ownershipErrors },
+      { status: 400 }
+    );
+  }
 
   let admin;
   try {
     admin = createAdminClient();
   } catch {
     return NextResponse.json(
-      { error: "Server configuration error (missing service role)." },
+      { error: "Server configuration error. Please contact KSP support." },
       { status: 500 }
     );
   }
+
+  const closedMsg = await assertApplicationsOpen(admin);
+  if (closedMsg) {
+    return NextResponse.json({ error: closedMsg }, { status: 403 });
+  }
+
+  const eligibility = evaluateEligibilityForAutoReject(normalized);
+  const submitted_at = new Date().toISOString();
 
   let appId = application_id || null;
 
@@ -118,6 +198,30 @@ export async function POST(request) {
     if (transitionError) {
       return NextResponse.json({ error: transitionError }, { status: 409 });
     }
+  } else {
+    // Prefer updating an existing draft over creating a duplicate application row
+    const { data: existingDraft } = await admin
+      .from("applications")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .eq("status", "draft")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingDraft?.id) {
+      appId = existingDraft.id;
+    } else {
+      const { data: anyNonDraft } = await admin
+        .from("applications")
+        .select("id, status")
+        .eq("user_id", user.id)
+        .neq("status", "draft")
+        .limit(1)
+        .maybeSingle();
+      if (anyNonDraft?.id) {
+        return NextResponse.json({ error: "Application already submitted" }, { status: 400 });
+      }
+    }
   }
 
   const userEmail = user.email || null;
@@ -134,12 +238,14 @@ export async function POST(request) {
     if (appId) {
       const { error: updErr } = await admin.from("applications").update(row).eq("id", appId);
       if (updErr) {
-        return NextResponse.json({ error: updErr.message }, { status: 500 });
+        console.error("[submit-stage1] reject update failed", updErr.message);
+        return NextResponse.json({ error: APPLICANT_SAVE_ERROR }, { status: 500 });
       }
     } else {
       const { data: ins, error: insErr } = await admin.from("applications").insert(row).select("id").single();
       if (insErr) {
-        return NextResponse.json({ error: insErr.message }, { status: 500 });
+        console.error("[submit-stage1] reject insert failed", insErr.message);
+        return NextResponse.json({ error: APPLICANT_SAVE_ERROR }, { status: 500 });
       }
       appId = ins?.id;
     }
@@ -172,12 +278,14 @@ export async function POST(request) {
   if (appId) {
     const { error: updErr } = await admin.from("applications").update(row).eq("id", appId);
     if (updErr) {
-      return NextResponse.json({ error: updErr.message }, { status: 500 });
+      console.error("[submit-stage1] submit update failed", updErr.message);
+      return NextResponse.json({ error: APPLICANT_SAVE_ERROR }, { status: 500 });
     }
   } else {
     const { data: ins, error: insErr } = await admin.from("applications").insert(row).select("id").single();
     if (insErr) {
-      return NextResponse.json({ error: insErr.message }, { status: 500 });
+      console.error("[submit-stage1] submit insert failed", insErr.message);
+      return NextResponse.json({ error: APPLICANT_SAVE_ERROR }, { status: 500 });
     }
     appId = ins?.id;
   }

@@ -92,7 +92,14 @@ export async function POST(request) {
     .eq("user_id", user.id);
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+    console.error("[submit-stage2] update failed", updateError.message);
+    return NextResponse.json(
+      {
+        error:
+          "We couldn't submit your Stage 2 video. Please try again. If the problem continues, contact KSP support.",
+      },
+      { status: 500 }
+    );
   }
 
   const name = app.full_name || profile?.full_name || "Applicant";

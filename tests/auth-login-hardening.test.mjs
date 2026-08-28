@@ -26,9 +26,11 @@ test("staff create normalizes email but not password", () => {
 });
 
 test("portal login normalizes email and maps auth errors distinctly", () => {
+  const friendly = readFileSync(resolve("lib/friendly-auth-error.js"), "utf8");
   assert.match(portalLogin, /email\.trim\(\)\.toLowerCase\(\)/);
-  assert.match(portalLogin, /Please verify your email before signing in/);
-  assert.match(portalLogin, /Invalid email or password/);
+  assert.match(portalLogin, /toFriendlyAuthError/);
+  assert.match(friendly, /Please verify your email before signing in/);
+  assert.match(friendly, /Invalid email or password/);
   assert.doesNotMatch(portalLogin, /password\.trim\(/);
   assert.doesNotMatch(portalLogin, /password\.toLowerCase\(/);
 });

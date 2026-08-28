@@ -76,14 +76,17 @@ test("login?verified=true shows display-only success banner", () => {
 });
 
 test("unverified login shows verification-specific error and resend", () => {
+  const friendly = readFileSync(resolve("lib/friendly-auth-error.js"), "utf8");
   assert.match(
-    portalLogin,
+    friendly,
     /Please verify your email before signing in\. Check your inbox for the verification link\./
   );
-  assert.match(portalLogin, /email_not_confirmed/);
+  assert.match(friendly, /email_not_confirmed/);
+  assert.match(portalLogin, /toFriendlyAuthError/);
   assert.match(portalLogin, /Resend verification email/);
   assert.match(portalLogin, /needsVerification/);
   assert.doesNotMatch(portalLogin, /Invalid login credentials/);
+  assert.doesNotMatch(portalLogin, /setError\(msg\)/);
 });
 
 test("verified applicant login still uses password and portal home", () => {

@@ -8,21 +8,23 @@ test("hero uses real group photo in a right-side panel (no slideshow, no mockup)
   assert.equal(existsSync(bgPath), true);
   const src = readFileSync(bgPath, "utf8");
 
-  assert.match(src, /HERO_PHOTO|scholars-formal-1\.png/);
-  assert.match(src, /\/hero\/scholars-formal-1\.png/);
+  assert.match(src, /HERO_PHOTO|ksp-11th-class-hero\.png/);
+  assert.match(src, /\/images\/ksp-11th-class-hero\.png/);
   assert.doesNotMatch(src, /ksp-group-hero|ChatGPT/i);
   assert.doesNotMatch(src, /src:\s*["'][^"']*ksp-group-hero/);
   assert.doesNotMatch(src, /HERO_SLIDES|setInterval|setTimeout|AnimatePresence|activeSlide|Ken Burns/i);
+  assert.doesNotMatch(src, /blur-|filter:\s*blur|backdrop-blur/);
   assert.match(src, /pointer-events-none/);
   assert.match(src, /w-\[58%\]|w-\[52%\]/);
   assert.match(src, /linear-gradient\(\s*90deg/);
   assert.match(src, /alt=""/);
   assert.match(src, /priority/);
+  assert.match(src, /quality=\{90\}/);
   assert.match(src, /aria-hidden/);
 });
 
 test("real hero photograph exists; mockup asset is not shipped", () => {
-  assert.equal(existsSync(resolve("public/hero/scholars-formal-1.png")), true);
+  assert.equal(existsSync(resolve("public/images/ksp-11th-class-hero.png")), true);
   assert.equal(existsSync(resolve("public/hero/ksp-group-hero.png")), false);
 });
 

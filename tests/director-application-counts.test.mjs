@@ -91,11 +91,12 @@ test("dashboard metrics and applications page share operational scope helper", (
     "utf8"
   );
   const dash = readFileSync(resolve("app/(dashboard)/director/page.js"), "utf8");
-  assert.match(metrics, /summarizeDirectorApplicationCounts/);
+  assert.match(metrics, /fetchDirectorApplicationCountSummary/);
   assert.match(metrics, /total_applications: summary\.all/);
   assert.match(metrics, /draft_applications: summary\.draft/);
   assert.match(apps, /applyDirectorOperationalScope/);
-  assert.match(apps, /summarizeDirectorApplicationCounts/);
+  assert.match(apps, /fetchDirectorApplicationCountSummary/);
+  assert.match(apps, /fetchAllApplicationPages/);
   assert.match(apps, /DIRECTOR_PRIMARY_FILTERS/);
   assert.match(dash, /Submitted applications/);
   assert.match(dash, /draft_applications/);

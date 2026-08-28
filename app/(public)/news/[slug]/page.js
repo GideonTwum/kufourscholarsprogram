@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { articles as fallbackArticles, categoryColors } from "@/lib/news-data";
-import { formatArticle, getCategoryColor } from "@/lib/news";
+import { categoryColors } from "@/lib/news-data";
+import {
+  formatArticle,
+  getCategoryColor,
+  isPubliclyVisibleArticle,
+  selectPublicArticles,
+} from "@/lib/news";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Clock, ArrowRight } from "lucide-react";
@@ -8,75 +13,92 @@ import { notFound } from "next/navigation";
 
 export async function generateStaticParams() {
   try {
-    const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
     const { data } = await supabase
       .from("news_articles")
-      .select("slug");
+      .select("slug")
+      .eq("is_published", true)
+      .lte("published_at", new Date().toISOString());
     if (data?.length) return data.map((a) => ({ slug: a.slug }));
   } catch {}
-  return fallbackArticles.map((a) => ({ slug: a.slug }));
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("news_articles")
+      .select("slug")
+      .lte("published_at", new Date().toISOString());
+    return (data || []).map((a) => ({ slug: a.slug }));
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   try {
-    const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
     const { data } = await supabase
       .from("news_articles")
-      .select("title, excerpt")
+      .select("title, excerpt, is_published, published_at")
       .eq("slug", slug)
-      .single();
-    if (data)
+      .maybeSingle();
+    const article = formatArticle(data);
+    if (article && isPubliclyVisibleArticle(article)) {
       return {
-        title: `${data.title} | Kufuor Scholars Program`,
-        description: data.excerpt,
+        title: `${article.title} | Kufuor Scholars Program`,
+        description: article.excerpt,
       };
+    }
   } catch {}
-  const article = fallbackArticles.find((a) => a.slug === slug);
-  if (!article) return {};
-  return {
-    title: `${article.title} | Kufuor Scholars Program`,
-    description: article.excerpt,
-  };
+  return { title: "News | Kufuor Scholars Program" };
+}
+
+async function fetchArticleBySlug(slug) {
+  const supabase = await createClient();
+  let { data, error } = await supabase
+    .from("news_articles")
+    .select("*")
+    .eq("slug", slug)
+    .eq("is_published", true)
+    .maybeSingle();
+  if (error) {
+    ({ data } = await supabase.from("news_articles").select("*").eq("slug", slug).maybeSingle());
+  }
+  const article = formatArticle(data);
+  if (!article || !isPubliclyVisibleArticle(article)) return null;
+  return article;
 }
 
 export default async function ArticlePage({ params }) {
   const { slug } = await params;
   let article = null;
-
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("news_articles")
-      .select("*")
-      .eq("slug", slug)
-      .single();
-    if (data) article = formatArticle(data);
+    article = await fetchArticleBySlug(slug);
   } catch {}
-
-  if (!article) {
-    article = fallbackArticles.find((a) => a.slug === slug);
-  }
   if (!article) notFound();
 
   let otherArticles = [];
   try {
     const supabase = await createClient();
-    const { data } = await supabase
+    let { data, error } = await supabase
       .from("news_articles")
       .select("*")
       .neq("slug", slug)
+      .eq("is_published", true)
+      .lte("published_at", new Date().toISOString())
       .order("published_at", { ascending: false })
       .limit(3);
-    otherArticles = (data || []).map(formatArticle);
+    if (error) {
+      ({ data } = await supabase
+        .from("news_articles")
+        .select("*")
+        .neq("slug", slug)
+        .lte("published_at", new Date().toISOString())
+        .order("published_at", { ascending: false })
+        .limit(6));
+    }
+    otherArticles = selectPublicArticles(data || [], { limit: 3 });
   } catch {}
-  if (otherArticles.length === 0) {
-    otherArticles = fallbackArticles
-      .filter((a) => a.slug !== slug)
-      .slice(0, 3);
-  }
 
   const categoryColor = categoryColors[article.category] || getCategoryColor(article.category);
 
@@ -150,9 +172,7 @@ export default async function ArticlePage({ params }) {
       {otherArticles.length > 0 && (
         <div className="bg-gray-50 py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="mb-8 text-2xl font-bold text-royal">
-              More Articles
-            </h2>
+            <h2 className="mb-8 text-2xl font-bold text-royal">More Articles</h2>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {otherArticles.map((related) => (
                 <Link

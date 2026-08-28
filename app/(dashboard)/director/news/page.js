@@ -27,6 +27,7 @@ export default function DirectorNewsPage() {
     body: "",
     image: "/scholars14.jpg",
     featured: false,
+    is_published: true,
     read_time: "3 min read",
     published_at: new Date().toISOString().slice(0, 16),
   });
@@ -56,6 +57,7 @@ export default function DirectorNewsPage() {
         body: article.body || "",
         image: article.image || "/scholars14.jpg",
         featured: !!article.featured,
+        is_published: article.is_published !== false,
         read_time: article.read_time || "3 min read",
         published_at: d.toISOString().slice(0, 16),
       });
@@ -69,6 +71,7 @@ export default function DirectorNewsPage() {
         body: "",
         image: "/scholars14.jpg",
         featured: false,
+        is_published: true,
         read_time: "3 min read",
         published_at: new Date().toISOString().slice(0, 16),
       });
@@ -238,7 +241,7 @@ export default function DirectorNewsPage() {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -249,6 +252,17 @@ export default function DirectorNewsPage() {
                   className="rounded border-gray-300"
                 />
                 <span className="text-sm">Featured</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.is_published !== false}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, is_published: e.target.checked }))
+                  }
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm">Published (visible on public site)</span>
               </label>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500">
@@ -308,6 +322,7 @@ export default function DirectorNewsPage() {
                     {a.published_at
                       ? new Date(a.published_at).toLocaleDateString("en-GB")
                       : "—"}
+                    {a.is_published === false ? " · Draft (hidden)" : ""}
                   </p>
                 </div>
               </div>
