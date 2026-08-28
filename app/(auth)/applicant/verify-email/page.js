@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { applicantEmailConfirmRedirectTo } from "@/lib/auth-email-confirm";
 import { toFriendlyAuthError } from "@/lib/friendly-auth-error";
+import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
 
 const RESEND_KEY = "ksp_verify_resend_at";
 const EMAIL_KEY = "ksp_verify_email";
@@ -217,6 +218,8 @@ function VerifyEmailContent() {
           Back to Sign In
         </Link>
       </p>
+
+      <ApplicantSupportNotice variant="auth" />
     </div>
   );
 }

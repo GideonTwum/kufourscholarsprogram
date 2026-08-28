@@ -16,6 +16,7 @@ import {
   getSocialLinks,
   KSP_PUBLIC_SOCIAL_PLATFORMS,
 } from "@/lib/social-links";
+import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
 
 const contactInfo = [
   {
@@ -111,6 +112,15 @@ export default function Contact() {
             </motion.div>
           ))}
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.55 }}
+          className="mt-8"
+        >
+          <ApplicantSupportNotice variant="public" />
+        </motion.div>
 
         {/* Map placeholder + social links */}
         <motion.div

@@ -11,6 +11,7 @@ import {
   toFriendlyAuthError,
 } from "@/lib/friendly-auth-error";
 import { applicantEmailConfirmRedirectTo } from "@/lib/auth-email-confirm";
+import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
 
 const UNVERIFIED_LOGIN_MESSAGE = AUTH_EMAIL_NOT_CONFIRMED;
 
@@ -282,6 +283,8 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
       </form>
 
       {footer ? <div className="mt-6 text-center text-sm text-gray-500">{footer}</div> : null}
+
+      {expectedRole === "applicant" ? <ApplicantSupportNotice variant="auth" /> : null}
 
       <p className="mt-4 text-center text-xs text-gray-400">
         Wrong portal?{" "}

@@ -20,6 +20,7 @@ import ApplicantProgressBar from "./components/ApplicantProgressBar";
 import { normalizeApplicationStatus } from "@/lib/application-status";
 import { isValidWhatsAppGroupUrl } from "@/lib/countries";
 import { formatClassApplicationLabel, formatClassProgramName } from "@/lib/application-class";
+import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
 
 function InterviewScheduledCard({ slot, onFirstView }) {
   useEffect(() => {
@@ -407,6 +408,10 @@ export default function ApplicantDashboard() {
         ) : (
           <ApplicantProgressBar status={application.status} />
         )}
+      </div>
+
+      <div className="mt-8">
+        <ApplicantSupportNotice variant="dashboard" />
       </div>
     </div>
   );

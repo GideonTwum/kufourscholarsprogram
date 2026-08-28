@@ -33,6 +33,7 @@ import { normalizeYearOfStudy } from "@/lib/countries";
 import { getApplicantApplicationView } from "@/lib/application-status";
 import { scrollStage1ContentToTop } from "@/lib/stage1-scroll";
 import ApplicantProgressBar from "../components/ApplicantProgressBar";
+import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
 
 const stepLabels = ["Personal", "Academic", "Documents", "Concept Note", "Review"];
 
@@ -586,6 +587,10 @@ export default function ApplicationPage() {
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Submit Stage 1
           </button>
         )}
+      </div>
+
+      <div className="mt-8">
+        <ApplicantSupportNotice variant="dashboard" />
       </div>
     </div>
   );

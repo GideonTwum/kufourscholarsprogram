@@ -8,6 +8,7 @@ import {
   KSP_PUBLIC_SOCIAL_PLATFORMS,
 } from "@/lib/social-links";
 import { applyNowHref, APPLY_PREP_HREF } from "@/lib/apply-cta";
+import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
 
 const quickLinks = [
   { label: "About", href: "/about" },
@@ -123,9 +124,7 @@ export default function Footer({ applicationsOpen = false }) {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">
-              Stay Updated
-            </h3>
+            <ApplicantSupportNotice variant="footer" />
             <p className="mt-4 text-sm text-white/50">
               Get the latest news about the program and application deadlines.
             </p>

@@ -23,6 +23,7 @@ import {
 import { isValidEmailFormat } from "@/lib/auth-recovery";
 import { toFriendlyAuthError } from "@/lib/friendly-auth-error";
 import { applicantEmailConfirmRedirectTo } from "@/lib/auth-email-confirm";
+import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
 
 
 export default function ApplicantRegisterPage() {
@@ -287,6 +288,8 @@ export default function ApplicantRegisterPage() {
           Applicant sign in
         </Link>
       </p>
+
+      <ApplicantSupportNotice variant="auth" />
     </div>
   );
 }
