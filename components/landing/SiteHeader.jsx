@@ -4,13 +4,11 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import ClassRecruitmentBanner from "@/components/landing/ClassRecruitmentBanner";
 import Navbar from "@/components/landing/Navbar";
 import StaffApplyNotice from "@/components/landing/StaffApplyNotice";
-import TemporaryLaunchWaitBanner from "@/components/landing/TemporaryLaunchWaitBanner";
 
 /**
- * Fixed site header:
- * 1) TemporaryLaunchWaitBanner (temporary — remove after 10:15 AM)
- * 2) ClassRecruitmentBanner (when applications open)
- * 3) Navbar
+ * Fixed two-layer site header:
+ * 1) ClassRecruitmentBanner (when applications open)
+ * 2) Navbar
  *
  * Sets --site-header-height and renders a matching spacer so page content
  * (including the homepage hero) begins below the full header — no overlap.
@@ -54,7 +52,6 @@ export default function SiteHeader({
         <Suspense fallback={null}>
           <StaffApplyNotice />
         </Suspense>
-        <TemporaryLaunchWaitBanner />
         <ClassRecruitmentBanner
           applicationsOpen={applicationsOpen}
           applicationClassName={applicationClassName}

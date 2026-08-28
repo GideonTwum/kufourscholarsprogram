@@ -5,31 +5,18 @@ import { resolve } from "node:path";
 
 test("SiteHeader stacks banner above navbar and reserves spacer", () => {
   const header = readFileSync(resolve("components/landing/SiteHeader.jsx"), "utf8");
-  assert.match(header, /TemporaryLaunchWaitBanner/);
   assert.match(header, /ClassRecruitmentBanner/);
   assert.match(header, /Navbar/);
   assert.match(header, /embedded/);
   assert.match(header, /data-site-header-spacer/);
   assert.match(header, /--site-header-height/);
   assert.match(header, /fixed inset-x-0 top-0/);
+  assert.doesNotMatch(header, /TemporaryLaunchWaitBanner/);
 
-  // Temporary wait banner, then recruitment banner, then Navbar
-  const waitIdx = header.indexOf("<TemporaryLaunchWaitBanner");
+  // Banner appears before Navbar in JSX order
   const bannerIdx = header.indexOf("<ClassRecruitmentBanner");
   const navIdx = header.indexOf("<Navbar");
-  assert.ok(waitIdx >= 0 && bannerIdx > waitIdx && navIdx > bannerIdx);
-});
-
-test("temporary launch wait banner is easy to disable and has required copy", () => {
-  const banner = readFileSync(
-    resolve("components/landing/TemporaryLaunchWaitBanner.jsx"),
-    "utf8"
-  );
-  assert.match(banner, /TEMPORARY_LAUNCH_WAIT_BANNER_ENABLED/);
-  assert.match(banner, /Applications Open at/);
-  assert.match(banner, /10:15 AM/);
-  assert.match(banner, /Thank you for your patience/);
-  assert.doesNotMatch(banner, /countdown|setInterval|ApplyNowCta/i);
+  assert.ok(bannerIdx >= 0 && navIdx > bannerIdx);
 });
 
 test("public layout uses SiteHeader instead of bare Navbar", () => {
