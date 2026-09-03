@@ -30,6 +30,7 @@ import {
   normalizeConceptNoteTitle,
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
+import { normalizeDemographicsFields } from "@/lib/applicant-demographics";
 import { getApplicantApplicationView } from "@/lib/application-status";
 import { scrollStage1ContentToTop } from "@/lib/stage1-scroll";
 import ApplicantProgressBar from "../components/ApplicantProgressBar";
@@ -68,13 +69,15 @@ function buildApplicationPayload(data, userId, status, submittedAt = null) {
     ? data.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
     : [];
   const recommendations = getRecommendationLetterPaths(data);
-  const normalized = normalizeDualCitizenshipFields({
-    ...data,
-    year_of_study: normalizeYearOfStudy(data.year_of_study) || data.year_of_study,
-    concept_note_title: normalizeConceptNoteTitle(data.concept_note_title),
-    concept_note_path:
-      typeof data.concept_note_path === "string" ? data.concept_note_path.trim() : "",
-  });
+  const normalized = normalizeDemographicsFields(
+    normalizeDualCitizenshipFields({
+      ...data,
+      year_of_study: normalizeYearOfStudy(data.year_of_study) || data.year_of_study,
+      concept_note_title: normalizeConceptNoteTitle(data.concept_note_title),
+      concept_note_path:
+        typeof data.concept_note_path === "string" ? data.concept_note_path.trim() : "",
+    })
+  );
   return {
     ...normalized,
     leadership_evidence_urls: leadership,
@@ -226,6 +229,7 @@ export default function ApplicationPage() {
         setData({
           full_name: existing.full_name || profile?.full_name || "",
           date_of_birth: existing.date_of_birth || "",
+          gender: existing.gender || "",
           phone: existing.phone || "",
           address: existing.address || "",
           hometown: existing.hometown || "",
@@ -362,8 +366,10 @@ export default function ApplicationPage() {
       const personalKeys = [
         "full_name",
         "date_of_birth",
+        "gender",
         "phone",
         "address",
+        "region",
         "country_of_origin",
         "nationality",
         "has_dual_citizenship",

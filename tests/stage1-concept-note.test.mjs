@@ -17,8 +17,10 @@ import { evaluateEligibilityForAutoReject } from "../lib/eligibility-server.js";
 const baseValid = {
   full_name: "Test Applicant",
   date_of_birth: "2005-01-15",
+  gender: "female",
   phone: "+233200000000",
   address: "Accra",
+  region: "Greater Accra",
   country_of_origin: "Ghana",
   nationality: "Ghanaian",
   has_dual_citizenship: false,

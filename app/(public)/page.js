@@ -4,6 +4,7 @@ import ApplicantOpenForum from "@/components/landing/ApplicantOpenForum";
 import WhyApply from "@/components/landing/WhyApply";
 import About from "@/components/landing/About";
 import ProgramHighlights from "@/components/landing/ProgramHighlights";
+import AssociatesSection from "@/components/landing/AssociatesSection";
 import Stats from "@/components/landing/Stats";
 import ScholarSpotlight from "@/components/landing/ScholarSpotlight";
 import ScholarVideos from "@/components/landing/ScholarVideos";
@@ -129,6 +130,7 @@ export default async function Home() {
       <WhyApply applicationsOpen={applicationsOpen} applicationClassName={applicationClassName} />
       <About />
       <ProgramHighlights />
+      <AssociatesSection />
       <Stats />
       <ScholarSpotlight scholars={featuredScholars} />
       <ScholarVideos videos={scholarVideos} />

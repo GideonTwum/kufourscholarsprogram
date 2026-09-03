@@ -3,6 +3,8 @@
 import { User, Calendar, Phone, MapPin, Globe, Heart, Share2 } from "lucide-react";
 import { AGE_ELIGIBILITY_MESSAGE } from "@/lib/application-validation";
 import { AFRICAN_COUNTRIES, WORLD_COUNTRIES } from "@/lib/countries";
+import { GENDER_OPTIONS } from "@/lib/applicant-demographics";
+import { GHANA_REGIONS, isCanonicalGhanaRegion } from "@/lib/ghana-regions";
 import CountrySelect from "@/components/applicant/CountrySelect";
 
 const inputClass =
@@ -59,6 +61,33 @@ export default function PersonalInfo({ data, onChange, errors = {} }) {
           {errors.date_of_birth && <p className="mt-1 text-xs text-red-600">{errors.date_of_birth}</p>}
         </div>
         <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            Gender <span className="text-red-500">*</span>
+          </label>
+          <div
+            className={`flex flex-wrap gap-4 rounded-lg border px-4 py-2.5 ${
+              errors.gender ? "border-red-300 bg-red-50/40" : "border-gray-200 bg-white"
+            }`}
+            role="radiogroup"
+            aria-label="Gender"
+          >
+            {GENDER_OPTIONS.map((opt) => (
+              <label key={opt.value} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="gender"
+                  value={opt.value}
+                  checked={data.gender === opt.value}
+                  onChange={() => update("gender", opt.value)}
+                  className="h-4 w-4 border-gray-300 text-royal focus:ring-gold"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+          {errors.gender && <p className="mt-1 text-xs text-red-600">{errors.gender}</p>}
+        </div>
+        <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone Number <span className="text-red-500">*</span></label>
           <div className="relative">
             <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -79,8 +108,28 @@ export default function PersonalInfo({ data, onChange, errors = {} }) {
           <input type="text" value={data.hometown || ""} onChange={(e) => update("hometown", e.target.value)} placeholder="e.g. Kumasi" className={errors.hometown ? plainInputError : plainInput} />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Region</label>
-          <input type="text" value={data.region || ""} onChange={(e) => update("region", e.target.value)} placeholder="e.g. Ashanti Region" className={errors.region ? plainInputError : plainInput} />
+          <label htmlFor="region" className="mb-1.5 block text-sm font-medium text-gray-700">
+            Region <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="region"
+            value={data.region || ""}
+            onChange={(e) => update("region", e.target.value)}
+            className={errors.region ? plainInputError : plainInput}
+            aria-invalid={Boolean(errors.region) || undefined}
+          >
+            <option value="">Select Ghana region</option>
+            {data.region && !isCanonicalGhanaRegion(data.region) ? (
+              <option value={data.region}>{data.region} (saved — please reselect)</option>
+            ) : null}
+            {GHANA_REGIONS.map((region) => (
+              <option key={region} value={region}>
+                {region}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">Select your region of residence in Ghana.</p>
+          {errors.region && <p className="mt-1 text-xs text-red-600">{errors.region}</p>}
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">

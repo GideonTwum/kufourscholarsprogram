@@ -1,8 +1,10 @@
 "use client";
 
-import { Building, BookOpen, GraduationCap, BarChart3, School } from "lucide-react";
+import { BookOpen, GraduationCap, BarChart3, School } from "lucide-react";
 import { GRADE_TYPES } from "@/lib/application-validation";
 import { ALLOWED_YEAR_OF_STUDY } from "@/lib/countries";
+import { findCanonicalTertiaryInstitution } from "@/lib/ghana-tertiary-institutions";
+import InstitutionSelect from "@/components/applicant/InstitutionSelect";
 
 function gradePlaceholder(type) {
   switch (type) {
@@ -60,12 +62,18 @@ export default function AcademicInfo({ data, onChange, errors = {} }) {
         {errors.senior_high_school && <p className="mt-1 text-xs text-red-600">{errors.senior_high_school}</p>}
       </div>
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">University / Institution <span className="text-red-500">*</span></label>
-        <div className="relative">
-          <Building size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" value={data.university || ""} onChange={(e) => update("university", e.target.value)} placeholder="e.g. University of Ghana" className={fieldClass("university")} />
-        </div>
-        {errors.university && <p className="mt-1 text-xs text-red-600">{errors.university}</p>}
+        <label htmlFor="university" className="mb-1.5 block text-sm font-medium text-gray-700">
+          University / Institution <span className="text-red-500">*</span>
+        </label>
+        <InstitutionSelect
+          value={data.university || ""}
+          onChange={(v) => update("university", v)}
+          error={Boolean(errors.university)}
+          otherError={Boolean(errors.university) && !findCanonicalTertiaryInstitution(data.university)}
+        />
+        {errors.university ? (
+          <p className="mt-1 text-xs text-red-600">{errors.university}</p>
+        ) : null}
       </div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">Student ID Number</label>

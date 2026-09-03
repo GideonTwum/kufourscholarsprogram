@@ -15,6 +15,7 @@ import {
   Video,
 } from "lucide-react";
 import { getLeadershipEvidencePaths, getRecommendationLetterPaths } from "@/lib/application-validation";
+import { formatGenderLabel } from "@/lib/applicant-demographics";
 import { assessmentStageForStatus } from "@/lib/assessor-workflow";
 
 const scoreFields = [
@@ -253,8 +254,10 @@ export default function AssessorApplicantDetailPage() {
             <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
               <Field label="Full name" value={nameFor(application)} />
               <Field label="Phone" value={application.phone} />
+              <Field label="Gender" value={formatGenderLabel(application.gender)} />
               <Field label="Nationality" value={application.nationality} />
-              <Field label="University" value={application.university} />
+              <Field label="Region" value={application.region} />
+              <Field label="University / Institution" value={application.university} />
               <Field label="Program" value={application.program} />
               <Field label="Year of study" value={application.year_of_study} />
               <Field label="Grade type" value={application.grade_type} />

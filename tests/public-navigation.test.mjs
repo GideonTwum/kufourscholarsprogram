@@ -21,7 +21,11 @@ test("public navigation keeps top-level set small with Community and Explore gro
   const community = publicNavigation.find((i) => i.label === "Community");
   assert.deepEqual(
     community.children.map((c) => c.href),
-    ["/teams", "/alumni"]
+    ["/teams", "/alumni", "/associates"]
+  );
+  assert.deepEqual(
+    community.children.map((c) => c.label),
+    ["Mentors & Team", "Alumni", "Associates"]
   );
 
   const explore = publicNavigation.find((i) => i.label === "Explore");
@@ -39,5 +43,6 @@ test("nav active helpers mark parents when a child route is active", () => {
 
   const community = publicNavigation.find((i) => i.label === "Community");
   assert.equal(isNavItemActive("/alumni", community), true);
+  assert.equal(isNavItemActive("/associates", community), true);
   assert.equal(isNavItemActive("/news", community), false);
 });

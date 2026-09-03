@@ -19,6 +19,7 @@ import {
   evaluateApplicationsOpenGate,
   supabaseProjectHostFromUrl,
 } from "@/lib/applications-open-gate";
+import { normalizeDemographicsFields } from "@/lib/applicant-demographics";
 
 export const dynamic = "force-dynamic";
 
@@ -154,15 +155,17 @@ export async function POST(request) {
   const { data: safeApplicationData, ignoredDangerousFields } =
     sanitizeStage1ApplicationData(applicationData);
 
-  const normalized = normalizeDualCitizenshipFields({
-    ...safeApplicationData,
-    year_of_study: normalizeYearOfStudy(safeApplicationData.year_of_study) || safeApplicationData.year_of_study,
-    concept_note_title: normalizeConceptNoteTitle(safeApplicationData.concept_note_title),
-    concept_note_path:
-      typeof safeApplicationData.concept_note_path === "string"
-        ? safeApplicationData.concept_note_path.trim()
-        : "",
-  });
+  const normalized = normalizeDemographicsFields(
+    normalizeDualCitizenshipFields({
+      ...safeApplicationData,
+      year_of_study: normalizeYearOfStudy(safeApplicationData.year_of_study) || safeApplicationData.year_of_study,
+      concept_note_title: normalizeConceptNoteTitle(safeApplicationData.concept_note_title),
+      concept_note_path:
+        typeof safeApplicationData.concept_note_path === "string"
+          ? safeApplicationData.concept_note_path.trim()
+          : "",
+    })
+  );
 
   if (ignoredDangerousFields.length > 0) {
     console.warn("[submit-stage1] ignored protected applicant fields", {

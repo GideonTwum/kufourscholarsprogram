@@ -21,6 +21,7 @@ import {
   Clock,
 } from "lucide-react";
 import { getLeadershipEvidencePaths, getRecommendationLetterPaths } from "@/lib/application-validation";
+import { formatGenderLabel } from "@/lib/applicant-demographics";
 import { getDirectorStageActions } from "@/lib/director-stage-actions";
 import { evaluatorDisplayName } from "@/lib/staff-lifecycle";
 import DirectorStageActionBar from "../../components/DirectorStageActionBar";
@@ -595,10 +596,12 @@ export default function ApplicationReviewPage() {
             <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
               <Field label="Full Name" value={application.full_name} />
               <Field label="Date of Birth" value={application.date_of_birth} />
+              <Field label="Gender" value={formatGenderLabel(application.gender)} />
               <Field label="Phone" value={application.phone} />
               <Field label="Nationality" value={application.nationality} />
               <Field label="Address" value={application.address} />
-              <Field label="Hometown & Region" value={[application.hometown, application.region].filter(Boolean).join(", ")} />
+              <Field label="Hometown" value={application.hometown} />
+              <Field label="Region" value={application.region} />
               <Field label="Country of Origin" value={application.country_of_origin} />
               <Field
                 label="Dual citizenship"
@@ -643,7 +646,7 @@ export default function ApplicationReviewPage() {
 
           <Section title="Academic Information" icon={GraduationCap}>
             <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-              <Field label="University" value={application.university} />
+              <Field label="University / Institution" value={application.university} />
               <Field label="Program" value={application.program} />
               <Field label="Year of Study" value={application.year_of_study} />
               <Field label="Grade type (CWA / CGPA / GPA)" value={application.grade_type} />

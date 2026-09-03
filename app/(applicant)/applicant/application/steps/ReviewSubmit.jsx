@@ -17,6 +17,7 @@ import {
   getLeadershipEvidencePaths,
   getRecommendationLetterPaths,
 } from "@/lib/application-validation";
+import { formatGenderLabel } from "@/lib/applicant-demographics";
 
 function Section({ title, icon: Icon, stepIndex, goToStep, readOnly, children }) {
   return (
@@ -102,6 +103,7 @@ export default function ReviewSubmit({
       <Section title="Personal Information" icon={User} stepIndex={0} goToStep={goToStep} readOnly={readOnly}>
         <Field label="Full Name" value={data.full_name} />
         <Field label="Date of Birth" value={data.date_of_birth} />
+        <Field label="Gender" value={formatGenderLabel(data.gender)} />
         <Field label="Phone" value={data.phone} />
         <Field label="Address" value={data.address} />
         <Field label="Hometown" value={data.hometown} />
@@ -140,7 +142,7 @@ export default function ReviewSubmit({
       <Section title="Academic Information" icon={GraduationCap} stepIndex={1} goToStep={goToStep} readOnly={readOnly}>
         <Field label="Junior High School" value={data.junior_high_school} />
         <Field label="Senior High School" value={data.senior_high_school} />
-        <Field label="University" value={data.university} />
+        <Field label="University / Institution" value={data.university} />
         <Field label="Student ID Number" value={data.student_id} optionalEmpty />
         <Field label="Program" value={data.program} />
         <Field label="Year of Study" value={data.year_of_study} />
