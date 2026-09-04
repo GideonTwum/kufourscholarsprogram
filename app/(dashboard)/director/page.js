@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Users, FileText, Megaphone, MessageSquare, CalendarDays, UserCheck, Loader2, AlertCircle, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import ApplicantDemographicsReach from "@/components/director/ApplicantDemographicsReach";
 
 const quickActions = [
   {
@@ -218,6 +219,8 @@ export default function DirectorDashboard() {
           </div>
         </>
       ) : null}
+
+      <ApplicantDemographicsReach />
 
       <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Quick actions</h2>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

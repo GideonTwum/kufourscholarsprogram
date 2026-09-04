@@ -25,6 +25,7 @@ test("requireActiveDirector is used for privileged director paths", () => {
   const files = [
     "app/api/applications/[id]/update-status/route.js",
     "app/api/director/dashboard-metrics/route.js",
+    "app/api/director/demographics/route.js",
     "app/api/director/settings/route.js",
     "app/api/director/audit-log/route.js",
     "app/api/director/announcements/route.js",
