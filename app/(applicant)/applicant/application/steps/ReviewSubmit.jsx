@@ -14,8 +14,11 @@ import {
 import {
   CV_PERSONAL_STATEMENT_HINT,
   KSP_SOCIAL_HANDLES,
+  WASSCE_HISTORICAL_MESSAGE,
   getLeadershipEvidencePaths,
   getRecommendationLetterPaths,
+  getWassceResultsPaths,
+  shouldShowWassceHistoricalNote,
 } from "@/lib/application-validation";
 import { formatGenderLabel } from "@/lib/applicant-demographics";
 
@@ -89,6 +92,8 @@ export default function ReviewSubmit({
 }) {
   const leadership = getLeadershipEvidencePaths(data);
   const recommendations = getRecommendationLetterPaths(data);
+  const wassceResults = getWassceResultsPaths(data);
+  const wassceHistorical = shouldShowWassceHistoricalNote(data, { isEditable: !readOnly });
   const contact2 =
     data.emergency_contact_2_name || data.emergency_contact_2_number
       ? `${data.emergency_contact_2_name || ""} — ${data.emergency_contact_2_number || ""}`.trim()
@@ -171,6 +176,21 @@ export default function ReviewSubmit({
           value={data.academic_transcript_url ? "Uploaded" : ""}
           href={docUrls.academic_transcript_url}
         />
+        {wassceHistorical ? (
+          <Field label="WASSCE / NovDec Results" value={WASSCE_HISTORICAL_MESSAGE} optionalEmpty />
+        ) : wassceResults.length === 0 ? (
+          <Field label="WASSCE / NovDec Results" value="" />
+        ) : (
+          wassceResults.map((_, i) => (
+            <Field
+              key={`wassce-${i}`}
+              label={`WASSCE / NovDec Results ${i + 1}`}
+              value="Uploaded"
+              href={docUrls.wassce?.[i]}
+              hrefLabel="View document"
+            />
+          ))
+        )}
         <Field
           label="National ID"
           value={data.student_id_path ? "Uploaded" : ""}

@@ -125,6 +125,7 @@ test("Year of Study: First Year and Sophomore accepted; advanced years rejected"
     ...baseAcademic({ year_of_study: "3rd Year" }),
     cv_personal_statement_url: "a.pdf",
     academic_transcript_url: "b.pdf",
+    wassce_results_urls: ["w.pdf"],
     recommendation_urls: ["c.pdf", "d.pdf"],
     photo_url: "photo.jpg",
     student_id_path: "id.pdf",
@@ -160,6 +161,7 @@ test("Photo: 5MB limit", () => {
   const docs = validateDocuments({
     cv_personal_statement_url: "a.pdf",
     academic_transcript_url: "b.pdf",
+    wassce_results_urls: ["w.pdf"],
     recommendation_urls: ["c.pdf", "d.pdf"],
     photo_url: "photo.jpg",
     student_id_path: "id.pdf",
@@ -172,6 +174,7 @@ test("Photo: 5MB limit", () => {
     validateDocuments({
       cv_personal_statement_url: "a.pdf",
       academic_transcript_url: "b.pdf",
+      wassce_results_urls: ["w.pdf"],
       recommendation_urls: ["c.pdf", "d.pdf"],
       photo_url: "",
       student_id_path: "id.pdf",

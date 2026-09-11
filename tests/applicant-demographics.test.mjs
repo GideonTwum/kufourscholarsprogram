@@ -181,6 +181,7 @@ test("final submit rejects missing demographics", () => {
     confirms_ghana_enrollment: true,
     cv_personal_statement_url: "u/a/cv.pdf",
     academic_transcript_url: "u/a/t.pdf",
+    wassce_results_urls: ["u/a/wassce.pdf"],
     recommendation_urls: ["u/a/r1.pdf", "u/a/r2.pdf"],
     photo_url: "https://example.com/p.jpg",
     student_id_path: "u/a/id.pdf",

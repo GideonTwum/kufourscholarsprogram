@@ -41,6 +41,7 @@ test("validateDocuments rejects more than MAX recommendation letters", () => {
     academic_transcript_url: `${UID}/t.pdf`,
     cv_personal_statement_url: `${UID}/cv.pdf`,
     student_id_path: `${UID}/id.pdf`,
+    wassce_results_urls: [`${UID}/wassce-results/a.pdf`],
     recommendation_urls: paths,
     ksp_tiktok_follow_screenshot_path: `${UID}/tt.png`,
     ksp_linkedin_follow_screenshot_path: `${UID}/li.png`,

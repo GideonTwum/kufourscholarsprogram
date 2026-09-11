@@ -51,6 +51,7 @@ function baseDocs(overrides = {}) {
   return {
     cv_personal_statement_url: "user/cv/a.pdf",
     academic_transcript_url: "user/transcript/a.pdf",
+    wassce_results_urls: ["user/wassce-results/a.pdf"],
     recommendation_urls: ["user/recommendation/1.pdf", "user/recommendation/2.pdf"],
     photo_url: "https://example.com/photo.jpg",
     student_id_path: "user/student-id/id.pdf",

@@ -26,6 +26,7 @@ import {
   STEP_VALIDATION_FIELDS,
   getLeadershipEvidencePaths,
   getRecommendationLetterPaths,
+  getWassceResultsPaths,
   normalizeDualCitizenshipFields,
   normalizeConceptNoteTitle,
 } from "@/lib/application-validation";
@@ -41,6 +42,7 @@ const stepLabels = ["Personal", "Academic", "Documents", "Concept Note", "Review
 const DOC_FIELDS = [
   "cv_personal_statement_url",
   "academic_transcript_url",
+  "wassce_results_urls",
   "leadership_evidence_urls",
   "recommendation_urls",
   "recommendation_url",
@@ -69,6 +71,7 @@ function buildApplicationPayload(data, userId, status, submittedAt = null) {
     ? data.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
     : [];
   const recommendations = getRecommendationLetterPaths(data);
+  const wassce = getWassceResultsPaths(data);
   const normalized = normalizeDemographicsFields(
     normalizeDualCitizenshipFields({
       ...data,
@@ -84,6 +87,7 @@ function buildApplicationPayload(data, userId, status, submittedAt = null) {
     leadership_evidence_url: leadership[0] || null,
     recommendation_urls: recommendations,
     recommendation_url: recommendations[0] || null,
+    wassce_results_urls: wassce,
     user_id: userId,
     status,
     updated_at: new Date().toISOString(),
@@ -136,6 +140,17 @@ function useApplicationDocUrls(data) {
           urls.recommendations.push(null);
         }
       }
+      const wassce = getWassceResultsPaths(data);
+      urls.wassce = [];
+      for (const path of wassce) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const json = await res.json();
+          urls.wassce.push(json.url || null);
+        } catch (_) {
+          urls.wassce.push(null);
+        }
+      }
       const p = data.photo_url;
       if (p) {
         if (/^https?:\/\//i.test(p)) urls.photo_url = p;
@@ -154,6 +169,7 @@ function useApplicationDocUrls(data) {
     data?.cv_personal_statement_url,
     data?.cv_url,
     data?.academic_transcript_url,
+    data?.wassce_results_urls,
     data?.leadership_evidence_url,
     data?.leadership_evidence_urls,
     data?.recommendation_url,
@@ -264,6 +280,9 @@ export default function ApplicationPage() {
           confirms_ghana_enrollment: !!existing.confirms_ghana_enrollment,
           cv_personal_statement_url: existing.cv_personal_statement_url || existing.cv_url || "",
           academic_transcript_url: existing.academic_transcript_url || "",
+          wassce_results_urls: Array.isArray(existing.wassce_results_urls)
+            ? existing.wassce_results_urls.filter((x) => typeof x === "string" && x)
+            : [],
           leadership_evidence_urls: normalizeLeadershipFromExisting(existing),
           recommendation_urls: normalizeRecommendationsFromExisting(existing),
           recommendation_url: normalizeRecommendationsFromExisting(existing)[0] || "",

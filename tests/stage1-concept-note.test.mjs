@@ -39,6 +39,7 @@ const baseValid = {
   confirms_ghana_enrollment: true,
   cv_personal_statement_url: "user/cv/a.pdf",
   academic_transcript_url: "user/transcript/a.pdf",
+  wassce_results_urls: ["user/wassce-results/a.pdf"],
   leadership_evidence_urls: ["user/leadership/a.pdf"],
   recommendation_urls: ["user/recommendation/a.pdf", "user/recommendation/b.pdf"],
   photo_url: "https://example.com/photo.jpg",

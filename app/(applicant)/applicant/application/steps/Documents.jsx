@@ -22,9 +22,14 @@ import {
   MAX_LEADERSHIP_FILES,
   MAX_RECOMMENDATION_LETTERS,
   MIN_RECOMMENDATION_LETTERS,
+  MAX_WASSCE_RESULTS,
+  MIN_WASSCE_RESULTS,
+  ACADEMIC_TRANSCRIPT_HINT,
   CV_PERSONAL_STATEMENT_HINT,
+  WASSCE_RESULTS_HINT,
   getLeadershipEvidencePaths,
   getRecommendationLetterPaths,
+  getWassceResultsPaths,
 } from "@/lib/application-validation";
 import {
   APPLICATIONS_BUCKET,
@@ -36,6 +41,7 @@ import {
 
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp"];
 const STUDENT_ID_EXTS = ["pdf", ...IMAGE_EXTS];
+const WASSCE_EXTS = ["pdf", ...IMAGE_EXTS];
 
 function SignedViewLink({ path, label = "View" }) {
   const [url, setUrl] = useState(null);
@@ -83,6 +89,7 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
 
   const leadershipPaths = getLeadershipEvidencePaths(data);
   const recommendationPaths = getRecommendationLetterPaths(data);
+  const wasscePaths = getWassceResultsPaths(data);
 
   function clearUploadError(field) {
     setUploadErrors((prev) => {
@@ -167,6 +174,12 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
           recommendation_url: next[0] || null,
         };
       });
+    } else if (fieldKey === "wassce_add") {
+      onChange((prev) => {
+        const cur = getWassceResultsPaths(prev);
+        if (cur.length >= MAX_WASSCE_RESULTS) return prev;
+        return { ...prev, wassce_results_urls: [...cur, filePath] };
+      });
     } else {
       onChange((prev) => ({ ...prev, [fieldKey]: filePath }));
     }
@@ -233,6 +246,14 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
         recommendation_urls: cur,
         recommendation_url: cur[0] || null,
       };
+    });
+  }
+
+  function removeWassceAt(index) {
+    onChange((prev) => {
+      const cur = [...getWassceResultsPaths(prev)];
+      cur.splice(index, 1);
+      return { ...prev, wassce_results_urls: cur };
     });
   }
 
@@ -454,8 +475,99 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
         "academic_transcript_url",
         "transcript",
         FileText,
-        "Official academic transcript in PDF"
+        ACADEMIC_TRANSCRIPT_HINT
       )}
+
+      <div>
+        <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700">
+          <FileText size={16} />
+          WASSCE / NovDec Results <span className="text-red-500">*</span>
+        </label>
+        <p className="mb-2 text-xs text-gray-500">{WASSCE_RESULTS_HINT}</p>
+        <p className="mb-2 text-xs text-gray-500">
+          At least one WASSCE/NovDec document is required. You may add up to {MAX_WASSCE_RESULTS}{" "}
+          documents (PDF, JPG, PNG, or WebP).
+        </p>
+        <div className="space-y-3">
+          {wasscePaths.map((path, index) => (
+            <div
+              key={`${path}-${index}`}
+              className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50/80 px-3 py-2"
+            >
+              <span className="flex min-w-0 items-center gap-2 text-sm text-green-800">
+                <CheckCircle2 size={16} className="shrink-0" />
+                <span className="truncate">Results document {index + 1} uploaded</span>
+              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <SignedViewLink path={path} />
+                <button
+                  type="button"
+                  onClick={() => removeWassceAt(index)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-red-100 hover:text-red-600"
+                  title={`Remove results document ${index + 1}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {wasscePaths.length < MAX_WASSCE_RESULTS ? (
+            <div
+              className={`rounded-lg border-2 border-dashed p-4 ${
+                errors.wassce_results_urls || uploadErrors.wassce_add
+                  ? "border-red-200 bg-red-50/30"
+                  : "border-gray-200 hover:border-gold hover:bg-gold/5"
+              }`}
+            >
+              <label className="flex cursor-pointer items-center justify-center gap-2 py-3 text-center">
+                {uploading.wassce_add ? (
+                  <Loader2 size={20} className="animate-spin text-royal" />
+                ) : (
+                  <>
+                    <Plus size={20} className="text-gray-400" />
+                    <span className="text-sm text-gray-500">
+                      {wasscePaths.length === 0
+                        ? "Upload WASSCE / NovDec document"
+                        : "Add another result document"}
+                    </span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      uploadToApplications(
+                        f,
+                        "wassce_add",
+                        "wassce-results",
+                        WASSCE_EXTS,
+                        "Use PDF, JPG, PNG, or WebP."
+                      );
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {(errors.wassce_results_urls || uploadErrors.wassce_add) && (
+                <p className="mt-2 flex items-center gap-1 text-xs text-red-600">
+                  <AlertCircle size={12} />
+                  {errors.wassce_results_urls || uploadErrors.wassce_add}
+                </p>
+              )}
+            </div>
+          ) : null}
+          {wasscePaths.length >= MIN_WASSCE_RESULTS &&
+          wasscePaths.length < MAX_WASSCE_RESULTS &&
+          !errors.wassce_results_urls ? (
+            <p className="text-xs text-gray-400">
+              {wasscePaths.length} of {MAX_WASSCE_RESULTS} documents uploaded
+            </p>
+          ) : null}
+        </div>
+      </div>
 
       <div>
         <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700">

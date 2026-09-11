@@ -17,6 +17,7 @@ const USER_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const STAGE1_FOLDERS = [
   "cv",
   "transcript",
+  "wassce-results",
   "student-id",
   "recommendation",
   "leadership",

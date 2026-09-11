@@ -12,6 +12,7 @@ import {
   validateForSubmit,
   getRecommendationLetterPaths,
   getLeadershipEvidencePaths,
+  getWassceResultsPaths,
 } from "@/lib/application-validation";
 import { normalizeYearOfStudy } from "@/lib/countries";
 import { assertOwnedApplicationsPath } from "@/lib/storage-path";
@@ -31,6 +32,7 @@ function buildRow(applicationData, userId, overrides = {}) {
     ? applicationData.leadership_evidence_urls.filter((x) => typeof x === "string" && x)
     : [];
   const recommendations = getRecommendationLetterPaths(applicationData);
+  const wassceResults = getWassceResultsPaths(applicationData);
   return {
     ...applicationData,
     user_id: userId,
@@ -38,6 +40,7 @@ function buildRow(applicationData, userId, overrides = {}) {
     leadership_evidence_url: leadership[0] || null,
     recommendation_urls: recommendations,
     recommendation_url: recommendations[0] || null,
+    wassce_results_urls: wassceResults,
     concept_note_title: normalizeConceptNoteTitle(applicationData.concept_note_title) || null,
     concept_note_path:
       typeof applicationData.concept_note_path === "string"
@@ -75,6 +78,10 @@ function validateOwnedDocumentPaths(data, userId) {
   getLeadershipEvidencePaths(data).forEach((path, i) => {
     const err = assertOwnedApplicationsPath(path, userId, `Leadership evidence ${i + 1}`);
     if (err) errors.leadership_evidence_urls = err;
+  });
+  getWassceResultsPaths(data).forEach((path, i) => {
+    const err = assertOwnedApplicationsPath(path, userId, `WASSCE / NovDec Results ${i + 1}`);
+    if (err) errors.wassce_results_urls = err;
   });
   return errors;
 }

@@ -14,7 +14,7 @@ import {
   User,
   Video,
 } from "lucide-react";
-import { getLeadershipEvidencePaths, getRecommendationLetterPaths } from "@/lib/application-validation";
+import { getLeadershipEvidencePaths, getRecommendationLetterPaths, getWassceResultsPaths, shouldShowWassceHistoricalNote, WASSCE_HISTORICAL_MESSAGE } from "@/lib/application-validation";
 import { formatGenderLabel } from "@/lib/applicant-demographics";
 import { assessmentStageForStatus } from "@/lib/assessor-workflow";
 
@@ -161,6 +161,14 @@ export default function AssessorApplicantDetailPage() {
         recommendations.push(data.url || null);
       }
       next.recommendations = recommendations;
+
+      const wassce = [];
+      for (const path of getWassceResultsPaths(application)) {
+        const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+        wassce.push(data.url || null);
+      }
+      next.wassce = wassce;
       setDocUrls(next);
     }
     loadDocs();
@@ -273,6 +281,22 @@ export default function AssessorApplicantDetailPage() {
               <DocumentLink label="Passport Picture" url={docUrls.photo} loading={!!application.photo_url} />
               <DocumentLink label="CV / Personal Statement" url={docUrls.cv} loading={!!(application.cv_personal_statement_url || application.cv_url)} />
               <DocumentLink label="Academic Transcript" url={docUrls.transcript} loading={!!application.academic_transcript_url} />
+              {shouldShowWassceHistoricalNote(application, { isEditable: false }) ? (
+                <p className="text-sm text-gray-500 sm:col-span-2">
+                  WASSCE / NovDec Results: {WASSCE_HISTORICAL_MESSAGE}
+                </p>
+              ) : getWassceResultsPaths(application).length === 0 ? (
+                <p className="text-sm text-gray-500 sm:col-span-2">WASSCE / NovDec Results: Not provided</p>
+              ) : (
+                getWassceResultsPaths(application).map((_, i) => (
+                  <DocumentLink
+                    key={`wassce-${i}`}
+                    label={`WASSCE / NovDec Results ${i + 1}`}
+                    url={docUrls.wassce?.[i]}
+                    loading
+                  />
+                ))
+              )}
               <DocumentLink label="National ID" url={docUrls.studentId} loading={!!application.student_id_path} />
               {getRecommendationLetterPaths(application).map((_, i) => (
                 <DocumentLink

@@ -82,6 +82,7 @@ test("server auto-reject blocks age 24+ with shared message", () => {
     confirms_ghana_enrollment: true,
     cv_personal_statement_url: "a.pdf",
     academic_transcript_url: "b.pdf",
+    wassce_results_urls: ["w.pdf"],
     recommendation_urls: ["r1.pdf", "r2.pdf"],
     photo_url: "https://example.com/p.jpg",
     student_id_path: "u/student-id/x.pdf",
@@ -109,6 +110,7 @@ test("document validation uses Passport Picture and National ID labels", () => {
   const errors = validateDocuments({
     cv_personal_statement_url: "cv.pdf",
     academic_transcript_url: "t.pdf",
+    wassce_results_urls: ["w.pdf"],
     recommendation_urls: ["a.pdf", "b.pdf"],
     photo_url: "",
     student_id_path: "",
@@ -180,6 +182,7 @@ test("legacy student_id_path still validated as National ID storage field", () =
     validateDocuments({
       cv_personal_statement_url: "cv.pdf",
       academic_transcript_url: "t.pdf",
+      wassce_results_urls: ["w.pdf"],
       recommendation_urls: ["a.pdf", "b.pdf"],
       photo_url: "https://example.com/p.jpg",
       student_id_path: "user/student-id/legacy.pdf",

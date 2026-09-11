@@ -16,7 +16,7 @@ import {
   ClipboardList,
   CheckCircle2,
 } from "lucide-react";
-import { getLeadershipEvidencePaths, getRecommendationLetterPaths } from "@/lib/application-validation";
+import { getLeadershipEvidencePaths, getRecommendationLetterPaths, getWassceResultsPaths, shouldShowWassceHistoricalNote, WASSCE_HISTORICAL_MESSAGE } from "@/lib/application-validation";
 import { formatGenderLabel } from "@/lib/applicant-demographics";
 import {
   getApplicantDisplayName,
@@ -227,6 +227,17 @@ export default function PanelApplicantDetailPage() {
           urls.recommendations.push(null);
         }
       }
+      const wassce = getWassceResultsPaths(application);
+      urls.wassce = [];
+      for (const path of wassce) {
+        try {
+          const res = await fetch(`/api/storage/signed-url?path=${encodeURIComponent(path)}`);
+          const data = await res.json();
+          urls.wassce.push(data.url || null);
+        } catch (_) {
+          urls.wassce.push(null);
+        }
+      }
       setDocUrls(urls);
     };
     fetchUrls();
@@ -235,6 +246,7 @@ export default function PanelApplicantDetailPage() {
     application?.cv_personal_statement_url,
     application?.cv_url,
     application?.academic_transcript_url,
+    application?.wassce_results_urls,
     application?.leadership_evidence_url,
     application?.leadership_evidence_urls,
     application?.recommendation_url,
@@ -379,6 +391,29 @@ export default function PanelApplicantDetailPage() {
               {docFields.map((doc) => (
                 <DocCard key={doc.field} label={doc.label} field={doc.field} application={appWithCv} docUrls={docUrls} icon={FileText} />
               ))}
+              {shouldShowWassceHistoricalNote(application, { isEditable: false }) ? (
+                <div className="min-w-0 rounded-lg border border-gray-100 p-4 sm:col-span-2">
+                  <FileText size={20} className="mb-2 text-gray-400" />
+                  <p className="text-sm font-medium text-gray-900">WASSCE / NovDec Results</p>
+                  <p className="mt-1 text-xs text-gray-500">{WASSCE_HISTORICAL_MESSAGE}</p>
+                </div>
+              ) : (
+                getWassceResultsPaths(application).map((path, i) => (
+                  <div key={`wassce-${i}`} className="min-w-0 rounded-lg border border-gray-100 p-4">
+                    <FileText size={20} className="mb-2 text-gray-400" />
+                    <p className="truncate text-sm font-medium text-gray-900">WASSCE / NovDec Results {i + 1}</p>
+                    {!path ? (
+                      <p className="mt-1 text-xs text-gray-400">Not uploaded</p>
+                    ) : docUrls.wassce?.[i] ? (
+                      <a href={docUrls.wassce[i]} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-royal hover:text-gold">
+                        <ExternalLink size={12} /> View Document
+                      </a>
+                    ) : (
+                      <p className="mt-1 text-xs text-amber-600">Loading…</p>
+                    )}
+                  </div>
+                ))
+              )}
               {getRecommendationLetterPaths(application).map((path, i) => (
                 <div key={`rec-${i}`} className="min-w-0 rounded-lg border border-gray-100 p-4">
                   <FileText size={20} className="mb-2 text-gray-400" />
