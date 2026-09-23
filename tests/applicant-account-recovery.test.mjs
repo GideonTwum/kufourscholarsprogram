@@ -8,6 +8,7 @@ import {
   ACCOUNT_RECOVERY_SUCCESS_MESSAGE,
   collectApplicantIdentityCandidates,
   evaluateApplicantRecoveryMatch,
+  filterOwnedRecoveryApplications,
   hashEmailForRateLimit,
   initiateMatchedApplicantRecovery,
   isAccountRecoveryEligibleRole,
@@ -16,6 +17,7 @@ import {
   normalizeRecoveryEmail,
   normalizeRecoveryName,
   phonesMatchForRecovery,
+  prioritizeRecoveryApplicationsByClass,
   recoveryFailureBody,
   recoveryRateLimitedBody,
   recoverySuccessBody,
@@ -53,7 +55,7 @@ const APPLICATION = {
 function matchInput(overrides = {}) {
   return {
     profile: APPLICANT_PROFILE,
-    application: APPLICATION,
+    applications: [APPLICATION],
     email: "juliana@example.com",
     fullName: "Juliana Adenkia",
     phone: "0241234567",
@@ -80,7 +82,22 @@ test("name normalization allows spacing and case differences only", () => {
 test("Ghana phone forms normalize equivalently for comparison", () => {
   assert.equal(phonesMatchForRecovery("0241234567", "+233241234567"), true);
   assert.equal(phonesMatchForRecovery("0241234567", "233241234567"), true);
+  assert.equal(phonesMatchForRecovery("020 123 4567", "(+233) 20-123-4567"), true);
   assert.equal(normalizePhoneForCompare("+14155552671"), "14155552671");
+});
+
+test("Ghana +2330 redundant trunk zero canonicalizes deterministically", () => {
+  assert.equal(normalizePhoneForCompare("+2330241234567"), "233241234567");
+  assert.equal(normalizePhoneForCompare("2330241234567"), "233241234567");
+  assert.equal(phonesMatchForRecovery("+2330241234567", "0241234567"), true);
+  assert.equal(phonesMatchForRecovery("+233 024 123 4567", "+233241234567"), true);
+});
+
+test("9-digit Ghana number without leading 0 is not auto-expanded", () => {
+  // No shared project rule treats 241234567 as national 0241234567 — keep conservative.
+  assert.equal(normalizePhoneForCompare("241234567"), "241234567");
+  assert.equal(phonesMatchForRecovery("241234567", "0241234567"), false);
+  assert.equal(phonesMatchForRecovery("241234567", "+233241234567"), false);
 });
 
 test("eligibility helper allows only applicant", () => {
@@ -135,15 +152,24 @@ test("incorrect email / name / phone fail without field-specific public message"
   assert.equal(recoveryFailureBody().message, ACCOUNT_RECOVERY_FAILURE_MESSAGE);
 });
 
-test("mismatched application ownership fails", () => {
+test("foreign application identity is ignored; cannot satisfy match alone", () => {
   const result = evaluateApplicantRecoveryMatch(
     matchInput({
-      application: { ...APPLICATION, user_id: "user-bbb", full_name: "Other Person" },
+      applications: [
+        {
+          id: "other-app",
+          user_id: "user-bbb",
+          full_name: "Other Person",
+          phone: "0249999999",
+        },
+      ],
       fullName: "Other Person",
+      phone: "0249999999",
     })
   );
+  // Foreign row discarded; profile name/phone do not match submitted → mismatch
   assert.equal(result.matched, false);
-  assert.equal(result.code, "ownership_mismatch");
+  assert.ok(result.code === "name_mismatch" || result.code === "phone_mismatch");
 });
 
 test("selectRecoveryEmailAction is state-aware and exclusive", () => {
@@ -356,16 +382,224 @@ test("name/phone can match from application when profile phone empty", () => {
   const result = evaluateApplicantRecoveryMatch(
     matchInput({
       profile: { ...APPLICANT_PROFILE, phone: null },
-      application: { ...APPLICATION, phone: "0241234567" },
+      applications: [{ ...APPLICATION, phone: "0241234567" }],
       phone: "+233241234567",
     })
   );
   assert.equal(result.matched, true);
   const candidates = collectApplicantIdentityCandidates(
     { full_name: "A", phone: null },
-    { full_name: "B", phone: "0241" }
+    [{ full_name: "B", phone: "0241" }]
   );
   assert.deepEqual(candidates.names, ["A", "B"]);
+});
+
+test("multi-app: older owned phone wins when latest phone empty", () => {
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, phone: null },
+      applications: [
+        {
+          id: "newer",
+          user_id: "user-aaa",
+          full_name: "Juliana Adenkia",
+          phone: null,
+          application_class_name: "11th Class",
+        },
+        {
+          id: "older",
+          user_id: "user-aaa",
+          full_name: "Juliana Adenkia",
+          phone: "0241234567",
+          application_class_name: "11th Class",
+        },
+      ],
+      phone: "+233241234567",
+    })
+  );
+  assert.equal(result.matched, true);
+  assert.equal(result.code, "match");
+});
+
+test("multi-app: older owned name wins when latest name differs", () => {
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, full_name: "Signup Name" },
+      applications: [
+        {
+          id: "newer",
+          user_id: "user-aaa",
+          full_name: "Draft Incomplete",
+          phone: "0241234567",
+        },
+        {
+          id: "older",
+          user_id: "user-aaa",
+          full_name: "Juliana Adenkia",
+          phone: "0241234567",
+        },
+      ],
+      fullName: "Juliana Adenkia",
+      phone: "0241234567",
+    })
+  );
+  assert.equal(result.matched, true);
+});
+
+test("multi-app: profile name + owned application phone across rows", () => {
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, phone: null },
+      applications: [
+        { id: "a1", user_id: "user-aaa", full_name: "Other Label", phone: null },
+        { id: "a2", user_id: "user-aaa", full_name: "Still Other", phone: "0241234567" },
+      ],
+      fullName: "Juliana Adenkia", // profile
+      phone: "+233241234567", // older/other owned app
+    })
+  );
+  assert.equal(result.matched, true);
+});
+
+test("multi-app: name from one owned app and phone from another owned app", () => {
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, full_name: "Signup Only", phone: null },
+      applications: [
+        {
+          id: "name-row",
+          user_id: "user-aaa",
+          full_name: "Juliana Adenkia",
+          phone: null,
+        },
+        {
+          id: "phone-row",
+          user_id: "user-aaa",
+          full_name: null,
+          phone: "0241234567",
+        },
+      ],
+      fullName: "Juliana Adenkia",
+      phone: "0241234567",
+    })
+  );
+  assert.equal(result.matched, true);
+});
+
+test("multi-app: foreign matching phone/name must not be considered", () => {
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, phone: null, full_name: "Signup Only" },
+      applications: [
+        {
+          id: "owned-empty",
+          user_id: "user-aaa",
+          full_name: "Signup Only",
+          phone: null,
+        },
+        {
+          id: "foreign",
+          user_id: "user-bbb",
+          full_name: "Juliana Adenkia",
+          phone: "0241234567",
+        },
+      ],
+      fullName: "Juliana Adenkia",
+      phone: "0241234567",
+    })
+  );
+  assert.equal(result.matched, false);
+});
+
+test("multi-app: no owned phone candidate → phone_mismatch", () => {
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, phone: null },
+      applications: [
+        { id: "a1", user_id: "user-aaa", full_name: "Juliana Adenkia", phone: null },
+        { id: "a2", user_id: "user-aaa", full_name: "Juliana Adenkia", phone: "" },
+      ],
+      phone: "0241234567",
+    })
+  );
+  assert.equal(result.code, "phone_mismatch");
+});
+
+test("multi-app: no owned name candidate → name_mismatch", () => {
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, full_name: "Stored Name" },
+      applications: [
+        { id: "a1", user_id: "user-aaa", full_name: "Stored Name", phone: "0241234567" },
+      ],
+      fullName: "Completely Different",
+      phone: "0241234567",
+    })
+  );
+  assert.equal(result.code, "name_mismatch");
+});
+
+test("filterOwnedRecoveryApplications drops other users", () => {
+  const owned = filterOwnedRecoveryApplications("user-aaa", [
+    { user_id: "user-aaa", phone: "1" },
+    { user_id: "user-bbb", phone: "2" },
+    { user_id: "user-aaa", phone: "3" },
+  ]);
+  assert.equal(owned.length, 2);
+  assert.ok(owned.every((a) => a.user_id === "user-aaa"));
+});
+
+test("current-Class apps are prioritized but blank class still eligible", () => {
+  const sorted = prioritizeRecoveryApplicationsByClass(
+    [
+      { id: "old", application_class_name: null, phone: "a" },
+      { id: "current", application_class_name: "11th Class", phone: "b" },
+      { id: "other", application_class_name: "10th Class", phone: "c" },
+    ],
+    "11th Class"
+  );
+  assert.equal(sorted[0].id, "current");
+
+  // Missing preferred class must not exclude historical rows from matching
+  const result = evaluateApplicantRecoveryMatch(
+    matchInput({
+      profile: { ...APPLICANT_PROFILE, phone: null },
+      preferredApplicationClassName: "11th Class",
+      applications: [
+        {
+          id: "legacy",
+          user_id: "user-aaa",
+          full_name: "Juliana Adenkia",
+          phone: "0241234567",
+          application_class_name: null,
+        },
+      ],
+      phone: "0241234567",
+    })
+  );
+  assert.equal(result.matched, true);
+});
+
+test("API loads owned application identity rows (not latest-only limit 1)", () => {
+  const src = readFileSync(recoveryApi, "utf8");
+  assert.match(src, /profiles\.email|keyed from profiles\.email/);
+  assert.match(src, /application_class_name/);
+  assert.match(src, /\.eq\("user_id", profile\.id\)/);
+  assert.doesNotMatch(src, /\.limit\(1\)/);
+  assert.match(src, /applications/);
+  assert.match(src, /preferredApplicationClassName/);
+  // Identity fields only — no document payloads
+  assert.doesNotMatch(src, /cv_url|transcript|wassce|concept_note/);
+});
+
+test("recovery performs no mutations and preserves generic enumeration-safe failure", () => {
+  const src = readFileSync(recoveryApi, "utf8");
+  assert.doesNotMatch(src, /\.insert\(/);
+  assert.doesNotMatch(src, /\.update\(/);
+  assert.doesNotMatch(src, /\.delete\(/);
+  assert.doesNotMatch(src, /createUser/);
+  assert.equal(recoveryFailureBody().message, ACCOUNT_RECOVERY_FAILURE_MESSAGE);
+  assert.deepEqual(Object.keys(recoveryFailureBody()), ["message"]);
 });
 
 test("case-insensitive email match still works for applicants", () => {

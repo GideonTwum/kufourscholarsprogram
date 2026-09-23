@@ -27,7 +27,8 @@ function clientIp(request) {
 /**
  * Applicant-only account recovery (profiles.role === "applicant").
  *
- * - Matches email + full name + phone against the existing applicant profile/application
+ * - Matches email + full name + phone against the existing applicant profile and
+ *   ALL owned application identity rows (same user_id), not latest-only
  * - Never creates users/profiles/applications
  * - Never returns access/refresh/service-role tokens
  * - Never creates a browser session from the three-field match alone
@@ -69,12 +70,14 @@ export async function POST(request) {
   }
 
   let profile = null;
-  let application = null;
+  let applications = [];
+  let preferredApplicationClassName = null;
   let emailConfirmed = false;
 
   try {
     const admin = createAdminClient();
 
+    // Initial identity lookup is keyed from profiles.email (not auth.users.email).
     // Prefer exact match on normalized (lowercase) email — registration stores lowercased.
     // Fallback ilike escapes %/_ so wildcards cannot enumerate.
     const ilikeSafe = email.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -108,14 +111,28 @@ export async function POST(request) {
     profile = matches.length === 1 ? matches[0] : null;
 
     if (profile?.id) {
+      // All owned application identity rows (not latest-only). Cap is defensive;
+      // typical applicants have a small number of rows.
       const { data: apps } = await admin
         .from("applications")
-        .select("id, user_id, full_name, phone, status")
+        .select("id, user_id, full_name, phone, application_class_name")
         .eq("user_id", profile.id)
         .order("updated_at", { ascending: false })
-        .limit(1);
+        .limit(50);
 
-      application = Array.isArray(apps) && apps.length > 0 ? apps[0] : null;
+      applications = Array.isArray(apps) ? apps : [];
+
+      try {
+        const { data: classSetting } = await admin
+          .from("site_settings")
+          .select("value")
+          .eq("key", "application_class_name")
+          .maybeSingle();
+        preferredApplicationClassName =
+          typeof classSetting?.value === "string" ? classSetting.value.trim() || null : null;
+      } catch {
+        preferredApplicationClassName = null;
+      }
 
       try {
         const { data: authData } = await admin.auth.admin.getUserById(profile.id);
@@ -135,11 +152,14 @@ export async function POST(request) {
 
   const evaluation = evaluateApplicantRecoveryMatch({
     profile,
-    application,
+    applications,
+    preferredApplicationClassName,
     email,
     fullName,
     phone,
   });
+
+  const applicationIdPresent = applications.length > 0;
 
   if (!evaluation.matched) {
     logApplicantRecoveryEvent("applicant_recovery_match_failed", {
@@ -147,7 +167,7 @@ export async function POST(request) {
       code: evaluation.code,
       role: profile?.role || null,
       profileIdPresent: Boolean(profile?.id),
-      applicationIdPresent: Boolean(application?.id),
+      applicationIdPresent,
     });
     return NextResponse.json(recoveryFailureBody());
   }
@@ -158,7 +178,7 @@ export async function POST(request) {
     role: profile.role,
     emailConfirmed,
     profileIdPresent: true,
-    applicationIdPresent: Boolean(application?.id),
+    applicationIdPresent,
   });
 
   try {
@@ -184,7 +204,7 @@ export async function POST(request) {
     emailConfirmed,
     emailAction: selectRecoveryEmailAction(emailConfirmed),
     profileIdPresent: true,
-    applicationIdPresent: Boolean(application?.id),
+    applicationIdPresent,
   });
 
   return NextResponse.json(recoverySuccessBody());
