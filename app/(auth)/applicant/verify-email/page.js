@@ -217,6 +217,10 @@ function VerifyEmailContent() {
         <Link href="/login" className="font-semibold text-royal hover:text-gold">
           Back to Sign In
         </Link>
+        {" · "}
+        <Link href="/account-recovery" className="font-semibold text-royal hover:text-gold">
+          Account Recovery
+        </Link>
       </p>
 
       <ApplicantSupportNotice variant="auth" />

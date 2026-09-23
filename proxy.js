@@ -18,6 +18,7 @@ const authRoutes = [
   "/register",
   "/applicant-register",
   "/forgot-password",
+  "/account-recovery",
 ];
 
 /** Recovery session must stay on this page — do not bounce to dashboard. */

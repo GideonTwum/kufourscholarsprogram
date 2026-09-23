@@ -34,6 +34,8 @@ test("portal login bounce still sends directors to /director", () => {
   assert.equal(authRouteBouncePath("/director-login", "director"), "/director");
   assert.equal(authRouteBouncePath("/login", "applicant"), "/applicant");
   assert.equal(authRouteBouncePath("/forgot-password", "director"), null);
+  assert.equal(authRouteBouncePath("/account-recovery", "director"), null);
+  assert.equal(authRouteBouncePath("/account-recovery", "applicant"), null);
 });
 
 test("post-auth redirect never sends applicants to Director MFA paths", () => {

@@ -284,6 +284,15 @@ export default function PortalLoginForm({ expectedRole, title, subtitle, footer 
 
       {footer ? <div className="mt-6 text-center text-sm text-gray-500">{footer}</div> : null}
 
+      {expectedRole === "applicant" ? (
+        <p className="mt-4 text-center text-sm text-gray-500">
+          Trouble verifying or signing in?{" "}
+          <Link href="/account-recovery" className="font-semibold text-gold-dark hover:text-gold">
+            Applicant Account Recovery
+          </Link>
+        </p>
+      ) : null}
+
       {expectedRole === "applicant" ? <ApplicantSupportNotice variant="auth" /> : null}
 
       <p className="mt-4 text-center text-xs text-gray-400">
