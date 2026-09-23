@@ -3,93 +3,32 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isDirectorRole } from "@/lib/roles";
-import {
-  FileText,
-  Filter,
-  ChevronRight,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Users,
-  Video,
-  Search,
-} from "lucide-react";
+import { Filter } from "lucide-react";
 import DirectorWorkflowGuide from "../components/DirectorWorkflowGuide";
+import DirectorApplicationsList from "@/components/director/DirectorApplicationsList";
 import {
+  DIRECTOR_PENDING_STATUSES,
   DIRECTOR_PRIMARY_FILTERS,
   applyDirectorOperationalScope,
   applyDirectorStatusFilter,
   fetchAllApplicationPages,
   fetchDirectorApplicationCountSummary,
 } from "@/lib/director-application-scope";
+import {
+  DIRECTOR_WORKFLOW_FILTERS,
+  buildDirectorAssignmentWorkflowMap,
+  classifyDirectorApplications,
+  filterByDirectorWorkflow,
+  summarizeDirectorWorkflowCounts,
+} from "@/lib/director-application-workflow";
 
-const statusConfig = {
-  pending: {
-    label: "Pending",
-    color: "bg-amber-50 text-amber-700",
-    icon: Clock,
-  },
-  stage_1_submitted: {
-    label: "Stage 1 review",
-    color: "bg-amber-50 text-amber-700",
-    icon: Search,
-  },
-  review_pending: {
-    label: "Deferred",
-    color: "bg-slate-100 text-slate-700",
-    icon: Clock,
-  },
-  stage_1_approved: {
-    label: "Stage 1 ✓",
-    color: "bg-purple-50 text-purple-700",
-    icon: Users,
-  },
-  stage_2_submitted: {
-    label: "Stage 2 review",
-    color: "bg-indigo-50 text-indigo-700",
-    icon: Video,
-  },
-  stage_2_review_pending: {
-    label: "Stage 2 deferred",
-    color: "bg-slate-100 text-slate-700",
-    icon: Clock,
-  },
-  stage_2_approved: {
-    label: "Stage 2 ✓",
-    color: "bg-indigo-50 text-indigo-700",
-    icon: Video,
-  },
-  interview_review_pending: {
-    label: "Interview pending",
-    color: "bg-slate-100 text-slate-700",
-    icon: Clock,
-  },
-  called_for_interview: {
-    label: "Interview",
-    color: "bg-indigo-50 text-indigo-700",
-    icon: Video,
-  },
-  interview: {
-    label: "Interview",
-    color: "bg-indigo-50 text-indigo-700",
-    icon: Video,
-  },
-  accepted: {
-    label: "Accepted",
-    color: "bg-green-50 text-green-700",
-    icon: CheckCircle2,
-  },
-  rejected: {
-    label: "Rejected",
-    color: "bg-red-50 text-red-700",
-    icon: XCircle,
-  },
-  draft: {
-    label: "Draft",
-    color: "bg-gray-50 text-gray-500",
-    icon: Clock,
-  },
-};
+function hrefForFilters({ status = "", workflow = "all" }) {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (workflow && workflow !== "all") params.set("workflow", workflow);
+  const qs = params.toString();
+  return qs ? `/director/applications?${qs}` : "/director/applications";
+}
 
 async function fetchWithAdmin(statusFilter) {
   const admin = createAdminClient();
@@ -179,7 +118,11 @@ async function loadCounts() {
   }
 }
 
-async function loadActiveAssignmentLabels() {
+/**
+ * Active assignments + matching assessments for workflow classification and labels.
+ * Operates on the full Director operational population (not the visible page alone).
+ */
+async function loadAssignmentWorkflowMeta(applications) {
   try {
     const admin = createAdminClient();
     const { data: rows } = await admin
@@ -187,42 +130,34 @@ async function loadActiveAssignmentLabels() {
       .select("application_id, assessor_id, status, profiles:assessor_id(full_name, email)")
       .eq("status", "active");
 
-    const map = {};
-    for (const row of rows || []) {
-      const name = row.profiles?.full_name || row.profiles?.email || "Assessor";
-      map[row.application_id] = {
-        assessor_id: row.assessor_id,
-        label: `Assigned to ${name}`,
-        email: row.profiles?.email || null,
-      };
+    const active = rows || [];
+    const appIds = active.map((r) => r.application_id).filter(Boolean);
+    let assessments = [];
+    if (appIds.length > 0) {
+      const { data: assessmentRows } = await admin
+        .from("application_assessments")
+        .select(
+          "application_id, assessor_id, stage, recommendation, submitted_at, assessor_name_snapshot"
+        )
+        .in("application_id", appIds)
+        .order("submitted_at", { ascending: false });
+      assessments = assessmentRows || [];
     }
 
-    const appIds = Object.keys(map);
-    if (appIds.length === 0) return map;
-
-    const { data: assessments } = await admin
-      .from("application_assessments")
-      .select("application_id, assessor_id, recommendation, submitted_at, assessor_name_snapshot")
-      .in("application_id", appIds)
-      .order("submitted_at", { ascending: false });
-
-    const seen = new Set();
-    for (const a of assessments || []) {
-      if (seen.has(a.application_id)) continue;
-      if (map[a.application_id]?.assessor_id && a.assessor_id !== map[a.application_id].assessor_id) {
-        continue;
-      }
-      seen.add(a.application_id);
-      if (map[a.application_id]) {
-        const who = a.assessor_name_snapshot || map[a.application_id].label.replace(/^Assigned to /, "");
-        map[a.application_id].label = `Assessment submitted by ${who}`;
-        map[a.application_id].recommendation = a.recommendation || null;
-      }
-    }
-    return map;
+    const statusByAppId = Object.fromEntries(
+      (applications || []).map((app) => [app.id, app.status])
+    );
+    return buildDirectorAssignmentWorkflowMap(active, assessments, statusByAppId);
   } catch {
     return {};
   }
+}
+
+function normalizeWorkflowParam(raw) {
+  const key = typeof raw === "string" ? raw.trim() : "";
+  if (!key || key === "all") return "all";
+  if (DIRECTOR_WORKFLOW_FILTERS.some((f) => f.key === key)) return key;
+  return "all";
 }
 
 export default async function DirectorApplicationsPage({ searchParams }) {
@@ -243,19 +178,41 @@ export default async function DirectorApplicationsPage({ searchParams }) {
 
   const params = await searchParams;
   const statusFilter = params?.status || "";
+  const workflowFilter = normalizeWorkflowParam(params?.workflow);
 
-  const [{ applications, loadError }, counts, assignmentLabels] = await Promise.all([
-    loadApplications(statusFilter),
+  // Load full operational set for accurate workflow counts, then apply status filter in memory.
+  const [{ applications: allOperational, loadError }, statusCounts] = await Promise.all([
+    loadApplications(""),
     loadCounts(),
-    loadActiveAssignmentLabels(),
   ]);
 
-  const countForFilter = (key) => {
-    if (key === "") return counts.all;
-    if (key === "pending") return counts.pending;
-    if (key === "accepted") return counts.accepted;
-    if (key === "rejected") return counts.rejected;
+  const assignmentMap = await loadAssignmentWorkflowMeta(allOperational);
+  const classifiedAll = classifyDirectorApplications(allOperational, assignmentMap);
+  const workflowCounts = summarizeDirectorWorkflowCounts(classifiedAll);
+
+  // Status filter (Pending / Accepted / Rejected / exact) on top of operational set
+  const statusScoped = statusFilter
+    ? classifiedAll.filter(({ app }) => {
+        if (statusFilter === "pending") {
+          return DIRECTOR_PENDING_STATUSES.includes(app.status);
+        }
+        return app.status === statusFilter;
+      })
+    : classifiedAll;
+
+  const listItems = filterByDirectorWorkflow(statusScoped, workflowFilter);
+
+  const countForStatusFilter = (key) => {
+    if (key === "") return statusCounts.all;
+    if (key === "pending") return statusCounts.pending;
+    if (key === "accepted") return statusCounts.accepted;
+    if (key === "rejected") return statusCounts.rejected;
     return 0;
+  };
+
+  const countForWorkflow = (key) => {
+    if (key === "all") return workflowCounts.all;
+    return workflowCounts[key] || 0;
   };
 
   return (
@@ -277,97 +234,62 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         </div>
       )}
 
-      {/* Primary filters */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      {/* Workflow queues — mutually exclusive current stages */}
+      <div className="mb-4 flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-gray-400" />
-          <span className="text-xs font-medium text-gray-500">Filter:</span>
+          <span className="text-xs font-medium text-gray-500">Workflow:</span>
+        </div>
+        {DIRECTOR_WORKFLOW_FILTERS.map(({ key, label }) => (
+          <Link
+            key={key}
+            href={hrefForFilters({ status: statusFilter, workflow: key })}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              workflowFilter === key
+                ? "bg-royal text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {label} ({countForWorkflow(key)})
+          </Link>
+        ))}
+      </div>
+
+      {/* Existing outcome / pipeline status chips */}
+      <div className="mb-6 flex flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Status:</span>
         </div>
         {DIRECTOR_PRIMARY_FILTERS.map(({ key, label }) => (
           <Link
-            key={key || "all"}
-            href={key ? `/director/applications?status=${key}` : "/director/applications"}
+            key={key || "all-status"}
+            href={hrefForFilters({
+              status: key,
+              workflow: workflowFilter,
+            })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === key
                 ? "bg-royal text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            {label} ({countForFilter(key)})
+            {key === "" ? "All statuses" : label} ({countForStatusFilter(key)})
           </Link>
         ))}
       </div>
 
-      {counts.draft > 0 ? (
+      {statusCounts.draft > 0 ? (
         <p className="mb-4 text-xs text-gray-500">
-          {counts.draft} draft application{counts.draft === 1 ? "" : "s"} in progress (not shown
-          until Stage 1 is submitted).
+          {statusCounts.draft} draft application{statusCounts.draft === 1 ? "" : "s"} in progress
+          (not shown until Stage 1 is submitted).
         </p>
       ) : null}
 
-      {/* Application list */}
-      {!applications || applications.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-200 bg-white p-12 text-center">
-          <FileText size={32} className="mx-auto text-gray-300" />
-          <p className="mt-3 text-sm text-gray-400">
-            {statusFilter === "pending"
-              ? "No pending applications."
-              : statusFilter === "accepted"
-                ? "No accepted applications yet."
-                : statusFilter === "rejected"
-                  ? "No rejected applications."
-                  : "No applications found."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {applications.map((app) => {
-            const config = statusConfig[app.status] || statusConfig.pending;
-            const assignee = assignmentLabels[app.id];
-            return (
-              <Link
-                key={app.id}
-                href={`/director/applications/${app.id}`}
-                className="group flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center sm:gap-4"
-              >
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-royal text-xs font-bold text-gold">
-                  {(app.profiles?.full_name || app.full_name)
-                    ?.split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase() || "?"}
-                </div>
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  <p className="truncate font-semibold text-gray-900">
-                    {app.profiles?.full_name || app.full_name || "Unknown"}
-                  </p>
-                  <p className="truncate text-xs text-gray-500">
-                    {app.profiles?.email || "\u2014"}
-                    {" · "}
-                    <span className={assignee ? "text-indigo-700" : "text-gray-400"}>
-                      {assignee?.label || "Unassigned"}
-                    </span>
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${config.color}`}
-                >
-                  {statusConfig[app.status]?.label || config.label}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {app.submitted_at
-                    ? new Date(app.submitted_at).toLocaleDateString()
-                    : "\u2014"}
-                </span>
-                <ChevronRight
-                  size={16}
-                  className="text-gray-300 transition-colors group-hover:text-royal"
-                />
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <DirectorApplicationsList
+        items={listItems}
+        workflowFilter={workflowFilter}
+        statusFilter={statusFilter}
+      />
     </div>
   );
 }

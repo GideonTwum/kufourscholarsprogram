@@ -45,10 +45,15 @@ test("director detail assignment includes assessor identity and assessment summa
 });
 
 test("director applications list shows Unassigned or Assigned to", () => {
-  const src = readFileSync(resolve("app/(dashboard)/director/applications/page.js"), "utf8");
-  assert.match(src, /loadActiveAssignmentLabels/);
-  assert.match(src, /Unassigned/);
-  assert.match(src, /Assigned to/);
+  const page = readFileSync(resolve("app/(dashboard)/director/applications/page.js"), "utf8");
+  const list = readFileSync(
+    resolve("components/director/DirectorApplicationsList.jsx"),
+    "utf8"
+  );
+  const helper = readFileSync(resolve("lib/director-application-workflow.js"), "utf8");
+  assert.match(page, /loadAssignmentWorkflowMeta|buildDirectorAssignmentWorkflowMap/);
+  assert.match(list, /Unassigned/);
+  assert.match(helper, /Assigned to/);
 });
 
 test("verify assessor application load SQL exists", () => {
