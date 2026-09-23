@@ -28,6 +28,8 @@ test("assessor dashboard distinguishes empty vs failure and retries", () => {
   assert.match(src, /Retry/);
   assert.match(src, /Assigned to you/);
   assert.match(src, /Assessment pending|Assessment submitted/);
+  assert.match(src, /filterAssessorApplicationsBySearch/);
+  assert.match(src, /No assigned applicants match your search/);
 });
 
 test("director detail assignment includes assessor identity and assessment summary", () => {
