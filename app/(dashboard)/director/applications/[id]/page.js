@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ClipboardList,
   Clock,
+  Mail,
 } from "lucide-react";
 import { getLeadershipEvidencePaths, getRecommendationLetterPaths, getWassceResultsPaths, shouldShowWassceHistoricalNote, WASSCE_HISTORICAL_MESSAGE } from "@/lib/application-validation";
 import { formatGenderLabel } from "@/lib/applicant-demographics";
@@ -534,9 +535,20 @@ export default function ApplicationReviewPage() {
               <p className="truncate text-sm text-gray-500">{profile?.email}</p>
             </div>
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusFlow.find((s) => s.key === application.status)?.color || "bg-gray-100 text-gray-600"}`}>
-            {statusFlow.find((s) => s.key === application.status)?.label || application.status?.replace(/_/g, " ")}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${statusFlow.find((s) => s.key === application.status)?.color || "bg-gray-100 text-gray-600"}`}>
+              {statusFlow.find((s) => s.key === application.status)?.label || application.status?.replace(/_/g, " ")}
+            </span>
+            {application.status !== "draft" ? (
+              <Link
+                href={`/director/communications?applicant=${encodeURIComponent(application.id)}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-royal/20 bg-royal/5 px-3 py-1.5 text-xs font-medium text-royal hover:bg-royal/10"
+              >
+                <Mail size={14} />
+                Message Applicant
+              </Link>
+            ) : null}
+          </div>
         </div>
       </div>
 

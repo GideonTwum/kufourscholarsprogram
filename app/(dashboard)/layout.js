@@ -35,6 +35,7 @@ const directorNav = [
   { label: "News", href: "/director/news", icon: Newspaper },
   { label: "Messages", href: "/director/messages", icon: MessageCircle },
   { label: "Announcements", href: "/director/announcements", icon: Megaphone },
+  { label: "Communications", href: "/director/communications", icon: Mail },
   { label: "Requests", href: "/director/requests", icon: MessageSquare },
   { label: "Audit Log", href: "/director/audit-log", icon: FileText },
   { label: "Settings", href: "/director/settings", icon: Settings },
