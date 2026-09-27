@@ -221,7 +221,7 @@ test("zero recipient and validation edges", () => {
   assert.ok(COMMUNICATION_AUDIENCES.includes("interview_review_pending"));
 });
 
-test("migration includes sending claim + RLS; resume UI present", () => {
+test("migration includes sending claim + RLS; continue-send UI present", () => {
   const mig = resolve("supabase/migrations/202609270001_director_communications.sql");
   assert.equal(existsSync(mig), true);
   const sql = readFileSync(mig, "utf8");
@@ -236,9 +236,10 @@ test("migration includes sending claim + RLS; resume UI present", () => {
     resolve("app/(dashboard)/director/communications/CommunicationsClient.jsx"),
     "utf8"
   );
-  assert.match(ui, /Resume Sending/);
+  assert.match(ui, /Continue Sending/);
   assert.match(ui, /resumeCampaign/);
-  assert.match(ui, /already-delivered applicants are skipped/i);
+  assert.match(ui, /interrupted before all recipients were processed/i);
+  assert.doesNotMatch(ui, /Resume Sending/);
 });
 
 test("audience select uses profiles.email — never applications.email column", () => {

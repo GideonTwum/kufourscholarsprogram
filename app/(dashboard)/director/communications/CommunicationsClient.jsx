@@ -40,6 +40,15 @@ function formatApplicationStatus(status) {
   return String(status).replace(/_/g, " ");
 }
 
+function formatCampaignStatus(status) {
+  if (status === "completed") return "Sent";
+  if (status === "partial_failure") return "Sent with issues";
+  if (status === "failed") return "Failed";
+  if (status === "processing" || status === "queued") return "Sending";
+  if (status === "draft") return "Draft";
+  return status ? String(status).replace(/_/g, " ") : "";
+}
+
 export default function CommunicationsClient() {
   const searchParams = useSearchParams();
   const applicantId = searchParams.get("applicant") || "";
@@ -64,6 +73,7 @@ export default function CommunicationsClient() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [lastSendOutcome, setLastSendOutcome] = useState(null);
   const [sending, setSending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
@@ -229,18 +239,32 @@ export default function CommunicationsClient() {
     setResumingId(communicationId);
     setError("");
     setSuccess("");
+    setLastSendOutcome(null);
     setSendProgress(null);
     try {
       const finalResult = await continueSending(communicationId);
-      setSuccess(
-        finalResult.message ||
-          `Finished: ${finalResult.successful_count ?? 0} delivered, ${finalResult.failed_count ?? 0} failed.`
-      );
+      const successful = finalResult.successful_count ?? 0;
+      const failed = finalResult.failed_count ?? 0;
+      const total = successful + failed;
+      setLastSendOutcome({
+        kind: "bulk",
+        successful,
+        failed,
+        total,
+        name: null,
+      });
+      if (failed > 0 && successful > 0) {
+        setSuccess(`Sending completed with some issues: ${successful} sent successfully · ${failed} could not be sent`);
+      } else if (failed > 0 && successful === 0) {
+        setSuccess(`Sending failed: ${failed} could not be sent`);
+      } else {
+        setSuccess(`Emails sent: ${successful} applicant${successful === 1 ? "" : "s"} processed.`);
+      }
       loadHistory();
     } catch (e) {
       setError(
         e.message ||
-          "Resume interrupted. Refresh History and click Resume Sending again — already-sent applicants will not be emailed twice."
+          "Sending was interrupted. Refresh Email History and click Continue Sending — applicants who already received the email will not be emailed again."
       );
       loadHistory();
     } finally {
@@ -253,6 +277,7 @@ export default function CommunicationsClient() {
     setPreviewLoading(true);
     setError("");
     setSuccess("");
+    setLastSendOutcome(null);
     setPreview(null);
     if (audience === "individual" && !applicationId) {
       setError("Select an applicant before previewing.");
@@ -284,17 +309,23 @@ export default function CommunicationsClient() {
   }
 
   const sampleEmail = useMemo(() => {
-    const name = preview?.preview?.[0]?.full_name || "Ama Mensah";
+    const name =
+      selectedApplicant?.full_name || preview?.preview?.[0]?.full_name || "Ama Mensah";
     return buildPersonalizedEmail({ subject, body, fullName: name });
-  }, [subject, body, preview]);
+  }, [subject, body, preview, selectedApplicant]);
+
+  const isIndividualConfirm =
+    audience === "individual" && (preview?.recipient_count === 1 || Boolean(selectedApplicant));
 
   async function confirmAndSend() {
     setSending(true);
     setError("");
     setSuccess("");
+    setLastSendOutcome(null);
     setSendProgress(null);
     const key = idempotencyKey || `comm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     setIdempotencyKey(key);
+    const individualName = selectedApplicant?.full_name || null;
     try {
       const res = await fetch("/api/director/communications", {
         method: "POST",
@@ -323,16 +354,51 @@ export default function CommunicationsClient() {
 
       setConfirmOpen(false);
       setIdempotencyKey("");
-      setSuccess(
-        finalResult.message ||
-          `Finished: ${finalResult.successful_count ?? 0} delivered, ${finalResult.failed_count ?? 0} failed.`
-      );
-      setTab("history");
-      loadHistory();
+      const successful = finalResult.successful_count ?? 0;
+      const failed = finalResult.failed_count ?? 0;
+      const total = Math.max(successful + failed, preview?.recipient_count || 0);
+
+      if (audience === "individual" && successful >= 1 && failed === 0) {
+        setLastSendOutcome({
+          kind: "individual",
+          successful,
+          failed: 0,
+          total: 1,
+          name: individualName,
+        });
+        setSuccess(
+          individualName
+            ? `Email sent successfully. Your email was sent to ${individualName}.`
+            : "Email sent successfully."
+        );
+        setTab("compose");
+      } else {
+        setLastSendOutcome({
+          kind: "bulk",
+          successful,
+          failed,
+          total,
+          name: null,
+        });
+        if (failed > 0 && successful > 0) {
+          setSuccess(
+            `Sending completed with some issues: ${successful} sent successfully · ${failed} could not be sent`
+          );
+        } else if (failed > 0 && successful === 0) {
+          setSuccess(`Sending failed: ${failed} could not be sent`);
+        } else {
+          setSuccess(
+            `Emails sent: ${successful} applicant${successful === 1 ? "" : "s"} were processed.`
+          );
+        }
+        setTab("history");
+        loadHistory();
+      }
     } catch (e) {
       setError(e.message || "Send failed.");
     } finally {
       setSending(false);
+      setSendProgress(null);
     }
   }
 
@@ -358,12 +424,10 @@ export default function CommunicationsClient() {
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
           <Mail className="text-royal" size={28} />
-          Communications
+          Email
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          Send updates and recruitment messages to applicants. Recipients are resolved securely on
-          the server from your selected audience. Large sends run in small batches — keep this page
-          open until finished, or use Resume Sending from History if interrupted.
+          Send updates and messages to applicants.
         </p>
       </div>
 
@@ -371,7 +435,7 @@ export default function CommunicationsClient() {
         {[
           { key: "compose", label: "Compose" },
           { key: "templates", label: "Templates" },
-          { key: "history", label: "History" },
+          { key: "history", label: "Email History" },
         ].map((t) => (
           <button
             key={t.key}
@@ -392,10 +456,69 @@ export default function CommunicationsClient() {
           <span>{error}</span>
         </div>
       ) : null}
-      {success ? (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-          <span>{success}</span>
+      {success || lastSendOutcome ? (
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-700" />
+            <div className="min-w-0">
+              {lastSendOutcome?.kind === "individual" ? (
+                <>
+                  <p className="font-semibold">Email sent successfully</p>
+                  <p className="mt-1">
+                    Your email was sent to {lastSendOutcome.name || "the selected applicant"}.
+                  </p>
+                </>
+              ) : lastSendOutcome?.kind === "bulk" && lastSendOutcome.failed > 0 && lastSendOutcome.successful === 0 ? (
+                <>
+                  <p className="font-semibold">Sending failed</p>
+                  <p className="mt-1">{lastSendOutcome.failed} could not be sent</p>
+                </>
+              ) : lastSendOutcome?.kind === "bulk" && lastSendOutcome.failed > 0 ? (
+                <>
+                  <p className="font-semibold">Sending completed with some issues</p>
+                  <p className="mt-1">
+                    {lastSendOutcome.successful} sent successfully · {lastSendOutcome.failed} could not
+                    be sent
+                  </p>
+                </>
+              ) : lastSendOutcome?.kind === "bulk" ? (
+                <>
+                  <p className="font-semibold">Emails sent</p>
+                  <p className="mt-1">
+                    {lastSendOutcome.successful} applicant
+                    {lastSendOutcome.successful === 1 ? " was" : "s were"} processed.
+                  </p>
+                </>
+              ) : (
+                <p>{success}</p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuccess("");
+                    setLastSendOutcome(null);
+                    setTab("compose");
+                  }}
+                  className="rounded-lg bg-royal px-3 py-1.5 text-xs font-medium text-white hover:bg-royal/90"
+                >
+                  Send Another Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuccess("");
+                    setLastSendOutcome(null);
+                    setTab("history");
+                    loadHistory();
+                  }}
+                  className="rounded-lg border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-900 hover:bg-green-50"
+                >
+                  View History
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -428,7 +551,7 @@ export default function CommunicationsClient() {
       {tab === "history" ? (
         <div className="rounded-xl bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="font-semibold text-gray-900">Recent Communications</h2>
+            <h2 className="font-semibold text-gray-900">Email History</h2>
             <button
               type="button"
               onClick={loadHistory}
@@ -442,24 +565,26 @@ export default function CommunicationsClient() {
               <Loader2 className="animate-spin text-royal" />
             </div>
           ) : history.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">No communications yet.</p>
+            <p className="py-8 text-center text-sm text-gray-500">No emails sent yet.</p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {history.map((row) => {
                 const canResume = row.status === "processing" || row.status === "queued";
-                const remaining = Math.max(
-                  0,
-                  (row.recipient_count || 0) - (row.successful_count || 0) - (row.failed_count || 0)
-                );
+                const total = row.recipient_count || 0;
                 return (
                   <li key={row.id} className="py-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate font-medium text-gray-900">{row.subject}</p>
                         <p className="text-xs text-gray-500">
-                          {row.audience_label} · {row.recipient_count} recipients ·{" "}
-                          {row.successful_count ?? 0} delivered · {row.failed_count ?? 0} failed
-                          {canResume ? ` · ~${remaining} remaining` : ""}
+                          {row.audience_label} · {total} recipient{total === 1 ? "" : "s"}
+                          {total > 0
+                            ? ` · ${row.successful_count ?? 0} sent${
+                                (row.failed_count || 0) > 0
+                                  ? ` · ${row.failed_count} could not be sent`
+                                  : ""
+                              }`
+                            : ""}
                         </p>
                         <p className="text-xs text-gray-400">
                           {row.created_by_name_snapshot || "Director"} ·{" "}
@@ -467,8 +592,7 @@ export default function CommunicationsClient() {
                         </p>
                         {canResume ? (
                           <p className="mt-1 text-xs text-blue-700">
-                            Sending was interrupted or is still in progress. Resume continues the
-                            original recipient list only — already-delivered applicants are skipped.
+                            This email was interrupted before all recipients were processed.
                           </p>
                         ) : null}
                       </div>
@@ -476,7 +600,7 @@ export default function CommunicationsClient() {
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(row.status)}`}
                         >
-                          {row.status?.replace(/_/g, " ")}
+                          {formatCampaignStatus(row.status)}
                         </span>
                         {canResume ? (
                           <button
@@ -490,16 +614,16 @@ export default function CommunicationsClient() {
                             ) : (
                               <RefreshCw size={12} />
                             )}
-                            Resume Sending
+                            Continue Sending
                           </button>
                         ) : null}
                       </div>
                     </div>
                     {resumingId === row.id && sendProgress ? (
-                      <p className="mt-2 text-xs text-blue-700">
-                        Progress: {sendProgress.successful_count ?? 0} delivered,{" "}
-                        {sendProgress.failed_count ?? 0} failed,{" "}
-                        {sendProgress.remaining_pending ?? "?"} pending…
+                      <p className="mt-2 text-sm text-blue-700">
+                        Sending emails...{" "}
+                        {(sendProgress.successful_count ?? 0) + (sendProgress.failed_count ?? 0)} of{" "}
+                        {total || "?"} sent
                       </p>
                     ) : null}
                   </li>
@@ -516,7 +640,7 @@ export default function CommunicationsClient() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="audience">
-                  Audience
+                  Who are you emailing?
                 </label>
                 <select
                   id="audience"
@@ -549,7 +673,7 @@ export default function CommunicationsClient() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="template">
-                  Template
+                  What do you want to send?
                 </label>
                 <select
                   id="template"
@@ -569,7 +693,7 @@ export default function CommunicationsClient() {
             {audience === "individual" ? (
               <div className="mt-4">
                 <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="applicant-search">
-                  Applicant
+                  Recipient
                 </label>
                 {applicantLookupLoading ? (
                   <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-600">
@@ -696,8 +820,8 @@ export default function CommunicationsClient() {
                 maxLength={12000}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Personalization: {"{{first_name}}"}, {"{{full_name}}"}. Each applicant receives their
-                own private email.
+                You can personalize with {"{{first_name}}"} or {"{{full_name}}"}. Each applicant
+                receives a separate, private email.
               </p>
             </div>
 
@@ -726,14 +850,14 @@ export default function CommunicationsClient() {
                 className="inline-flex items-center gap-2 rounded-lg bg-royal px-4 py-2 text-sm font-medium text-white hover:bg-royal/90 disabled:opacity-50"
               >
                 <Send size={16} />
-                Send Message
+                Send Email
               </button>
             </div>
           </div>
 
           {preview ? (
             <div className="rounded-xl bg-white p-5 shadow-sm">
-              <h2 className="font-semibold text-gray-900">Recipient preview</h2>
+              <h2 className="font-semibold text-gray-900">Preview Recipients</h2>
               <p className="mt-1 text-sm text-gray-700">{preview.message}</p>
               {preview.exclusion_message ? (
                 <p className="mt-1 text-sm text-amber-700">{preview.exclusion_message}</p>
@@ -762,8 +886,8 @@ export default function CommunicationsClient() {
               </div>
               {preview.has_more ? (
                 <p className="mt-2 text-xs text-gray-500">
-                  Showing first {preview.preview_limit} of {preview.recipient_count}. Full send uses
-                  the complete server-resolved list.
+                  Showing first {preview.preview_limit} of {preview.recipient_count}. All matching
+                  applicants will be included when you send.
                 </p>
               ) : null}
             </div>
@@ -796,53 +920,110 @@ export default function CommunicationsClient() {
       {confirmOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Send communication</h3>
-            <dl className="mt-3 space-y-2 text-sm text-gray-700">
-              <div>
-                <dt className="text-gray-500">Audience</dt>
-                <dd className="font-medium">{COMMUNICATION_AUDIENCE_LABELS[audience]}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">Recipients</dt>
-                <dd className="font-medium">{preview?.recipient_count ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">Subject</dt>
-                <dd className="font-medium break-words">{subject}</dd>
-              </div>
-            </dl>
-            <p className="mt-3 text-sm text-gray-600">
-              You are about to send this message to {preview?.recipient_count ?? 0} applicant
-              {(preview?.recipient_count ?? 0) === 1 ? "" : "s"}. Each person receives a private
-              email. Large campaigns send in batches of 15 — keep this dialog open until finished.
-              Closing the browser does not cancel already-sent emails; use Resume Sending in History
-              for any remaining recipients.
-            </p>
-            {sendProgress && !sendProgress.done ? (
-              <p className="mt-2 text-sm text-blue-700">
-                Sending… {sendProgress.successful_count ?? 0} delivered,{" "}
-                {sendProgress.remaining_pending ?? "?"} remaining.
-              </p>
-            ) : null}
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                disabled={sending}
-                onClick={() => setConfirmOpen(false)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={sending}
-                onClick={confirmAndSend}
-                className="inline-flex items-center gap-2 rounded-lg bg-royal px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                Confirm &amp; Send
-              </button>
-            </div>
+            {isIndividualConfirm ? (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900">Send this email?</h3>
+                <p className="mt-3 text-sm text-gray-600">You&apos;re about to send an email to:</p>
+                <div className="mt-2 rounded-lg bg-gray-50 p-3 text-sm">
+                  <p className="font-semibold text-gray-900">
+                    {selectedApplicant?.full_name ||
+                      preview?.preview?.[0]?.full_name ||
+                      "Selected applicant"}
+                  </p>
+                  <p className="mt-0.5 text-gray-600">
+                    {selectedApplicant?.email || preview?.preview?.[0]?.email || ""}
+                  </p>
+                  {(selectedApplicant?.university || preview?.preview?.[0]?.university) ? (
+                    <p className="mt-0.5 text-gray-500">
+                      {selectedApplicant?.university || preview?.preview?.[0]?.university}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="mt-4 text-sm">
+                  <p className="text-gray-500">Subject</p>
+                  <p className="font-medium break-words text-gray-900">{subject}</p>
+                </div>
+                {sending && sendProgress && !sendProgress.done ? (
+                  <p className="mt-3 text-sm text-blue-700">Sending email...</p>
+                ) : null}
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => setConfirmOpen(false)}
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-sm disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={confirmAndSend}
+                    className="inline-flex items-center gap-2 rounded-lg bg-royal px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                    Send Email
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Send to {preview?.recipient_count ?? 0} applicants?
+                </h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  Each applicant will receive a separate, private email.
+                </p>
+                <dl className="mt-4 space-y-3 text-sm text-gray-700">
+                  <div>
+                    <dt className="text-gray-500">Recipients</dt>
+                    <dd className="font-medium">
+                      {preview?.recipient_count ?? 0} applicant
+                      {(preview?.recipient_count ?? 0) === 1 ? "" : "s"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-gray-500">Subject</dt>
+                    <dd className="font-medium break-words">{subject}</dd>
+                  </div>
+                </dl>
+                <p className="mt-4 text-sm text-gray-600">
+                  Emails are sent in small batches. Keep this page open while sending. If sending is
+                  interrupted, you can continue from History.
+                </p>
+                {sending && sendProgress ? (
+                  <div className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+                    <p className="font-semibold">Sending emails...</p>
+                    <p className="mt-1">
+                      {(sendProgress.successful_count ?? 0) + (sendProgress.failed_count ?? 0)} of{" "}
+                      {preview?.recipient_count ?? "?"} sent
+                    </p>
+                    <p className="mt-1 text-xs text-blue-700">
+                      Please keep this page open until sending is complete.
+                    </p>
+                  </div>
+                ) : null}
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => setConfirmOpen(false)}
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-sm disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={confirmAndSend}
+                    className="inline-flex items-center gap-2 rounded-lg bg-royal px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                    Send to {preview?.recipient_count ?? 0} Applicants
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}
@@ -852,7 +1033,7 @@ export default function CommunicationsClient() {
         <Link href="/director/announcements" className="text-royal hover:underline">
           Announcements
         </Link>
-        . This centre sends email via the existing Resend integration.
+        .
       </p>
     </div>
   );
