@@ -12,11 +12,14 @@ import {
   AlertCircle,
   CheckCircle2,
   RefreshCw,
+  Search,
+  X,
 } from "lucide-react";
 import {
   COMMUNICATION_AUDIENCES,
   COMMUNICATION_AUDIENCE_LABELS,
   COMMUNICATION_AUDIENCE_HINTS,
+  COMMUNICATION_APPLICANT_SEARCH_MIN_CHARS,
   COMMUNICATION_TEMPLATES,
   getCommunicationTemplate,
   buildPersonalizedEmail,
@@ -32,6 +35,11 @@ function statusBadgeClass(status) {
   return "bg-gray-100 text-gray-600";
 }
 
+function formatApplicationStatus(status) {
+  if (!status) return "";
+  return String(status).replace(/_/g, " ");
+}
+
 export default function CommunicationsClient() {
   const searchParams = useSearchParams();
   const applicantId = searchParams.get("applicant") || "";
@@ -39,6 +47,14 @@ export default function CommunicationsClient() {
   const [tab, setTab] = useState("compose");
   const [audience, setAudience] = useState(applicantId ? "individual" : "all_submitted");
   const [applicationId, setApplicationId] = useState(applicantId);
+  const [selectedApplicant, setSelectedApplicant] = useState(null);
+  const [applicantQuery, setApplicantQuery] = useState("");
+  const [applicantResults, setApplicantResults] = useState([]);
+  const [applicantSearchLoading, setApplicantSearchLoading] = useState(false);
+  const [applicantSearchMessage, setApplicantSearchMessage] = useState(
+    "Type a name or email to search."
+  );
+  const [applicantLookupLoading, setApplicantLookupLoading] = useState(false);
   const [templateId, setTemplateId] = useState("application_update");
   const [subject, setSubject] = useState(COMMUNICATION_TEMPLATES[0].subject);
   const [body, setBody] = useState(COMMUNICATION_TEMPLATES[0].body);
@@ -63,6 +79,100 @@ export default function CommunicationsClient() {
     }
   }, [applicantId]);
 
+  // Prefill selected applicant from detail-page deep link (application_id in URL only)
+  useEffect(() => {
+    if (!applicantId) return;
+    let cancelled = false;
+    async function loadApplicant() {
+      setApplicantLookupLoading(true);
+      try {
+        const res = await fetch(
+          `/api/director/communications/applicants?application_id=${encodeURIComponent(applicantId)}`
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.applicant) {
+          setSelectedApplicant(data.applicant);
+          setApplicationId(data.applicant.application_id);
+          setApplicantQuery("");
+          setApplicantResults([]);
+        } else {
+          setError(data.error || "Could not load the selected applicant.");
+        }
+      } catch {
+        if (!cancelled) setError("Could not load the selected applicant.");
+      } finally {
+        if (!cancelled) setApplicantLookupLoading(false);
+      }
+    }
+    loadApplicant();
+    return () => {
+      cancelled = true;
+    };
+  }, [applicantId]);
+
+  // Debounced applicant search
+  useEffect(() => {
+    if (audience !== "individual" || selectedApplicant) return;
+    const q = applicantQuery.trim();
+    if (q.length < COMMUNICATION_APPLICANT_SEARCH_MIN_CHARS) {
+      setApplicantResults([]);
+      setApplicantSearchMessage(
+        q.length === 0
+          ? "Type a name or email to search."
+          : `Type at least ${COMMUNICATION_APPLICANT_SEARCH_MIN_CHARS} characters to search.`
+      );
+      setApplicantSearchLoading(false);
+      return;
+    }
+
+    const handle = setTimeout(async () => {
+      setApplicantSearchLoading(true);
+      setApplicantSearchMessage("Searching...");
+      try {
+        const res = await fetch(
+          `/api/director/communications/applicants?q=${encodeURIComponent(q)}`
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          setApplicantResults([]);
+          setApplicantSearchMessage(data.error || "Search failed.");
+        } else {
+          setApplicantResults(data.applicants || []);
+          setApplicantSearchMessage(
+            data.message ||
+              ((data.applicants || []).length === 0
+                ? "No submitted applicants found."
+                : "")
+          );
+        }
+      } catch {
+        setApplicantResults([]);
+        setApplicantSearchMessage("Search failed.");
+      } finally {
+        setApplicantSearchLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(handle);
+  }, [applicantQuery, audience, selectedApplicant]);
+
+  function selectApplicant(applicant) {
+    setSelectedApplicant(applicant);
+    setApplicationId(applicant.application_id);
+    setApplicantQuery("");
+    setApplicantResults([]);
+    setPreview(null);
+  }
+
+  function clearSelectedApplicant() {
+    setSelectedApplicant(null);
+    setApplicationId("");
+    setApplicantQuery("");
+    setApplicantResults([]);
+    setPreview(null);
+    setApplicantSearchMessage("Type a name or email to search.");
+  }
   function applyTemplate(id) {
     setTemplateId(id);
     const t = getCommunicationTemplate(id);
@@ -144,6 +254,11 @@ export default function CommunicationsClient() {
     setError("");
     setSuccess("");
     setPreview(null);
+    if (audience === "individual" && !applicationId) {
+      setError("Select an applicant before previewing.");
+      setPreviewLoading(false);
+      return;
+    }
     try {
       const res = await fetch("/api/director/communications/preview", {
         method: "POST",
@@ -223,6 +338,10 @@ export default function CommunicationsClient() {
 
   function openConfirm() {
     setError("");
+    if (audience === "individual" && !applicationId) {
+      setError("Select an applicant before sending.");
+      return;
+    }
     if (!preview || preview.recipient_count < 1) {
       setError("Preview recipients first and ensure at least one valid email exists.");
       return;
@@ -403,8 +522,15 @@ export default function CommunicationsClient() {
                   id="audience"
                   value={audience}
                   onChange={(e) => {
-                    setAudience(e.target.value);
+                    const next = e.target.value;
+                    setAudience(next);
                     setPreview(null);
+                    if (next !== "individual") {
+                      setSelectedApplicant(null);
+                      setApplicationId("");
+                      setApplicantQuery("");
+                      setApplicantResults([]);
+                    }
                   }}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 >
@@ -442,22 +568,105 @@ export default function CommunicationsClient() {
 
             {audience === "individual" ? (
               <div className="mt-4">
-                <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="appId">
-                  Application ID
+                <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="applicant-search">
+                  Applicant
                 </label>
-                <input
-                  id="appId"
-                  value={applicationId}
-                  onChange={(e) => {
-                    setApplicationId(e.target.value.trim());
-                    setPreview(null);
-                  }}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm"
-                  placeholder="Prefer Message Applicant from a detail page"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Prefer opening from an applicant detail page. Email is never placed in the URL.
-                </p>
+                {applicantLookupLoading ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-600">
+                    <Loader2 size={16} className="animate-spin text-royal" />
+                    Loading applicant…
+                  </div>
+                ) : selectedApplicant ? (
+                  <div className="rounded-lg border border-royal/20 bg-royal/5 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-gray-900">
+                          {selectedApplicant.full_name}
+                        </p>
+                        <p className="truncate text-sm text-gray-600">
+                          {selectedApplicant.email || "No email on file"}
+                          {selectedApplicant.university
+                            ? ` · ${selectedApplicant.university}`
+                            : ""}
+                        </p>
+                        {selectedApplicant.status ? (
+                          <span className="mt-2 inline-block rounded-full bg-white px-2 py-0.5 text-xs font-medium capitalize text-gray-700 ring-1 ring-gray-200">
+                            {formatApplicationStatus(selectedApplicant.status)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearSelectedApplicant}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        <X size={12} />
+                        Change
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="relative">
+                      <Search
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      />
+                      <input
+                        id="applicant-search"
+                        type="search"
+                        autoComplete="off"
+                        value={applicantQuery}
+                        onChange={(e) => {
+                          setApplicantQuery(e.target.value);
+                          setPreview(null);
+                        }}
+                        className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm"
+                        placeholder="Search applicant by name or email..."
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Search for a submitted applicant by name or email.
+                    </p>
+                    {(applicantSearchLoading ||
+                      applicantQuery.trim().length > 0 ||
+                      applicantResults.length > 0) && (
+                      <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                        {applicantSearchLoading ? (
+                          <div className="flex items-center gap-2 px-3 py-3 text-sm text-gray-500">
+                            <Loader2 size={14} className="animate-spin" />
+                            Searching...
+                          </div>
+                        ) : applicantResults.length === 0 ? (
+                          <p className="px-3 py-3 text-sm text-gray-500">{applicantSearchMessage}</p>
+                        ) : (
+                          <ul className="divide-y divide-gray-50 py-1">
+                            {applicantResults.map((row) => (
+                              <li key={row.application_id}>
+                                <button
+                                  type="button"
+                                  onClick={() => selectApplicant(row)}
+                                  className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-royal/5"
+                                >
+                                  <span className="font-medium text-gray-900">{row.full_name}</span>
+                                  <span className="truncate text-xs text-gray-600">
+                                    {row.email || "No email"}
+                                    {row.university ? ` · ${row.university}` : ""}
+                                  </span>
+                                  {row.status ? (
+                                    <span className="mt-0.5 text-[11px] capitalize text-gray-500">
+                                      {formatApplicationStatus(row.status)}
+                                    </span>
+                                  ) : null}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : null}
 
