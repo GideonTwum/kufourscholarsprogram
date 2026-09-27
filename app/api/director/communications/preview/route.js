@@ -62,6 +62,11 @@ export async function POST(request) {
 
   const resolved = await resolveCommunicationAudience(admin, audience, applicationId);
   if (!resolved.ok) {
+    console.error("[director-communications/preview] resolve failed", {
+      route: "/api/director/communications/preview",
+      audience,
+      error: resolved.error || null,
+    });
     return NextResponse.json({ error: resolved.error || "Could not resolve audience." }, { status: 400 });
   }
 

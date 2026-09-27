@@ -2,10 +2,12 @@ import {
   COMMUNICATION_AUDIENCES,
   COMMUNICATION_AUDIENCE_LABELS,
   COMMUNICATION_AUDIENCE_HINTS,
+  COMMUNICATION_APPLICATION_SELECT,
   COMMUNICATION_BATCH_SIZE,
   SENDING_CLAIM_STALE_MS,
   applyPersonalization,
   buildPersonalizedEmail,
+  buildRecipientDescriptors,
   deriveFirstName,
   filterClassifiedByAudience,
   isValidCommunicationAudience,
@@ -239,11 +241,33 @@ test("migration includes sending claim + RLS; resume UI present", () => {
   assert.match(ui, /already-delivered applicants are skipped/i);
 });
 
+test("audience select uses profiles.email — never applications.email column", () => {
+  assert.match(COMMUNICATION_APPLICATION_SELECT, /profiles!applications_user_id_fkey\(full_name, email\)/);
+  // Must not request a top-level applications.email column (does not exist in schema)
+  assert.doesNotMatch(COMMUNICATION_APPLICATION_SELECT, /university, email,/);
+  assert.doesNotMatch(COMMUNICATION_APPLICATION_SELECT, /,\s*email,/);
+  assert.doesNotMatch(COMMUNICATION_APPLICATION_SELECT, /,\s*email$/);
+
+  const desc = buildRecipientDescriptors([
+    {
+      workflow: "assessed",
+      app: {
+        id: "a1",
+        user_id: "u1",
+        status: "stage_1_submitted",
+        full_name: "Ama Mensah",
+        university: "UG",
+        profiles: { email: "ama@example.com", full_name: "Ama Mensah" },
+      },
+    },
+  ]);
+  assert.equal(desc[0].email, "ama@example.com");
+});
+
 test("audit payloads avoid full body and recipient lists", () => {
   const route = readFileSync(resolve("app/api/director/communications/route.js"), "utf8");
   assert.match(route, /recipient_count/);
   assert.match(route, /subject/);
-  // Must not audit the full message body field in newValue
   assert.doesNotMatch(route, /newValue:[\s\S]{0,120}body:/);
   assert.doesNotMatch(route, /newValue:[\s\S]{0,200}emails:/);
 });
