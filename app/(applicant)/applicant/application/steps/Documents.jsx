@@ -32,11 +32,14 @@ import {
   getWassceResultsPaths,
 } from "@/lib/application-validation";
 import {
-  APPLICATIONS_BUCKET,
-  APPLICANT_UPLOAD_USER_MESSAGE,
+  APPLICANT_UPLOAD_SESSION_MESSAGE,
+  APPLICANT_UPLOAD_TOO_LARGE_MESSAGE,
   buildApplicantStoragePath,
+  fileExtensionFromName,
+  resolveApplicantContentType,
   resolveAuthenticatedUploadUser,
   toApplicantUploadErrorMessage,
+  uploadApplicantDocument,
 } from "@/lib/applicant-storage-upload";
 
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp"];
@@ -101,18 +104,25 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
 
   async function uploadToApplications(file, fieldKey, folder, allowedExts, pdfOnlyMessage) {
     if (!file) return;
-    if (file.size > MAX_FILE_SIZE_DOCS) {
+    if (!file.size || file.size <= 0) {
       setUploadErrors((prev) => ({
         ...prev,
-        [fieldKey]: `File too large. Max 5MB.${pdfOnlyMessage ? " PDF only." : ""}`,
+        [fieldKey]: "This file appears to be empty. Please choose another file.",
       }));
       return;
     }
-    const ext = file.name.toLowerCase().split(".").pop();
-    if (!allowedExts.includes(ext)) {
+    if (file.size > MAX_FILE_SIZE_DOCS) {
       setUploadErrors((prev) => ({
         ...prev,
-        [fieldKey]: pdfOnlyMessage || "Use PDF, JPG, PNG, or WebP.",
+        [fieldKey]: APPLICANT_UPLOAD_TOO_LARGE_MESSAGE,
+      }));
+      return;
+    }
+    const ext = fileExtensionFromName(file.name);
+    if (!ext || !allowedExts.includes(ext)) {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [fieldKey]: pdfOnlyMessage || "Please upload a PDF, JPG or PNG file.",
       }));
       return;
     }
@@ -124,15 +134,15 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
     if (!sessionUserId) {
       setUploadErrors((prev) => ({
         ...prev,
-        [fieldKey]: APPLICANT_UPLOAD_USER_MESSAGE,
+        [fieldKey]: APPLICANT_UPLOAD_SESSION_MESSAGE,
       }));
       setUploading((prev) => ({ ...prev, [fieldKey]: false }));
       return;
     }
     if (userId && userId !== sessionUserId) {
       console.error("[applicant-upload] path userId mismatch vs session", {
-        propUserId: userId,
-        sessionUserId,
+        stage: "auth_check",
+        folder,
       });
     }
 
@@ -142,20 +152,42 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
     } catch (e) {
       setUploadErrors((prev) => ({
         ...prev,
-        [fieldKey]: toApplicantUploadErrorMessage(e),
+        [fieldKey]: toApplicantUploadErrorMessage(e, "[applicant-upload]", {
+          stage: "path_build",
+          folder,
+          ext,
+          size: file.size,
+        }),
       }));
       setUploading((prev) => ({ ...prev, [fieldKey]: false }));
       return;
     }
 
-    // Unique paths → insert; upsert:true still requires UPDATE RLS when Storage uses upsert path.
-    const { error } = await supabase.storage
-      .from(APPLICATIONS_BUCKET)
-      .upload(filePath, file, { upsert: true });
+    const contentType = resolveApplicantContentType(file, ext);
+    const { error } = await uploadApplicantDocument(supabase, {
+      path: filePath,
+      file,
+      contentType,
+      logMeta: {
+        stage: "storage_upload",
+        folder,
+        ext,
+        mime: contentType,
+        size: file.size,
+        field: fieldKey,
+      },
+    });
     if (error) {
       setUploadErrors((prev) => ({
         ...prev,
-        [fieldKey]: toApplicantUploadErrorMessage(error),
+        [fieldKey]: toApplicantUploadErrorMessage(error, "[applicant-upload]", {
+          stage: "storage_upload",
+          folder,
+          ext,
+          mime: contentType,
+          size: file.size,
+          field: fieldKey,
+        }),
       }));
     } else if (fieldKey === "leadership_add") {
       onChange((prev) => {
@@ -189,13 +221,23 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
   async function uploadPassportImage(file) {
     const fieldKey = "photo_url";
     if (!file) return;
-    if (file.size > MAX_FILE_SIZE_PHOTO) {
-      setUploadErrors((prev) => ({ ...prev, [fieldKey]: "Image must be under 5MB." }));
+    if (!file.size || file.size <= 0) {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [fieldKey]: "This file appears to be empty. Please choose another file.",
+      }));
       return;
     }
-    const ext = file.name.toLowerCase().split(".").pop();
-    if (!IMAGE_EXTS.includes(ext)) {
-      setUploadErrors((prev) => ({ ...prev, [fieldKey]: "Use JPG, PNG, or WebP." }));
+    if (file.size > MAX_FILE_SIZE_PHOTO) {
+      setUploadErrors((prev) => ({ ...prev, [fieldKey]: APPLICANT_UPLOAD_TOO_LARGE_MESSAGE }));
+      return;
+    }
+    const ext = fileExtensionFromName(file.name);
+    if (!ext || !IMAGE_EXTS.includes(ext)) {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [fieldKey]: "Please upload a JPG, PNG, or WebP image.",
+      }));
       return;
     }
     setUploading((prev) => ({ ...prev, [fieldKey]: true }));
@@ -204,17 +246,28 @@ export default function Documents({ data, onChange, userId, errors = {} }) {
     const user = await resolveAuthenticatedUploadUser(supabase);
     const sessionUserId = user?.id || null;
     if (!sessionUserId) {
-      setUploadErrors((prev) => ({ ...prev, [fieldKey]: APPLICANT_UPLOAD_USER_MESSAGE }));
+      setUploadErrors((prev) => ({ ...prev, [fieldKey]: APPLICANT_UPLOAD_SESSION_MESSAGE }));
       setUploading((prev) => ({ ...prev, [fieldKey]: false }));
       return;
     }
 
     const path = `${sessionUserId}/passport-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    const contentType = resolveApplicantContentType(file, ext);
+    const { error } = await supabase.storage.from("avatars").upload(path, file, {
+      upsert: false,
+      contentType: contentType || undefined,
+      cacheControl: "3600",
+    });
     if (error) {
       setUploadErrors((prev) => ({
         ...prev,
-        [fieldKey]: toApplicantUploadErrorMessage(error, "[applicant-avatar-upload]"),
+        [fieldKey]: toApplicantUploadErrorMessage(error, "[applicant-avatar-upload]", {
+          stage: "avatar_upload",
+          folder: "passport",
+          ext,
+          mime: contentType,
+          size: file.size,
+        }),
       }));
     } else {
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);

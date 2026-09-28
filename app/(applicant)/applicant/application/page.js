@@ -350,13 +350,39 @@ export default function ApplicationPage() {
   async function saveDraft() {
     setSaving(true);
     const payload = buildApplicationPayload(data, userId, "draft");
+    let saveError = null;
     if (appId) {
-      await supabase.from("applications").update(payload).eq("id", appId);
+      const { error } = await supabase.from("applications").update(payload).eq("id", appId);
+      saveError = error;
     } else {
-      const { data: created } = await supabase.from("applications").insert(payload).select("id").single();
+      const { data: created, error } = await supabase
+        .from("applications")
+        .insert(payload)
+        .select("id")
+        .single();
+      saveError = error;
       if (created) setAppId(created.id);
     }
     if (payload.photo_url) await syncProfilePhoto(payload.photo_url);
+    if (saveError) {
+      console.error("[applicant-draft-save]", {
+        stage: "draft_save",
+        message: String(saveError.message || "").slice(0, 200),
+        code: saveError.code || undefined,
+      });
+      setErrors((prev) => ({
+        ...prev,
+        _draft:
+          "Your document may have uploaded, but we couldn't save the application draft. Please tap Save Draft again. Your account data was not deleted.",
+      }));
+    } else {
+      setErrors((prev) => {
+        if (!prev._draft) return prev;
+        const next = { ...prev };
+        delete next._draft;
+        return next;
+      });
+    }
     setSaving(false);
   }
 

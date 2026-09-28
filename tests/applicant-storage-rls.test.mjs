@@ -5,8 +5,14 @@ import { resolve } from "node:path";
 import {
   APPLICATIONS_BUCKET,
   APPLICANT_UPLOAD_USER_MESSAGE,
+  APPLICANT_UPLOAD_SESSION_MESSAGE,
+  APPLICANT_UPLOAD_TOO_LARGE_MESSAGE,
+  APPLICANT_UPLOAD_UNSUPPORTED_MESSAGE,
   buildApplicantStoragePath,
+  fileExtensionFromName,
   isLikelyStorageAuthError,
+  isLikelySessionError,
+  resolveApplicantContentType,
   toApplicantUploadErrorMessage,
 } from "../lib/applicant-storage-upload.js";
 import { isOwnerStoragePath, sanitizeStoragePath } from "../lib/storage-path.js";
@@ -45,14 +51,56 @@ test("applicant cannot target another applicant namespace via path builder", () 
   assert.throws(() => buildApplicantStoragePath(USER_A, "../other", "pdf"));
 });
 
-test("RLS-style storage errors map to applicant-safe message", () => {
+test("path builder sanitizes extension and ignores unsafe user filenames", () => {
+  const path = buildApplicantStoragePath(USER_A, "recommendation", "PDF");
+  assert.match(path, /\.pdf$/);
+  assert.doesNotMatch(path, /[\s'()]/);
+  assert.equal(path.split("/").length, 3);
+  // Two unique calls must not collide
+  const a = buildApplicantStoragePath(USER_A, "transcript", "pdf");
+  const b = buildApplicantStoragePath(USER_A, "transcript", "pdf");
+  assert.notEqual(a, b);
+});
+
+test("fileExtensionFromName handles uppercase, spaces, and multiple dots", () => {
+  assert.equal(fileExtensionFromName("Report.PDF"), "pdf");
+  assert.equal(fileExtensionFromName("my file (1).JPG"), "jpg");
+  assert.equal(fileExtensionFromName("a.b.c.webp"), "webp");
+  assert.equal(fileExtensionFromName("noext"), "");
+});
+
+test("resolveApplicantContentType prefers browser MIME and falls back for blank PDF type", () => {
+  assert.equal(
+    resolveApplicantContentType({ type: "application/pdf" }, "pdf"),
+    "application/pdf"
+  );
+  assert.equal(resolveApplicantContentType({ type: "" }, "pdf"), "application/pdf");
+  assert.equal(resolveApplicantContentType({ type: "image/png" }, "png"), "image/png");
+  assert.equal(resolveApplicantContentType({ type: "" }, "jpg"), "image/jpeg");
+});
+
+test("RLS-style storage errors map to applicant-safe message (not device memory)", () => {
   const raw = "new row violates row-level security policy";
   assert.equal(isLikelyStorageAuthError(raw), true);
+  assert.equal(isLikelySessionError(raw), false);
   const prevErr = console.error;
   console.error = () => {};
   try {
     assert.equal(toApplicantUploadErrorMessage({ message: raw }), APPLICANT_UPLOAD_USER_MESSAGE);
     assert.doesNotMatch(APPLICANT_UPLOAD_USER_MESSAGE, /row-level security/i);
+    assert.doesNotMatch(APPLICANT_UPLOAD_USER_MESSAGE, /low memory|device memory/i);
+    assert.equal(
+      toApplicantUploadErrorMessage({ message: "JWT expired" }),
+      APPLICANT_UPLOAD_SESSION_MESSAGE
+    );
+    assert.equal(
+      toApplicantUploadErrorMessage({ message: "The object exceeded the maximum allowed size" }),
+      APPLICANT_UPLOAD_TOO_LARGE_MESSAGE
+    );
+    assert.equal(
+      toApplicantUploadErrorMessage({ message: "mime type application/x-msdownload is not supported" }),
+      APPLICANT_UPLOAD_UNSUPPORTED_MESSAGE
+    );
   } finally {
     console.error = prevErr;
   }
@@ -80,7 +128,7 @@ test("storage owner CRUD migration grants INSERT SELECT UPDATE DELETE for own fo
   assert.doesNotMatch(sql, /service_role/);
 });
 
-test("Documents and ConceptNote use shared path builder, session auth, and safe errors", () => {
+test("Documents and ConceptNote use unique-path insert (upsert:false), session auth, and safe errors", () => {
   const docs = readFileSync(
     resolve("app/(applicant)/applicant/application/steps/Documents.jsx"),
     "utf8"
@@ -89,15 +137,27 @@ test("Documents and ConceptNote use shared path builder, session auth, and safe 
     resolve("app/(applicant)/applicant/application/steps/ConceptNote.jsx"),
     "utf8"
   );
+  const helper = readFileSync(resolve("lib/applicant-storage-upload.js"), "utf8");
+
+  assert.match(helper, /upsert:\s*false/);
+  assert.doesNotMatch(helper, /upsert:\s*true/);
+  assert.match(helper, /uploadApplicantDocument/);
+  assert.doesNotMatch(helper, /readAsDataURL|FileReader|btoa\(/);
+
   for (const src of [docs, concept]) {
     assert.match(src, /buildApplicantStoragePath/);
     assert.match(src, /resolveAuthenticatedUploadUser/);
     assert.match(src, /toApplicantUploadErrorMessage/);
-    assert.match(src, /APPLICATIONS_BUCKET/);
+    assert.match(src, /uploadApplicantDocument/);
+    assert.match(src, /APPLICANT_UPLOAD_SESSION_MESSAGE/);
+    assert.doesNotMatch(src, /upsert:\s*true/);
     assert.doesNotMatch(src, /error\.message \|\| "Upload failed\."/);
+    assert.doesNotMatch(src, /readAsDataURL|FileReader/);
+    assert.doesNotMatch(src, /service_role|SERVICE_ROLE/);
   }
   assert.match(docs, /"cv"/);
   assert.match(docs, /"transcript"/);
+  assert.match(docs, /"wassce-results"/);
   assert.match(docs, /"student-id"/);
   assert.match(docs, /"recommendation"/);
   assert.match(docs, /"leadership"/);
@@ -114,4 +174,24 @@ test("historical applications policies lacked UPDATE/DELETE (regression baseline
   assert.match(base, /Users can read own uploads/);
   assert.doesNotMatch(base, /Users can update own uploads/);
   assert.doesNotMatch(base, /Users can delete own uploads/);
+});
+
+test("no applicant-facing low-memory upload copy exists in Stage 1 upload surfaces", () => {
+  const docs = readFileSync(
+    resolve("app/(applicant)/applicant/application/steps/Documents.jsx"),
+    "utf8"
+  );
+  const concept = readFileSync(
+    resolve("app/(applicant)/applicant/application/steps/ConceptNote.jsx"),
+    "utf8"
+  );
+  const helper = readFileSync(resolve("lib/applicant-storage-upload.js"), "utf8");
+  // User-visible string constants / JSX text only — exclude code comments.
+  const extractQuoted = (src) =>
+    [...src.matchAll(/["'`]([^"'`]{8,200})["'`]/g)].map((m) => m[1]).join("\n");
+  for (const src of [docs, concept, helper]) {
+    assert.doesNotMatch(extractQuoted(src), /low memory|out of memory|device memory/i);
+  }
+  assert.doesNotMatch(APPLICANT_UPLOAD_USER_MESSAGE, /memory/i);
+  assert.doesNotMatch(APPLICANT_UPLOAD_SESSION_MESSAGE, /memory/i);
 });

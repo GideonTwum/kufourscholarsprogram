@@ -19,11 +19,14 @@ import {
   normalizeConceptNoteTitle,
 } from "@/lib/application-validation";
 import {
-  APPLICATIONS_BUCKET,
-  APPLICANT_UPLOAD_USER_MESSAGE,
+  APPLICANT_UPLOAD_SESSION_MESSAGE,
+  APPLICANT_UPLOAD_TOO_LARGE_MESSAGE,
   buildApplicantStoragePath,
+  fileExtensionFromName,
+  resolveApplicantContentType,
   resolveAuthenticatedUploadUser,
   toApplicantUploadErrorMessage,
+  uploadApplicantDocument,
 } from "@/lib/applicant-storage-upload";
 
 export default function ConceptNote({ data, onChange, userId, errors = {}, readOnly = false }) {
@@ -62,13 +65,17 @@ export default function ConceptNote({ data, onChange, userId, errors = {}, readO
 
   async function uploadPdf(file) {
     if (readOnly || !file) return;
-    if (file.size > MAX_FILE_SIZE_DOCS) {
-      setUploadError("File too large. Max 5MB. PDF only.");
+    if (!file.size || file.size <= 0) {
+      setUploadError("This file appears to be empty. Please choose another file.");
       return;
     }
-    const ext = file.name.toLowerCase().split(".").pop();
+    if (file.size > MAX_FILE_SIZE_DOCS) {
+      setUploadError(APPLICANT_UPLOAD_TOO_LARGE_MESSAGE);
+      return;
+    }
+    const ext = fileExtensionFromName(file.name);
     if (ext !== "pdf") {
-      setUploadError("Only PDF format is allowed.");
+      setUploadError("Please upload a PDF file.");
       return;
     }
     setUploading(true);
@@ -77,14 +84,14 @@ export default function ConceptNote({ data, onChange, userId, errors = {}, readO
     const user = await resolveAuthenticatedUploadUser(supabase);
     const sessionUserId = user?.id || null;
     if (!sessionUserId) {
-      setUploadError(APPLICANT_UPLOAD_USER_MESSAGE);
+      setUploadError(APPLICANT_UPLOAD_SESSION_MESSAGE);
       setUploading(false);
       return;
     }
     if (userId && userId !== sessionUserId) {
       console.error("[applicant-upload] concept-note path userId mismatch vs session", {
-        propUserId: userId,
-        sessionUserId,
+        stage: "auth_check",
+        folder: "concept-note",
       });
     }
 
@@ -92,16 +99,43 @@ export default function ConceptNote({ data, onChange, userId, errors = {}, readO
     try {
       filePath = buildApplicantStoragePath(sessionUserId, "concept-note", "pdf");
     } catch (e) {
-      setUploadError(toApplicantUploadErrorMessage(e));
+      setUploadError(
+        toApplicantUploadErrorMessage(e, "[applicant-upload]", {
+          stage: "path_build",
+          folder: "concept-note",
+          ext: "pdf",
+          size: file.size,
+        })
+      );
       setUploading(false);
       return;
     }
 
-    const { error } = await supabase.storage
-      .from(APPLICATIONS_BUCKET)
-      .upload(filePath, file, { upsert: true });
+    const contentType = resolveApplicantContentType(file, "pdf");
+    const { error } = await uploadApplicantDocument(supabase, {
+      path: filePath,
+      file,
+      contentType,
+      logMeta: {
+        stage: "storage_upload",
+        folder: "concept-note",
+        ext: "pdf",
+        mime: contentType,
+        size: file.size,
+        field: "concept_note_path",
+      },
+    });
     if (error) {
-      setUploadError(toApplicantUploadErrorMessage(error));
+      setUploadError(
+        toApplicantUploadErrorMessage(error, "[applicant-upload]", {
+          stage: "storage_upload",
+          folder: "concept-note",
+          ext: "pdf",
+          mime: contentType,
+          size: file.size,
+          field: "concept_note_path",
+        })
+      );
     } else {
       onChange((prev) => ({ ...prev, concept_note_path: filePath }));
     }
