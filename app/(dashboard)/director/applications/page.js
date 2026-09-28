@@ -9,10 +9,14 @@ import DirectorApplicationsList from "@/components/director/DirectorApplications
 import {
   DIRECTOR_PENDING_STATUSES,
   DIRECTOR_PRIMARY_FILTERS,
+  DIRECTOR_APPLICATION_STAGE_FILTERS,
   applyDirectorOperationalScope,
   applyDirectorStatusFilter,
   fetchAllApplicationPages,
   fetchDirectorApplicationCountSummary,
+  filterByDirectorApplicationStage,
+  normalizeDirectorApplicationStageParam,
+  summarizeDirectorApplicationStageCounts,
 } from "@/lib/director-application-scope";
 import {
   DIRECTOR_WORKFLOW_FILTERS,
@@ -22,10 +26,11 @@ import {
   summarizeDirectorWorkflowCounts,
 } from "@/lib/director-application-workflow";
 
-function hrefForFilters({ status = "", workflow = "all" }) {
+function hrefForFilters({ status = "", workflow = "all", stage = "all" }) {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   if (workflow && workflow !== "all") params.set("workflow", workflow);
+  if (stage && stage !== "all") params.set("stage", stage);
   const qs = params.toString();
   return qs ? `/director/applications?${qs}` : "/director/applications";
 }
@@ -179,8 +184,9 @@ export default async function DirectorApplicationsPage({ searchParams }) {
   const params = await searchParams;
   const statusFilter = params?.status || "";
   const workflowFilter = normalizeWorkflowParam(params?.workflow);
+  const stageFilter = normalizeDirectorApplicationStageParam(params?.stage);
 
-  // Load full operational set for accurate workflow counts, then apply status filter in memory.
+  // Load full operational set for accurate stage/workflow counts, then filter in memory.
   const [{ applications: allOperational, loadError }, statusCounts] = await Promise.all([
     loadApplications(""),
     loadCounts(),
@@ -189,8 +195,9 @@ export default async function DirectorApplicationsPage({ searchParams }) {
   const assignmentMap = await loadAssignmentWorkflowMeta(allOperational);
   const classifiedAll = classifyDirectorApplications(allOperational, assignmentMap);
   const workflowCounts = summarizeDirectorWorkflowCounts(classifiedAll);
+  const stageCounts = summarizeDirectorApplicationStageCounts(classifiedAll);
 
-  // Status filter (Pending / Accepted / Rejected / exact) on top of operational set
+  // Composition: operational → Status → Application Stage → Workflow → (client search)
   const statusScoped = statusFilter
     ? classifiedAll.filter(({ app }) => {
         if (statusFilter === "pending") {
@@ -200,7 +207,8 @@ export default async function DirectorApplicationsPage({ searchParams }) {
       })
     : classifiedAll;
 
-  const listItems = filterByDirectorWorkflow(statusScoped, workflowFilter);
+  const stageScoped = filterByDirectorApplicationStage(statusScoped, stageFilter);
+  const listItems = filterByDirectorWorkflow(stageScoped, workflowFilter);
 
   const countForStatusFilter = (key) => {
     if (key === "") return statusCounts.all;
@@ -215,12 +223,23 @@ export default async function DirectorApplicationsPage({ searchParams }) {
     return workflowCounts[key] || 0;
   };
 
+  const countForStage = (key) => {
+    if (key === "all") return stageCounts.all;
+    return stageCounts[key] || 0;
+  };
+
   return (
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
         <p className="mt-1 text-sm text-gray-500">
           Review submitted applications (drafts in progress are not listed here).
+        </p>
+        <p className="mt-2 text-xs text-gray-500">
+          <span className="font-medium text-gray-600">Application Stage</span> is where the
+          applicant is in recruitment.{" "}
+          <span className="font-medium text-gray-600">Assessment Workflow</span> is where the
+          application is in assessor processing. These filters combine.
         </p>
       </div>
 
@@ -234,16 +253,44 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         </div>
       )}
 
-      {/* Workflow queues — mutually exclusive current stages */}
+      {/* Application Stage — recruitment location from applications.status */}
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-gray-400" />
-          <span className="text-xs font-medium text-gray-500">Workflow:</span>
+          <span className="text-xs font-medium text-gray-500">Application Stage:</span>
+        </div>
+        {DIRECTOR_APPLICATION_STAGE_FILTERS.map(({ key, label }) => (
+          <Link
+            key={key}
+            href={hrefForFilters({
+              status: statusFilter,
+              workflow: workflowFilter,
+              stage: key,
+            })}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              stageFilter === key
+                ? "bg-royal text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {label} ({countForStage(key)})
+          </Link>
+        ))}
+      </div>
+
+      {/* Assessment Workflow queues — mutually exclusive current processing stages */}
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Assessment Workflow:</span>
         </div>
         {DIRECTOR_WORKFLOW_FILTERS.map(({ key, label }) => (
           <Link
             key={key}
-            href={hrefForFilters({ status: statusFilter, workflow: key })}
+            href={hrefForFilters({
+              status: statusFilter,
+              workflow: key,
+              stage: stageFilter,
+            })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               workflowFilter === key
                 ? "bg-royal text-white"
@@ -266,6 +313,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
             href={hrefForFilters({
               status: key,
               workflow: workflowFilter,
+              stage: stageFilter,
             })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === key
@@ -289,6 +337,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         items={listItems}
         workflowFilter={workflowFilter}
         statusFilter={statusFilter}
+        stageFilter={stageFilter}
       />
     </div>
   );
