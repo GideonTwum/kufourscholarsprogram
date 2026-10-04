@@ -10,19 +10,20 @@ import {
 const ALLOWED_KEYS = new Set([
   "applications_open",
   "application_deadline",
+  "stage_2_deadline",
   "accepted_whatsapp_group_url",
   "application_class_name",
   // Legacy — accept updates for compatibility but do not use for user-facing Class copy.
   "application_cohort_year",
 ]);
 
-function validateDeadline(value) {
+function validateDeadline(value, key = "application_deadline") {
   if (value === null || value === "") return { ok: true, value: "" };
-  if (typeof value !== "string") return { ok: false, error: "application_deadline must be an ISO string or empty" };
+  if (typeof value !== "string") return { ok: false, error: `${key} must be an ISO string or empty` };
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return { ok: false, error: "Invalid application_deadline" };
+  if (Number.isNaN(d.getTime())) return { ok: false, error: `Invalid ${key}` };
   const max = Date.now() + 5 * 365 * 24 * 60 * 60 * 1000;
-  if (d.getTime() > max) return { ok: false, error: "application_deadline is too far in the future" };
+  if (d.getTime() > max) return { ok: false, error: `${key} is too far in the future` };
   return { ok: true, value: d.toISOString() };
 }
 
@@ -63,6 +64,7 @@ function settingsResponse(map) {
   return {
     applications_open: map.applications_open === "true",
     application_deadline: map.application_deadline || null,
+    stage_2_deadline: map.stage_2_deadline || null,
     accepted_whatsapp_group_url: map.accepted_whatsapp_group_url || "",
     application_class_name:
       map.application_class_name?.trim() || DEFAULT_APPLICATION_CLASS_NAME,
@@ -110,7 +112,7 @@ export async function PATCH(request) {
     return NextResponse.json(
       {
         error:
-          "No allowed settings provided. Allowed: applications_open, application_deadline, accepted_whatsapp_group_url, application_class_name",
+          "No allowed settings provided. Allowed: applications_open, application_deadline, stage_2_deadline, accepted_whatsapp_group_url, application_class_name",
       },
       { status: 400 }
     );
@@ -144,10 +146,20 @@ export async function PATCH(request) {
   }
 
   if ("application_deadline" in body) {
-    const v = validateDeadline(body.application_deadline);
+    const v = validateDeadline(body.application_deadline, "application_deadline");
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
     updates.push({
       key: "application_deadline",
+      value: v.value,
+      updated_at: nowIso,
+    });
+  }
+
+  if ("stage_2_deadline" in body) {
+    const v = validateDeadline(body.stage_2_deadline, "stage_2_deadline");
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+    updates.push({
+      key: "stage_2_deadline",
       value: v.value,
       updated_at: nowIso,
     });

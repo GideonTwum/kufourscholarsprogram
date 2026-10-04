@@ -25,6 +25,7 @@ test("audiences are allowlisted and labeled", () => {
   for (const key of [
     "all_submitted",
     "pending",
+    "stage_1_approved",
     "unassigned",
     "assigned",
     "assessed",

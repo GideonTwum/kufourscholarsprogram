@@ -11,6 +11,11 @@ import {
   resolveApplicationClassName,
   stage2TitleConfirmationMessage,
 } from "@/lib/application-class";
+import Stage2DeadlineCard from "@/components/applicant/Stage2DeadlineCard";
+import {
+  STAGE_2_DEADLINE_SETTING_KEY,
+  evaluateStage2DeadlineGate,
+} from "@/lib/stage-2-deadline-gate";
 
 const STAGE2_PROMPT =
   "Create a 3-minute video on a community problem, outlining the identified problem, cause, effect, intervention, and expected outcome.";
@@ -22,6 +27,7 @@ export default function Stage2Page() {
   const [application, setApplication] = useState(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [applicationClassName, setApplicationClassName] = useState("");
+  const [stage2Deadline, setStage2Deadline] = useState(null);
   const [confirmsPublic, setConfirmsPublic] = useState(false);
   const [confirmsTitle, setConfirmsTitle] = useState(false);
   const [confirmsDescription, setConfirmsDescription] = useState(false);
@@ -47,6 +53,16 @@ export default function Stage2Page() {
         .eq("key", "application_class_name")
         .maybeSingle();
       if (classSetting?.value) globalClass = String(classSetting.value).trim();
+
+      const { data: deadlineSetting } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", STAGE_2_DEADLINE_SETTING_KEY)
+        .maybeSingle();
+      if (deadlineSetting?.value) {
+        const d = new Date(deadlineSetting.value);
+        if (!Number.isNaN(d.getTime())) setStage2Deadline(d.toISOString());
+      }
 
       const { data: app } = await supabase
         .from("applications")
@@ -197,6 +213,11 @@ export default function Stage2Page() {
   const titleFormatLabel = applicationClassName
     ? `Full Name - KSP ${applicationClassName} Application`
     : "Full Name - KSP Application";
+  const deadlineGate = evaluateStage2DeadlineGate({
+    deadlineRaw: stage2Deadline,
+    nowMs: Date.now(),
+  });
+  const submissionsClosed = !deadlineGate.allowed;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -209,6 +230,28 @@ export default function Stage2Page() {
           Congratulations on being shortlisted! Submit your poster presentation video.
         </p>
 
+        <div className="mt-6">
+          <Stage2DeadlineCard deadlineIso={stage2Deadline} />
+        </div>
+
+        {submissionsClosed ? (
+          <div className="mt-8 rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+            <p className="font-semibold">Stage 2 submissions are closed.</p>
+            <p className="mt-2 text-amber-900">
+              You can still sign in and view your application. If the Director extends the
+              deadline, this page will allow submission again automatically.
+            </p>
+            <Link
+              href="/applicant"
+              className="mt-4 inline-block rounded-lg bg-royal px-6 py-2.5 text-sm font-semibold text-white hover:bg-royal/90"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+        ) : null}
+
+        {!submissionsClosed ? (
+          <>
         <div className="mt-6 rounded-lg border border-gold/30 bg-gold/5 p-4">
           <h3 className="font-semibold text-royal">Video Prompt</h3>
           <p className="mt-2 text-sm text-gray-700">{STAGE2_PROMPT}</p>
@@ -332,7 +375,7 @@ export default function Stage2Page() {
             </Link>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || submissionsClosed}
               className="flex items-center gap-2 rounded-lg bg-gold px-6 py-2.5 text-sm font-semibold text-royal hover:bg-gold/90 disabled:opacity-50"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
@@ -340,6 +383,8 @@ export default function Stage2Page() {
             </button>
           </div>
         </form>
+          </>
+        ) : null}
       </div>
     </div>
   );

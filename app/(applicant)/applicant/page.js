@@ -21,6 +21,11 @@ import { normalizeApplicationStatus } from "@/lib/application-status";
 import { isValidWhatsAppGroupUrl } from "@/lib/countries";
 import { formatClassApplicationLabel, formatClassProgramName } from "@/lib/application-class";
 import ApplicantSupportNotice from "@/components/applicant/ApplicantSupportNotice";
+import Stage2DeadlineCard from "@/components/applicant/Stage2DeadlineCard";
+import {
+  STAGE_2_DEADLINE_SETTING_KEY,
+  evaluateStage2DeadlineGate,
+} from "@/lib/stage-2-deadline-gate";
 
 function InterviewScheduledCard({ slot, onFirstView }) {
   useEffect(() => {
@@ -157,6 +162,7 @@ export default function ApplicantDashboard() {
   const [profile, setProfile] = useState(null);
   const [application, setApplication] = useState(null);
   const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [stage2Deadline, setStage2Deadline] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const hasFiredConfetti = useRef(false);
@@ -210,6 +216,18 @@ export default function ApplicantDashboard() {
         const raw = String(wa?.value || "").trim();
         if (raw && isValidWhatsAppGroupUrl(raw)) {
           setWhatsappUrl(raw.startsWith("http") ? raw : `https://${raw}`);
+        }
+      }
+
+      if (applicationData?.status === "stage_1_approved") {
+        const { data: deadlineSetting } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", STAGE_2_DEADLINE_SETTING_KEY)
+          .maybeSingle();
+        if (deadlineSetting?.value) {
+          const d = new Date(deadlineSetting.value);
+          if (!Number.isNaN(d.getTime())) setStage2Deadline(d.toISOString());
         }
       }
 
@@ -364,28 +382,43 @@ export default function ApplicantDashboard() {
             ) : null}
           </div>
         ) : normalizedStatus === "stage_1_approved" ? (
-          <div className="rounded-lg border-2 border-gold/30 bg-gradient-to-br from-royal/5 to-gold/10 p-6">
-            <div className="mb-4 flex justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gold text-royal">
-                <Video size={28} />
+          <div className="space-y-4">
+            <Stage2DeadlineCard deadlineIso={stage2Deadline} />
+            <div className="rounded-lg border-2 border-gold/30 bg-gradient-to-br from-royal/5 to-gold/10 p-6">
+              <div className="mb-4 flex justify-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gold text-royal">
+                  <Video size={28} />
+                </div>
               </div>
-            </div>
-            <h3 className="text-center text-xl font-bold text-gray-900">
-              Congratulations! You&apos;re Shortlisted for Stage 2
-            </h3>
-            <p className="mt-2 text-center text-sm text-gray-700">
-              Submit your poster presentation video. Create a 3-minute video on a community
-              problem, outlining the identified problem, cause, effect, intervention, and expected
-              outcome.
-            </p>
-            <div className="mt-6 flex justify-center">
-              <Link
-                href="/applicant/stage2"
-                className="inline-flex items-center gap-2 rounded-lg bg-gold px-6 py-3 text-sm font-semibold text-royal hover:bg-gold/90"
-              >
-                <Video size={18} />
-                Submit Stage 2 Video
-              </Link>
+              <h3 className="text-center text-xl font-bold text-gray-900">
+                Congratulations! You&apos;re Shortlisted for Stage 2
+              </h3>
+              <p className="mt-2 text-center text-sm text-gray-700">
+                Submit your poster presentation video. Create a 3-minute video on a community
+                problem, outlining the identified problem, cause, effect, intervention, and expected
+                outcome.
+              </p>
+              <div className="mt-6 flex justify-center">
+                {evaluateStage2DeadlineGate({
+                  deadlineRaw: stage2Deadline,
+                  nowMs: Date.now(),
+                }).allowed ? (
+                  <Link
+                    href="/applicant/stage2"
+                    className="inline-flex items-center gap-2 rounded-lg bg-gold px-6 py-3 text-sm font-semibold text-royal hover:bg-gold/90"
+                  >
+                    <Video size={18} />
+                    Submit Stage 2 Video
+                  </Link>
+                ) : (
+                  <Link
+                    href="/applicant/stage2"
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    View Stage 2 details
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         ) : normalizedStatus === "stage_2_submitted" ? (

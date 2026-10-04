@@ -13,21 +13,33 @@ import {
 } from "lucide-react";
 import { DEFAULT_APPLICATION_CLASS_NAME } from "@/lib/application-class";
 
+function utcDateParts(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: "", time: "23:59" };
+  return {
+    date: d.toISOString().slice(0, 10),
+    time: d.toISOString().slice(11, 16),
+  };
+}
+
 export default function DirectorSettingsPage() {
   const [applicationsOpen, setApplicationsOpen] = useState(false);
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("23:59");
+  const [stage2DeadlineDate, setStage2DeadlineDate] = useState("");
+  const [stage2DeadlineTime, setStage2DeadlineTime] = useState("23:59");
   const [whatsappUrl, setWhatsappUrl] = useState("");
   const [applicationClassName, setApplicationClassName] = useState(DEFAULT_APPLICATION_CLASS_NAME);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingDeadline, setSavingDeadline] = useState(false);
+  const [savingStage2Deadline, setSavingStage2Deadline] = useState(false);
   const [savingExtras, setSavingExtras] = useState(false);
   const [message, setMessage] = useState(null);
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/director/settings");
+    const res = await fetch("/api/director/settings", { cache: "no-store" });
     const data = await res.json();
     if (res.ok) {
       setApplicationsOpen(Boolean(data.applications_open));
@@ -42,6 +54,14 @@ export default function DirectorSettingsPage() {
       } else {
         setDeadlineDate("");
         setDeadlineTime("23:59");
+      }
+      if (data.stage_2_deadline) {
+        const parts = utcDateParts(data.stage_2_deadline);
+        setStage2DeadlineDate(parts.date);
+        setStage2DeadlineTime(parts.time);
+      } else {
+        setStage2DeadlineDate("");
+        setStage2DeadlineTime("23:59");
       }
     } else {
       setMessage({ type: "error", text: data.error || "Failed to load settings" });
@@ -210,10 +230,13 @@ export default function DirectorSettingsPage() {
       </div>
 
       <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
+        <h2 className="mb-2 flex items-center gap-2 font-bold text-gray-900">
           <Calendar size={20} />
-          Application Deadline & Countdown
+          Stage 1 Application Deadline
         </h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Controls Stage 1 applications only. Independent of the Stage 2 deadline.
+        </p>
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500">Date</label>
@@ -254,8 +277,8 @@ export default function DirectorSettingsPage() {
                 setMessage({
                   type: "success",
                   text: iso
-                    ? `Deadline set to ${new Date(iso).toLocaleString()}.`
-                    : "Deadline cleared.",
+                    ? `Stage 1 deadline set to ${new Date(iso).toLocaleString()}.`
+                    : "Stage 1 deadline cleared.",
                 });
               }
               setSavingDeadline(false);
@@ -264,7 +287,7 @@ export default function DirectorSettingsPage() {
             className="flex items-center gap-2 rounded-lg bg-royal px-4 py-2.5 text-sm font-semibold text-white hover:bg-royal/90 disabled:opacity-50"
           >
             {savingDeadline ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
-            Save Deadline
+            Save Stage 1 Deadline
           </button>
           {deadlineDate && (
             <button
@@ -279,6 +302,105 @@ export default function DirectorSettingsPage() {
             </button>
           )}
         </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h2 className="mb-2 flex items-center gap-2 font-bold text-gray-900">
+          <Calendar size={20} />
+          Stage 2 Deadline
+        </h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Approved Stage 1 applicants must complete and submit Stage 2 before this deadline.
+          Date and time are stored as GMT / UTC.
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Date (GMT)</label>
+            <input
+              type="date"
+              value={stage2DeadlineDate}
+              onChange={(e) => setStage2DeadlineDate(e.target.value)}
+              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Time (GMT)</label>
+            <input
+              type="time"
+              value={stage2DeadlineTime}
+              onChange={(e) => setStage2DeadlineTime(e.target.value)}
+              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              setSavingStage2Deadline(true);
+              setMessage(null);
+              const iso =
+                stage2DeadlineDate && stage2DeadlineTime
+                  ? new Date(`${stage2DeadlineDate}T${stage2DeadlineTime}:00.000Z`).toISOString()
+                  : "";
+              const res = await fetch("/api/director/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ stage_2_deadline: iso }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setMessage({ type: "error", text: data.error || "Failed to save Stage 2 deadline" });
+              } else {
+                setMessage({
+                  type: "success",
+                  text: iso
+                    ? `Stage 2 deadline set to ${new Date(iso).toLocaleString("en-GB", {
+                        timeZone: "UTC",
+                        dateStyle: "long",
+                        timeStyle: "short",
+                      })} GMT.`
+                    : "Stage 2 deadline cleared.",
+                });
+                if (iso) {
+                  const parts = utcDateParts(iso);
+                  setStage2DeadlineDate(parts.date);
+                  setStage2DeadlineTime(parts.time);
+                }
+              }
+              setSavingStage2Deadline(false);
+            }}
+            disabled={savingStage2Deadline}
+            className="flex items-center gap-2 rounded-lg bg-royal px-4 py-2.5 text-sm font-semibold text-white hover:bg-royal/90 disabled:opacity-50"
+          >
+            {savingStage2Deadline ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Clock size={16} />
+            )}
+            Save Stage 2 Deadline
+          </button>
+          {stage2DeadlineDate && (
+            <button
+              type="button"
+              onClick={() => {
+                setStage2DeadlineDate("");
+                setStage2DeadlineTime("23:59");
+              }}
+              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {stage2DeadlineDate && stage2DeadlineTime ? (
+          <p className="mt-3 text-xs text-gray-500">
+            Preview:{" "}
+            {new Date(`${stage2DeadlineDate}T${stage2DeadlineTime}:00.000Z`).toLocaleString(
+              "en-GB",
+              { timeZone: "UTC", dateStyle: "long", timeStyle: "short" }
+            )}{" "}
+            GMT
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">

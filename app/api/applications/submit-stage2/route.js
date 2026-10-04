@@ -5,6 +5,13 @@ import { validateStage2Video } from "@/lib/application-validation";
 import { assertStatusTransition } from "@/lib/application-status-transition.mjs";
 import { sendKspEmail } from "@/lib/email/send";
 import { escapeHtml } from "@/lib/email/escape";
+import {
+  STAGE_2_DEADLINE_SETTING_KEY,
+  evaluateStage2DeadlineGate,
+} from "@/lib/stage-2-deadline-gate";
+import { supabaseProjectHostFromUrl } from "@/lib/applications-open-gate";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   const supabase = await createClient();
@@ -58,6 +65,29 @@ export async function POST(request) {
     db = createAdminClient();
   } catch {
     return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+  }
+
+  const { data: deadlineSetting, error: deadlineError } = await db
+    .from("site_settings")
+    .select("value")
+    .eq("key", STAGE_2_DEADLINE_SETTING_KEY)
+    .maybeSingle();
+
+  const gate = evaluateStage2DeadlineGate({
+    deadlineRaw: deadlineError ? null : deadlineSetting?.value,
+    nowMs: Date.now(),
+  });
+
+  console.info("[stage2-deadline-diagnostic]", {
+    host: supabaseProjectHostFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    configured: gate.isConfigured,
+    expired: gate.isExpired,
+    deadlineParsedIso: gate.deadlineParsedIso,
+    allowed: gate.allowed,
+  });
+
+  if (!gate.allowed) {
+    return NextResponse.json({ error: gate.reason }, { status: 403 });
   }
 
   const { data: app, error: loadError } = await db

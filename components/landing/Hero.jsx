@@ -1,88 +1,33 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronDown, XCircle, Clock } from "lucide-react";
+import { ArrowRight, ChevronDown, XCircle } from "lucide-react";
 import Link from "next/link";
 import ApplyNowCta from "@/components/landing/ApplyNowCta";
 import HeroBackground from "@/components/landing/HeroBackground";
+import DeadlineCountdown from "@/components/DeadlineCountdown";
 import {
   formatHeroBadge,
   formatSearchCampaign,
 } from "@/lib/application-class";
 
 function Countdown({ deadline }) {
-  const [remaining, setRemaining] = useState(null);
-  const [mounted, setMounted] = useState(false);
-  const mountedRef = useRef(false);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    setMounted(true);
-    const target = new Date(deadline);
-
-    function tick() {
-      if (!mountedRef.current) return;
-      const now = new Date();
-      const diff = target - now;
-      if (diff <= 0) {
-        if (mountedRef.current) setRemaining(null);
-        return;
-      }
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const secs = Math.floor((diff % (1000 * 60)) / 1000);
-      setRemaining({ days, hours, mins, secs });
-    }
-
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => {
-      mountedRef.current = false;
-      clearInterval(interval);
-    };
-  }, [deadline]);
-
-  if (!mounted || !remaining) return null;
-
-  const passed = new Date(deadline) < new Date();
-  if (passed) {
-    const closedDate = new Date(deadline).toLocaleDateString("en-GB", { dateStyle: "long" });
-    return (
-      <div className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white/80">
-        <Clock size={16} />
-        Applications closed on {closedDate}
-      </div>
-    );
-  }
-
+  const closedDate = new Date(deadline).toLocaleDateString("en-GB", {
+    timeZone: "UTC",
+    dateStyle: "long",
+  });
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.6 }}
-      className="mt-6 flex flex-wrap items-center gap-3"
     >
-      <span className="text-sm font-medium text-white/75">Applications close in</span>
-      <div className="flex gap-2">
-        {[
-          { value: remaining.days, label: "days" },
-          { value: remaining.hours, label: "hrs" },
-          { value: remaining.mins, label: "min" },
-          { value: remaining.secs, label: "sec" },
-        ].map(({ value, label }) => (
-          <div
-            key={label}
-            className="flex min-w-[3rem] flex-col items-center rounded-lg border border-white/30 bg-white/10 px-3 py-2"
-          >
-            <span className="text-lg font-bold text-white tabular-nums">
-              {String(value).padStart(2, "0")}
-            </span>
-            <span className="text-[10px] font-medium uppercase text-white/60">{label}</span>
-          </div>
-        ))}
-      </div>
+      <DeadlineCountdown
+        deadline={deadline}
+        openLabel="Applications close in"
+        closedLabel={`Applications closed on ${closedDate}`}
+        variant="hero"
+      />
     </motion.div>
   );
 }

@@ -82,6 +82,7 @@ test("settings API allowlists fields only", () => {
   const src = readFileSync(resolve("app/api/director/settings/route.js"), "utf8");
   assert.match(src, /applications_open/);
   assert.match(src, /application_deadline/);
+  assert.match(src, /stage_2_deadline/);
   assert.match(src, /ALLOWED_KEYS/);
   assert.match(src, /recordDirectorAudit/);
 });
