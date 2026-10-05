@@ -103,6 +103,7 @@ export default function DirectorApplicationsList({
   workflowFilter = "all",
   statusFilter = "",
   stageFilter = "all",
+  assessorFilter = "",
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const hasSearch = searchQuery.trim().length > 0;
@@ -116,6 +117,10 @@ export default function DirectorApplicationsList({
 
   const emptyMessage = () => {
     if (hasSearch) return "No applications match your search in this filtered view.";
+    if (workflowFilter === "unassigned" && assessorFilter) {
+      return "No applications match Unassigned and the selected Assessor (an application cannot be both).";
+    }
+    if (assessorFilter) return "No applications currently assigned to this assessor in this view.";
     if (stageFilter === "stage_1") return "No Stage 1 applications in this view.";
     if (stageFilter === "stage_2") return "No Stage 2 applications in this view.";
     if (stageFilter === "interview") return "No Interview-stage applications in this view.";
