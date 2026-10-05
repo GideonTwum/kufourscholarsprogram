@@ -22,7 +22,6 @@ import {
 } from "@/lib/director-application-scope";
 import {
   DIRECTOR_WORKFLOW_FILTERS,
-  buildDirectorAssignmentWorkflowMap,
   classifyDirectorApplications,
   filterByDirectorAssessor,
   filterByDirectorWorkflow,
@@ -31,6 +30,7 @@ import {
   summarizeDirectorWorkflowCounts,
   summarizeSelectedAssessorWorkload,
 } from "@/lib/director-application-workflow";
+import { loadDirectorAssignmentWorkflowMeta } from "@/lib/director-assignment-workflow-meta";
 
 function hrefForFilters({ status = "", workflow = "all", stage = "all", assessor = "" }) {
   const params = new URLSearchParams();
@@ -133,34 +133,18 @@ async function loadCounts() {
 /**
  * Active assignments + matching assessments for workflow classification and labels.
  * Operates on the full Director operational population (not the visible page alone).
+ * Uses chunked assessment loading — a single giant `.in(application_id, …)` fails at scale.
  */
 async function loadAssignmentWorkflowMeta(applications) {
   try {
     const admin = createAdminClient();
-    const { data: rows } = await admin
-      .from("assessor_assignments")
-      .select("application_id, assessor_id, status, profiles:assessor_id(full_name, email, is_active)")
-      .eq("status", "active");
-
-    const active = rows || [];
-    const appIds = active.map((r) => r.application_id).filter(Boolean);
-    let assessments = [];
-    if (appIds.length > 0) {
-      const { data: assessmentRows } = await admin
-        .from("application_assessments")
-        .select(
-          "application_id, assessor_id, stage, recommendation, submitted_at, assessor_name_snapshot"
-        )
-        .in("application_id", appIds)
-        .order("submitted_at", { ascending: false });
-      assessments = assessmentRows || [];
-    }
-
-    const statusByAppId = Object.fromEntries(
-      (applications || []).map((app) => [app.id, app.status])
-    );
-    return buildDirectorAssignmentWorkflowMap(active, assessments, statusByAppId);
-  } catch {
+    return await loadDirectorAssignmentWorkflowMeta(admin, applications, {
+      logLabel: "director-applications",
+    });
+  } catch (err) {
+    console.error("[director-applications] loadAssignmentWorkflowMeta failed", {
+      message: err?.message || String(err),
+    });
     return {};
   }
 }

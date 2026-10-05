@@ -412,8 +412,10 @@ test("Director Applications page wires assessor URL and filter composition", () 
   assert.match(page, /summarizeDirectorAssessorOptions/);
   assert.match(page, /summarizeSelectedAssessorWorkload/);
   assert.match(page, /DirectorAssessorFilter/);
-  assert.match(page, /is_active/);
+  assert.match(page, /loadDirectorAssignmentWorkflowMeta/);
   assert.match(page, /isDirectorRole/);
+  const meta = readFileSync(resolve("lib/director-assignment-workflow-meta.js"), "utf8");
+  assert.match(meta, /is_active/);
   // Composition: status → stage → workflow → assessor
   const statusIdx = page.indexOf("statusScoped");
   const stageIdx = page.indexOf("stageScoped");
