@@ -5,10 +5,12 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Search,
   UserCheck,
   UserPlus,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 import {
   assessorDisplayName,
@@ -16,6 +18,13 @@ import {
   filterAssignableSelection,
   formatAssignedDate,
 } from "@/lib/assessor-assignment";
+import {
+  ASSIGN_ASSESSMENT_FILTERS,
+  ASSIGN_ASSIGNMENT_FILTERS,
+  ASSIGN_STAGE_FILTERS,
+  filterAssignApplicants,
+  summarizeAssignApplicantFilterCounts,
+} from "@/lib/assessor-assign-filters";
 
 function applicantName(app) {
   return (
@@ -30,6 +39,24 @@ function applicantName(app) {
 
 function applicantEmail(app) {
   return app.email || app.profiles?.email || "No email";
+}
+
+function FilterChip({ selected, onClick, children, count }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+        selected
+          ? "bg-royal text-white ring-2 ring-royal/30 ring-offset-1"
+          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+      }`}
+    >
+      {children}
+      {typeof count === "number" ? ` (${count})` : ""}
+    </button>
+  );
 }
 
 function AssignmentStateBadge({ state, assessorName }) {
@@ -68,6 +95,10 @@ export default function DirectorAssessorsPage() {
   const [lifecycleBusy, setLifecycleBusy] = useState(null);
   const [message, setMessage] = useState({ error: "", success: "" });
   const [createdCredentials, setCreatedCredentials] = useState(null);
+  const [applicantSearch, setApplicantSearch] = useState("");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
+  const [assessmentFilter, setAssessmentFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState("all");
 
   async function load() {
     setLoading(true);
@@ -108,6 +139,22 @@ export default function DirectorAssessorsPage() {
   const applicationsById = useMemo(
     () => Object.fromEntries(applications.map((app) => [app.id, app])),
     [applications]
+  );
+
+  const filterCounts = useMemo(
+    () => summarizeAssignApplicantFilterCounts(applications),
+    [applications]
+  );
+
+  const filteredApplications = useMemo(
+    () =>
+      filterAssignApplicants(applications, {
+        search: applicantSearch,
+        assignment: assignmentFilter,
+        assessment: assessmentFilter,
+        stage: stageFilter,
+      }),
+    [applications, applicantSearch, assignmentFilter, assessmentFilter, stageFilter]
   );
 
   // Keep checkboxes in sync: apps already assigned to the selected assessor stay checked.
@@ -520,8 +567,11 @@ export default function DirectorAssessorsPage() {
           </p>
 
           <div className="mt-5">
-            <label className="mb-1 block text-xs font-medium text-gray-500">Assessor</label>
+            <label htmlFor="assign-target-assessor" className="mb-1 block text-xs font-medium text-gray-500">
+              Assessor
+            </label>
             <select
+              id="assign-target-assessor"
               value={selectedAssessor}
               onChange={(e) => {
                 setSelectedAssessor(e.target.value);
@@ -538,7 +588,126 @@ export default function DirectorAssessorsPage() {
             </select>
           </div>
 
-          <div className="mt-5 max-h-[520px] space-y-2 overflow-y-auto pr-1">
+          <div className="mt-5 space-y-4 rounded-lg border border-gray-100 bg-gray-50/60 p-3 sm:p-4">
+            <div>
+              <label htmlFor="assign-applicant-search" className="mb-1 block text-xs font-medium text-gray-500">
+                Search Applicants
+              </label>
+              <div className="relative">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  aria-hidden="true"
+                />
+                <input
+                  id="assign-applicant-search"
+                  type="search"
+                  value={applicantSearch}
+                  onChange={(e) => setApplicantSearch(e.target.value)}
+                  placeholder="Search applicants by name..."
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-10 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-royal focus:ring-2 focus:ring-royal/20"
+                />
+                {applicantSearch.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => setApplicantSearch("")}
+                    className="absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    aria-label="Clear applicant search"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-gray-500" id="assign-assignment-filter-label">
+                Assignment
+              </p>
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-labelledby="assign-assignment-filter-label"
+              >
+                {ASSIGN_ASSIGNMENT_FILTERS.map(({ key, label }) => (
+                  <FilterChip
+                    key={key}
+                    selected={assignmentFilter === key}
+                    onClick={() => setAssignmentFilter(key)}
+                    count={filterCounts.assignment[key]}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-gray-500" id="assign-assessment-filter-label">
+                Assessment
+              </p>
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-labelledby="assign-assessment-filter-label"
+              >
+                {ASSIGN_ASSESSMENT_FILTERS.map(({ key, label }) => (
+                  <FilterChip
+                    key={key}
+                    selected={assessmentFilter === key}
+                    onClick={() => setAssessmentFilter(key)}
+                    count={
+                      key === "all"
+                        ? filterCounts.assessment.all
+                        : filterCounts.assessment[key]
+                    }
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-gray-500">
+                Assessed / Unassessed apply only to applicants with a current active assignee.
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-gray-500" id="assign-stage-filter-label">
+                Application Stage
+              </p>
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-labelledby="assign-stage-filter-label"
+              >
+                {ASSIGN_STAGE_FILTERS.map(({ key, label }) => (
+                  <FilterChip
+                    key={key}
+                    selected={stageFilter === key}
+                    onClick={() => setStageFilter(key)}
+                    count={filterCounts.stage[key]}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs text-gray-500" aria-live="polite">
+            {loading
+              ? "Loading applicants…"
+              : applications.length === 0
+                ? "No applications currently awaiting assessor review."
+                : filteredApplications.length === 0
+                  ? "No applicants match these filters."
+                  : `Showing ${filteredApplications.length} of ${applications.length} applicant${
+                      applications.length === 1 ? "" : "s"
+                    }`}
+          </p>
+
+          <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">
             {loading ? (
               <div className="flex justify-center py-10">
                 <Loader2 className="h-6 w-6 animate-spin text-royal" />
@@ -547,8 +716,12 @@ export default function DirectorAssessorsPage() {
               <p className="rounded-lg border border-dashed border-gray-200 py-10 text-center text-sm text-gray-500">
                 No applications currently awaiting assessor review.
               </p>
+            ) : filteredApplications.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-gray-200 py-10 text-center text-sm text-gray-500">
+                No applicants match these filters.
+              </p>
             ) : (
-              applications.map((app) => {
+              filteredApplications.map((app) => {
                 const state = classifyAssignmentCardState(app.current_assignment, selectedAssessor);
                 const checked = selectedApplications.includes(app.id);
                 const currentName = assessorDisplayName(app.current_assignment?.assessor);
@@ -562,7 +735,7 @@ export default function DirectorAssessorsPage() {
                           : ""
                       }`
                     : state === "unassigned"
-                      ? null
+                      ? "Awaiting assignment"
                       : "Assessment: Pending";
 
                 return (
