@@ -406,8 +406,11 @@ test("Director Applications page wires assessor URL and filter composition", () 
     resolve("app/(dashboard)/director/applications/page.js"),
     "utf8"
   );
-  assert.match(page, /params\.set\("assessor"/);
+  assert.match(page, /buildDirectorApplicationsListHref/);
   assert.match(page, /normalizeDirectorAssessorParam/);
+  assert.match(page, /assessorFilter/);
+  const returnHelper = readFileSync(resolve("lib/director-applications-return.js"), "utf8");
+  assert.match(returnHelper, /params\.set\("assessor"/);
   assert.match(page, /filterByDirectorAssessor/);
   assert.match(page, /summarizeDirectorAssessorOptions/);
   assert.match(page, /summarizeSelectedAssessorWorkload/);

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { resolveDirectorApplicationsReturnTo } from "@/lib/director-applications-return";
 import {
   ArrowLeft,
   User,
@@ -144,7 +145,11 @@ function DocCard({ label, field, application, docUrls, icon: Icon }) {
 
 export default function ApplicationReviewPage() {
   const { id } = useParams();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+  const backToApplicationsHref = resolveDirectorApplicationsReturnTo(
+    searchParams.get("returnTo")
+  );
 
   const [application, setApplication] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -460,7 +465,7 @@ export default function ApplicationReviewPage() {
     return (
       <div className="text-center">
         <p className="text-gray-500">Application not found.</p>
-        <Link href="/director/applications" className="mt-2 text-sm text-royal">
+        <Link href={backToApplicationsHref} className="mt-2 text-sm text-royal">
           Back to Applications
         </Link>
       </div>
@@ -519,7 +524,7 @@ export default function ApplicationReviewPage() {
   return (
     <div>
       <div className="mb-8">
-        <Link href="/director/applications" className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-royal">
+        <Link href={backToApplicationsHref} className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-royal">
           <ArrowLeft size={14} />
           Back to Applications
         </Link>

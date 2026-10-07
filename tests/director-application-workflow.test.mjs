@@ -498,8 +498,10 @@ test("Director applications page wires workflow filters, counts, search, and aut
   assert.match(page, /classifyDirectorApplications/);
   assert.match(page, /isDirectorRole/);
   assert.match(page, /DIRECTOR_PRIMARY_FILTERS/);
-  assert.match(page, /set\("workflow"/);
+  assert.match(page, /buildDirectorApplicationsListHref/);
   assert.match(page, /params\?\.workflow/);
+  const returnHelper = readFileSync(resolve("lib/director-applications-return.js"), "utf8");
+  assert.match(returnHelper, /params\.set\("workflow"/);
   assert.match(helper, /All Submitted/);
   assert.match(helper, /Unassigned/);
   assert.match(helper, /Assigned/);
@@ -507,7 +509,7 @@ test("Director applications page wires workflow filters, counts, search, and aut
   assert.match(helper, /Interview \/ Panel/);
   assert.match(list, /directorApplicationMatchesSearch/);
   assert.match(list, /Clear search/);
-  assert.match(list, /\/director\/applications\/\$\{app\.id\}/);
+  assert.match(list, /buildDirectorApplicationDetailHref/);
 });
 
 test("canonical terminal statuses are only accepted and rejected", () => {

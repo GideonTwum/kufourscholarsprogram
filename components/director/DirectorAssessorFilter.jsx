@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
  *   statusFilter?: string,
  *   workflowFilter?: string,
  *   stageFilter?: string,
+ *   searchQuery?: string,
  * }} props
  */
 export default function DirectorAssessorFilter({
@@ -21,6 +22,7 @@ export default function DirectorAssessorFilter({
   statusFilter = "",
   workflowFilter = "all",
   stageFilter = "all",
+  searchQuery = "",
 }) {
   const router = useRouter();
   const [nameQuery, setNameQuery] = useState("");
@@ -38,6 +40,8 @@ export default function DirectorAssessorFilter({
     if (workflowFilter && workflowFilter !== "all") params.set("workflow", workflowFilter);
     if (stageFilter && stageFilter !== "all") params.set("stage", stageFilter);
     if (assessorId) params.set("assessor", assessorId);
+    const q = typeof searchQuery === "string" ? searchQuery.trim() : "";
+    if (q) params.set("q", q);
     const qs = params.toString();
     return qs ? `/director/applications?${qs}` : "/director/applications";
   }

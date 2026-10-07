@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   ChevronRight,
@@ -18,6 +19,10 @@ import {
   directorApplicationMatchesSearch,
   isDirectorTerminalStatus,
 } from "@/lib/director-application-workflow";
+import {
+  buildDirectorApplicationDetailHref,
+  buildDirectorApplicationsListHref,
+} from "@/lib/director-applications-return";
 
 const statusConfig = {
   pending: {
@@ -96,6 +101,7 @@ const workflowBadgeClass = {
 
 /**
  * Client list: search within the already server-scoped Stage/Workflow/Status set.
+ * Search is URL-backed via `q` so detail → Back restores it with other filters.
  * Does not fetch applications — search never expands authorization.
  */
 export default function DirectorApplicationsList({
@@ -104,9 +110,48 @@ export default function DirectorApplicationsList({
   statusFilter = "",
   stageFilter = "all",
   assessorFilter = "",
+  initialSearchQuery = "",
 }) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState(
+    typeof initialSearchQuery === "string" ? initialSearchQuery : ""
+  );
   const hasSearch = searchQuery.trim().length > 0;
+
+  // Keep local search in sync when server filters/navigation change `q`.
+  useEffect(() => {
+    setSearchQuery(typeof initialSearchQuery === "string" ? initialSearchQuery : "");
+  }, [initialSearchQuery]);
+
+  // Sync search into the URL without dropping Stage/Workflow/Status/Assessor.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const href = buildDirectorApplicationsListHref({
+      status: statusFilter,
+      workflow: workflowFilter,
+      stage: stageFilter,
+      assessor: assessorFilter,
+      q: searchQuery,
+    });
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current === href) return;
+    const timer = setTimeout(() => {
+      router.replace(href, { scroll: false });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery, statusFilter, workflowFilter, stageFilter, assessorFilter, router]);
+
+  const listHref = useMemo(
+    () =>
+      buildDirectorApplicationsListHref({
+        status: statusFilter,
+        workflow: workflowFilter,
+        stage: stageFilter,
+        assessor: assessorFilter,
+        q: searchQuery,
+      }),
+    [statusFilter, workflowFilter, stageFilter, assessorFilter, searchQuery]
+  );
 
   const filtered = useMemo(() => {
     if (!hasSearch) return items;
@@ -196,7 +241,7 @@ export default function DirectorApplicationsList({
             return (
               <Link
                 key={app.id}
-                href={`/director/applications/${app.id}`}
+                href={buildDirectorApplicationDetailHref(app.id, listHref)}
                 className="group flex min-w-0 flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center sm:gap-4"
               >
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-royal text-xs font-bold text-gold">

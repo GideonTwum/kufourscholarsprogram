@@ -319,8 +319,10 @@ test("Director Applications page wires stage URL and filter composition", () => 
     resolve("app/(dashboard)/director/applications/page.js"),
     "utf8"
   );
-  assert.match(page, /params\.set\("stage"/);
+  assert.match(page, /buildDirectorApplicationsListHref/);
   assert.match(page, /normalizeDirectorApplicationStageParam/);
+  const returnHelper = readFileSync(resolve("lib/director-applications-return.js"), "utf8");
+  assert.match(returnHelper, /params\.set\("stage"/);
   assert.match(page, /filterByDirectorApplicationStage/);
   assert.match(page, /summarizeDirectorApplicationStageCounts/);
   assert.match(page, /Application Stage/);

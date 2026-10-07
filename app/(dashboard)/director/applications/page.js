@@ -31,15 +31,10 @@ import {
   summarizeSelectedAssessorWorkload,
 } from "@/lib/director-application-workflow";
 import { loadDirectorAssignmentWorkflowMeta } from "@/lib/director-assignment-workflow-meta";
+import { buildDirectorApplicationsListHref } from "@/lib/director-applications-return";
 
-function hrefForFilters({ status = "", workflow = "all", stage = "all", assessor = "" }) {
-  const params = new URLSearchParams();
-  if (status) params.set("status", status);
-  if (workflow && workflow !== "all") params.set("workflow", workflow);
-  if (stage && stage !== "all") params.set("stage", stage);
-  if (assessor) params.set("assessor", assessor);
-  const qs = params.toString();
-  return qs ? `/director/applications?${qs}` : "/director/applications";
+function hrefForFilters({ status = "", workflow = "all", stage = "all", assessor = "", q = "" }) {
+  return buildDirectorApplicationsListHref({ status, workflow, stage, assessor, q });
 }
 
 async function fetchWithAdmin(statusFilter) {
@@ -177,6 +172,8 @@ export default async function DirectorApplicationsPage({ searchParams }) {
   const workflowFilter = normalizeWorkflowParam(params?.workflow);
   const stageFilter = normalizeDirectorApplicationStageParam(params?.stage);
   const assessorFilter = normalizeDirectorAssessorParam(params?.assessor);
+  const searchQuery =
+    typeof params?.q === "string" ? params.q.trim().slice(0, 500) : "";
 
   // Load full operational set for accurate stage/workflow/assessor counts, then filter in memory.
   const [{ applications: allOperational, loadError }, statusCounts] = await Promise.all([
@@ -266,6 +263,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
               workflow: workflowFilter,
               stage: key,
               assessor: assessorFilter,
+              q: searchQuery,
             })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               stageFilter === key
@@ -291,6 +289,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
               workflow: key,
               stage: stageFilter,
               assessor: assessorFilter,
+              q: searchQuery,
             })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               workflowFilter === key
@@ -316,6 +315,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
               workflow: workflowFilter,
               stage: stageFilter,
               assessor: assessorFilter,
+              q: searchQuery,
             })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === key
@@ -334,6 +334,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         statusFilter={statusFilter}
         workflowFilter={workflowFilter}
         stageFilter={stageFilter}
+        searchQuery={searchQuery}
       />
 
       {assessorSummary ? <DirectorAssessorSummary summary={assessorSummary} /> : null}
@@ -351,6 +352,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         statusFilter={statusFilter}
         stageFilter={stageFilter}
         assessorFilter={assessorFilter}
+        initialSearchQuery={searchQuery}
       />
     </div>
   );
