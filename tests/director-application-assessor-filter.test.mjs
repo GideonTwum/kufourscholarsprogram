@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { buildDirectorApplicationsListHref } from "../lib/director-applications-return.js";
 
 import {
   filterByDirectorApplicationStage,
@@ -355,7 +356,9 @@ test("Assessed/Awaiting summary uses existing current-stage semantics", () => {
   assert.equal(summary.total, 3);
   assert.equal(summary.assessed, 1);
   assert.equal(summary.awaiting, 1);
-  // interview_panel counted in total only (not assessed/awaiting)
+  // interview_panel counted in total and other, not assessed/awaiting
+  assert.equal(summary.other, 1);
+  assert.equal(summary.assessed + summary.awaiting + summary.other, summary.total);
 });
 
 test("Invalid assessor query falls back to All Assessors", () => {
@@ -426,6 +429,58 @@ test("Director Applications page wires assessor URL and filter composition", () 
   const assessorIdx = page.indexOf("filterByDirectorAssessor(workflowScoped");
   assert.ok(statusIdx > 0 && stageIdx > statusIdx);
   assert.ok(workflowIdx > stageIdx && assessorIdx > workflowIdx);
+});
+
+test("assessor assessment status controls reuse workflow query and preserve other filters", () => {
+  const summary = readFileSync(
+    resolve("components/director/DirectorAssessorSummary.jsx"),
+    "utf8"
+  );
+  assert.match(summary, /Assessment Status/);
+  assert.match(summary, /Awaiting Assessment/);
+  assert.match(summary, /buildDirectorApplicationsListHref/);
+  assert.match(summary, /workflow: "assessed"/);
+  assert.match(summary, /workflow: "assigned"/);
+  assert.doesNotMatch(summary, /assessmentStatus/);
+
+  const allHref = buildDirectorApplicationsListHref({
+    status: "pending",
+    workflow: "all",
+    stage: "stage_1",
+    assessor: ASSESSOR_A,
+    q: "Daniela",
+  });
+  const assessedHref = buildDirectorApplicationsListHref({
+    status: "pending",
+    workflow: "assessed",
+    stage: "stage_1",
+    assessor: ASSESSOR_A,
+    q: "Daniela",
+  });
+  const awaitingHref = buildDirectorApplicationsListHref({
+    status: "pending",
+    workflow: "assigned",
+    stage: "stage_1",
+    assessor: ASSESSOR_A,
+    q: "Daniela",
+  });
+  assert.doesNotMatch(allHref, /workflow=/);
+  assert.match(assessedHref, /workflow=assessed/);
+  assert.match(awaitingHref, /workflow=assigned/);
+  for (const href of [allHref, assessedHref, awaitingHref]) {
+    assert.match(href, /status=pending/);
+    assert.match(href, /stage=stage_1/);
+    assert.match(href, new RegExp(`assessor=${ASSESSOR_A}`));
+    assert.match(href, /q=Daniela/);
+  }
+
+  const page = readFileSync(
+    resolve("app/(dashboard)/director/applications/page.js"),
+    "utf8"
+  );
+  assert.match(page, /<DirectorAssessorSummary/);
+  assert.match(page, /workflowFilter=\{workflowFilter\}/);
+  assert.match(page, /searchQuery=\{searchQuery\}/);
 });
 
 test("Assessor filter UI does not expose UUIDs as labels", () => {

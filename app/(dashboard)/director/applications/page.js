@@ -337,7 +337,15 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         searchQuery={searchQuery}
       />
 
-      {assessorSummary ? <DirectorAssessorSummary summary={assessorSummary} /> : null}
+      {assessorSummary ? (
+        <DirectorAssessorSummary
+          summary={assessorSummary}
+          workflowFilter={workflowFilter}
+          statusFilter={statusFilter}
+          stageFilter={stageFilter}
+          searchQuery={searchQuery}
+        />
+      ) : null}
 
       {statusCounts.draft > 0 ? (
         <p className="mb-4 text-xs text-gray-500">
