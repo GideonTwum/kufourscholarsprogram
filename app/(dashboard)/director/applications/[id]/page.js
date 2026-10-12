@@ -28,6 +28,7 @@ import { getDirectorStageActions } from "@/lib/director-stage-actions";
 import { evaluatorDisplayName } from "@/lib/staff-lifecycle";
 import DirectorStageActionBar from "../../components/DirectorStageActionBar";
 import DirectorAssessorAssignmentPanel from "@/components/director/DirectorAssessorAssignmentPanel";
+import DirectorEditApplicantDetails from "@/components/director/DirectorEditApplicantDetails";
 
 const statusFlow = [
   { key: "draft", label: "Draft", color: "bg-gray-100 text-gray-600" },
@@ -544,6 +545,16 @@ export default function ApplicationReviewPage() {
             <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${statusFlow.find((s) => s.key === application.status)?.color || "bg-gray-100 text-gray-600"}`}>
               {statusFlow.find((s) => s.key === application.status)?.label || application.status?.replace(/_/g, " ")}
             </span>
+            <DirectorEditApplicantDetails
+              application={application}
+              onSaved={(fields) => {
+                setApplication((prev) => (prev ? { ...prev, ...fields } : prev));
+                if (fields?.full_name) {
+                  setProfile((prev) => (prev ? { ...prev, full_name: fields.full_name } : prev));
+                }
+                setActionMessage("Applicant details updated.");
+              }}
+            />
             {application.status !== "draft" ? (
               <Link
                 href={`/director/communications?applicant=${encodeURIComponent(application.id)}`}
