@@ -72,6 +72,12 @@ export async function POST(request) {
     windowMs: 15 * 60 * 1000,
     max: 5,
   });
+  if (limit.unavailable) {
+    return NextResponse.json(
+      { error: "Could not check attempt limits. Try again shortly.", code: "rate_limit_unavailable" },
+      { status: 503 }
+    );
+  }
   if (!limit.allowed) {
     return NextResponse.json({ error: "Too many password attempts. Try again later." }, { status: 429 });
   }

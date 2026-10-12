@@ -9,6 +9,11 @@ import PasswordPolicyChecklist from "@/components/auth/PasswordPolicyChecklist";
 import { GENDER_OPTIONS, formatGenderLabel } from "@/lib/applicant-demographics";
 import { buildApplicantProfilePatch } from "@/lib/applicant-profile";
 import { validatePasswordChange } from "@/lib/password-policy";
+import {
+  EMAIL_CHANGE_BOTH_INBOXES_MESSAGE,
+  EMAIL_CHANGE_SENT_MESSAGE,
+  validateEmailChangeRequest,
+} from "@/lib/applicant-email-change";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20";
@@ -27,6 +32,10 @@ export default function ApplicantProfilePage() {
   const [passwordUpdated, setPasswordUpdated] = useState(false);
   const [passwordReauth, setPasswordReauth] = useState(false);
   const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [emailSessionExpired, setEmailSessionExpired] = useState(false);
+  const [emailDetail, setEmailDetail] = useState("");
+  const [pendingLocal, setPendingLocal] = useState("");
   const [uploading, setUploading] = useState(false);
 
   async function load() {
@@ -131,25 +140,61 @@ export default function ApplicantProfilePage() {
     setForm((prev) => ({ ...prev, photo_url: pub.publicUrl }));
   }
 
+  async function refreshProfile() {
+    const res = await fetch("/api/applicant/profile");
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    setData(json);
+    setForm(draft(json));
+    if (json.pendingEmail) setPendingLocal("");
+  }
+
   async function saveEmail(event) {
     event.preventDefault();
     if (saving) return;
-    setSaving(true);
     setError("");
-    const res = await fetch("/api/applicant/account/email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (!res.ok) {
-      setError(json.error || "Could not start the email change.");
+    setNotice("");
+    setEmailDetail("");
+    setEmailSessionExpired(false);
+    const validation = validateEmailChangeRequest(data?.profile?.email, email);
+    if (!validation.ok) {
+      setEmailError(validation.error);
       return;
     }
-    setNotice(json.message || "Verification email sent.");
-    setSection("");
-    await load();
+    setEmailError("");
+    setSaving(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const res = await fetch("/api/applicant/account/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: validation.email }),
+        signal: controller.signal,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEmailError(json.field === "email" ? json.error : "");
+        setError(json.error || "The email change could not be started. Try again.");
+        setEmailSessionExpired(json.code === "session_expired");
+        return;
+      }
+      setPendingLocal(validation.email);
+      setEmail("");
+      setNotice(json.message || EMAIL_CHANGE_SENT_MESSAGE);
+      setEmailDetail(json.detail || EMAIL_CHANGE_BOTH_INBOXES_MESSAGE);
+      setSection("");
+      refreshProfile().catch(() => {});
+    } catch (err) {
+      setError(
+        err?.name === "AbortError"
+          ? "The email change request timed out. Try again."
+          : "The email change could not be started. Check your connection and try again."
+      );
+    } finally {
+      clearTimeout(timer);
+      setSaving(false);
+    }
   }
 
   async function savePassword(event) {
@@ -328,16 +373,42 @@ export default function ApplicantProfilePage() {
           <div>
             <p className="text-xs font-medium text-gray-500">Email Address</p>
             <p className="mt-1 text-sm text-gray-900">{data.profile.email || "—"}</p>
-            {data.pendingEmail ? (
-              <p className="mt-1 text-xs font-medium text-amber-700">Pending verification: {data.pendingEmail}</p>
+            {data.pendingEmail || pendingLocal ? (
+              <p className="mt-1 text-xs font-medium text-amber-700">
+                Pending verification: {data.pendingEmail || pendingLocal}. This address is not active yet.
+              </p>
+            ) : null}
+            {emailDetail && section !== "email" ? (
+              <p className="mt-1 text-xs text-gray-600">{emailDetail}</p>
             ) : null}
             {section === "email" ? (
-              <form onSubmit={saveEmail} className="mt-3 max-w-md space-y-3">
-                <input type="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="New email address" />
-                <SaveRow saving={saving} onCancel={() => setSection("")} />
+              <form onSubmit={saveEmail} className="mt-3 max-w-md space-y-3" noValidate>
+                <label className="block text-xs font-medium text-gray-600">
+                  New email address
+                  <input
+                    type="email"
+                    className={`${inputClass} mt-1`}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    aria-invalid={emailError ? "true" : "false"}
+                  />
+                  {emailError ? <span className="mt-1 block text-xs text-red-700">{emailError}</span> : null}
+                </label>
+                {emailSessionExpired ? (
+                  <p className="text-sm text-red-700">
+                    <Link href="/login" className="font-semibold underline">Sign in</Link> and try the email change again.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { setSection(""); setEmailError(""); }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">Cancel</button>
+                  <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-royal px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {saving ? "Sending Verification..." : "Change Email"}
+                  </button>
+                </div>
               </form>
             ) : (
-              <button type="button" onClick={() => setSection("email")} className="mt-2 text-xs font-semibold text-royal">Change email</button>
+              <button type="button" onClick={() => { setEmailError(""); setSection("email"); }} className="mt-2 text-xs font-semibold text-royal">Change email</button>
             )}
           </div>
           <div>

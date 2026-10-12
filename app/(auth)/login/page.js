@@ -31,6 +31,17 @@ function EmailUpdatedBanner() {
   );
 }
 
+function EmailChangePendingBanner() {
+  const searchParams = useSearchParams();
+  if (searchParams.get("email_change_pending") !== "1") return null;
+  return (
+    <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+      One confirmation is complete. Confirm the message sent to the other inbox before the new
+      address becomes active. Your current email is still the one you use to sign in.
+    </div>
+  );
+}
+
 function VerificationErrorBanner() {
   const searchParams = useSearchParams();
   const failed =
@@ -50,6 +61,7 @@ function LoginContent() {
     <>
       <VerifiedBanner />
       <EmailUpdatedBanner />
+      <EmailChangePendingBanner />
       <VerificationErrorBanner />
       <PortalLoginForm
         expectedRole="applicant"

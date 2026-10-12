@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { syncVerifiedApplicantEmail } from "@/lib/applicant-email-sync";
+import { emailChangeStillPending, syncVerifiedApplicantEmail } from "@/lib/applicant-email-sync";
 import { safeAuthRedirectPath } from "@/lib/application-status-transition.mjs";
 import { isApplicantRole, resolvePostAuthRedirect } from "@/lib/portal-auth";
 import {
+  emailChangePendingLoginPath,
   emailChangedLoginPath,
   isEmailChangeOtpType,
   logEmailVerificationEvent,
@@ -88,15 +89,31 @@ export async function GET(request) {
       method: "token_hash_via_callback",
       type,
     });
-    await syncSessionEmail(supabase);
+    let stillPending = false;
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      stillPending = emailChange && emailChangeStillPending(user);
+      if (user?.id && !stillPending) await syncVerifiedApplicantEmail(createAdminClient(), user);
+    } catch (syncErr) {
+      console.error("[auth/callback]", {
+        event: "profile_email_sync_failed",
+        message: syncErr?.message ? String(syncErr.message).slice(0, 200) : "sync_error",
+        ts: new Date().toISOString(),
+      });
+    }
     try {
       await supabase.auth.signOut();
     } catch {
       /* non-fatal */
     }
-    return NextResponse.redirect(
-      new URL(emailChange ? emailChangedLoginPath(origin) : verifiedLoginPath(origin))
-    );
+    const nextPath = !emailChange
+      ? verifiedLoginPath(origin)
+      : stillPending
+        ? emailChangePendingLoginPath(origin)
+        : emailChangedLoginPath(origin);
+    return NextResponse.redirect(new URL(nextPath));
   }
 
   if (code) {

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { syncVerifiedApplicantEmail } from "@/lib/applicant-email-sync";
+import { emailChangeStillPending, syncVerifiedApplicantEmail } from "@/lib/applicant-email-sync";
 import {
+  emailChangePendingLoginPath,
   emailChangedLoginPath,
   isEmailChangeOtpType,
   logEmailVerificationEvent,
@@ -70,9 +71,11 @@ export async function GET(request) {
     message: null,
   });
 
+  let stillPending = false;
   try {
     const user = data?.user || (await supabase.auth.getUser()).data.user;
-    if (user?.id) {
+    stillPending = emailChange && emailChangeStillPending(user);
+    if (user?.id && !stillPending) {
       await syncVerifiedApplicantEmail(createAdminClient(), user);
     }
   } catch (syncErr) {
@@ -95,7 +98,10 @@ export async function GET(request) {
     });
   }
 
-  return NextResponse.redirect(
-    new URL(emailChange ? emailChangedLoginPath(origin) : verifiedLoginPath(origin))
-  );
+  const nextPath = !emailChange
+    ? verifiedLoginPath(origin)
+    : stillPending
+      ? emailChangePendingLoginPath(origin)
+      : emailChangedLoginPath(origin);
+  return NextResponse.redirect(new URL(nextPath));
 }

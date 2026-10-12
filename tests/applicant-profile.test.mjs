@@ -116,7 +116,7 @@ test("14. Invalid input is rejected", () => {
 
 test("15. Unauthorized requests are rejected", () => {
   assert.match(profileApi, /Unauthorized/);
-  assert.match(emailApi, /Unauthorized/);
+  assert.match(emailApi, /session_expired/);
   assert.match(passwordApi, /status: 401/);
   assert.match(profileApi, /isApplicantRole/);
 });
