@@ -1,17 +1,44 @@
 import { NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { recordDirectorAudit } from "@/lib/audit/director-audit";
 import { isApplicantRole } from "@/lib/portal-auth";
-import { passwordsMatch, validatePasswordPolicy } from "@/lib/password-policy";
+import { classifyPasswordChangeError, validatePasswordChange } from "@/lib/password-policy";
 import { consumeSharedRateLimit } from "@/lib/persistent-rate-limit";
 import { APPLICANT_PASSWORD_CHANGED_ACTION } from "@/lib/applicant-profile";
+
+/**
+ * Check the current password on a client that does not read or write cookies,
+ * so the applicant's active session is not replaced.
+ */
+function createPasswordVerifier() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+}
 
 export async function POST(request) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user?.email) {
+    return NextResponse.json(
+      {
+        error: "Your session has expired. Sign in again to update your password.",
+        code: "session_expired",
+      },
+      { status: 401 }
+    );
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -20,14 +47,6 @@ export async function POST(request) {
     .maybeSingle();
   if (!profile || !isApplicantRole(profile.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const limit = await consumeSharedRateLimit(`applicant-password:${user.id}`, {
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-  });
-  if (!limit.allowed) {
-    return NextResponse.json({ error: "Too many password attempts. Try again later." }, { status: 429 });
   }
 
   let body;
@@ -40,28 +59,43 @@ export async function POST(request) {
   const currentPassword = body?.currentPassword;
   const nextPassword = body?.newPassword;
   const confirmPassword = body?.confirmPassword;
-  if (typeof currentPassword !== "string" || typeof nextPassword !== "string") {
-    return NextResponse.json({ error: "Current and new passwords are required." }, { status: 400 });
-  }
-  if (!passwordsMatch(nextPassword, confirmPassword)) {
-    return NextResponse.json({ error: "New passwords do not match." }, { status: 400 });
-  }
-  const policy = validatePasswordPolicy(nextPassword);
-  if (!policy.ok) {
-    return NextResponse.json({ error: policy.message }, { status: 400 });
+  const validation = validatePasswordChange({ currentPassword, newPassword: nextPassword, confirmPassword });
+  if (!validation.ok) {
+    const field = Object.keys(validation.fields)[0];
+    return NextResponse.json(
+      { error: validation.fields[field], field, code: "validation" },
+      { status: 400 }
+    );
   }
 
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+  const limit = await consumeSharedRateLimit(`applicant-password:${user.id}`, {
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+  });
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Too many password attempts. Try again later." }, { status: 429 });
+  }
+
+  const verifier = createPasswordVerifier();
+  const { error: signInError } = await verifier.auth.signInWithPassword({
     email: user.email,
     password: currentPassword,
   });
   if (signInError) {
-    return NextResponse.json({ error: "Current password is incorrect." }, { status: 400 });
+    const failure = classifyPasswordChangeError(signInError, "verify");
+    return NextResponse.json(
+      { error: failure.error, code: failure.code, field: failure.field || null },
+      { status: failure.status }
+    );
   }
 
   const { error } = await supabase.auth.updateUser({ password: nextPassword });
   if (error) {
-    return NextResponse.json({ error: "The password could not be updated." }, { status: 400 });
+    const failure = classifyPasswordChangeError(error, "update");
+    return NextResponse.json(
+      { error: failure.error, code: failure.code, field: failure.field || null },
+      { status: failure.status }
+    );
   }
 
   await recordDirectorAudit({
@@ -75,5 +109,9 @@ export async function POST(request) {
     request,
   });
 
-  return NextResponse.json({ success: true, message: "Password updated." });
+  return NextResponse.json({
+    success: true,
+    reauthRequired: false,
+    message: "Password updated successfully.",
+  });
 }

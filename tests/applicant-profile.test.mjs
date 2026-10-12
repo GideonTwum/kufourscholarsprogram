@@ -117,7 +117,7 @@ test("14. Invalid input is rejected", () => {
 test("15. Unauthorized requests are rejected", () => {
   assert.match(profileApi, /Unauthorized/);
   assert.match(emailApi, /Unauthorized/);
-  assert.match(passwordApi, /Unauthorized/);
+  assert.match(passwordApi, /status: 401/);
   assert.match(profileApi, /isApplicantRole/);
 });
 
@@ -176,7 +176,9 @@ test("24. Password changes use Supabase Auth", () => {
 });
 
 test("25. Incorrect current password is rejected", () => {
-  assert.match(passwordApi, /Current password is incorrect/);
+  const policy = readFileSync(resolve("lib/password-policy.js"), "utf8");
+  assert.match(policy, /Current password is incorrect/);
+  assert.match(passwordApi, /classifyPasswordChangeError/);
 });
 
 test("26. Passwords are never logged", () => {

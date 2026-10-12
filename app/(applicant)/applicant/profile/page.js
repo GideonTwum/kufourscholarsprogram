@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Camera, CheckCircle2, Loader2, Save, X } from "lucide-react";
+import Link from "next/link";
+import { Camera, CheckCircle2, Eye, EyeOff, Loader2, Save, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import InstitutionSelect from "@/components/applicant/InstitutionSelect";
+import PasswordPolicyChecklist from "@/components/auth/PasswordPolicyChecklist";
 import { GENDER_OPTIONS, formatGenderLabel } from "@/lib/applicant-demographics";
 import { buildApplicantProfilePatch } from "@/lib/applicant-profile";
-import { passwordsMatch, PASSWORD_POLICY_MESSAGE, validatePasswordPolicy } from "@/lib/password-policy";
+import { validatePasswordChange } from "@/lib/password-policy";
 
 const inputClass =
   "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/20";
@@ -20,6 +22,10 @@ export default function ApplicantProfilePage() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [password, setPassword] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const [passwordReauth, setPasswordReauth] = useState(false);
   const [email, setEmail] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -149,33 +155,38 @@ export default function ApplicantProfilePage() {
   async function savePassword(event) {
     event.preventDefault();
     if (saving) return;
-    setSaving(true);
     setError("");
-    if (!passwordsMatch(password.newPassword, password.confirmPassword)) {
+    setNotice("");
+    setPasswordReauth(false);
+    const validation = validatePasswordChange(password);
+    if (!validation.ok) {
+      setPasswordErrors(validation.fields);
+      return;
+    }
+    setPasswordErrors({});
+    setSaving(true);
+    try {
+      const res = await fetch("/api/applicant/account/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(password),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (json.field && json.error) setPasswordErrors({ [json.field]: json.error });
+        setError(json.error || "The password could not be updated. Try again.");
+        setPasswordReauth(json.code === "session_expired");
+        return;
+      }
+      setPassword({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordUpdated(true);
+      setNotice("Password updated successfully.");
+      setSection("");
+    } catch {
+      setError("The password could not be updated. Check your connection and try again.");
+    } finally {
       setSaving(false);
-      setError("New passwords do not match.");
-      return;
     }
-    const policy = validatePasswordPolicy(password.newPassword);
-    if (!policy.ok) {
-      setSaving(false);
-      setError(policy.message);
-      return;
-    }
-    const res = await fetch("/api/applicant/account/password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(password),
-    });
-    const json = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (!res.ok) {
-      setError(json.error || "Could not update password.");
-      return;
-    }
-    setPassword({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    setNotice(json.message || "Password updated.");
-    setSection("");
   }
 
   if (loading) {
@@ -331,16 +342,60 @@ export default function ApplicantProfilePage() {
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500">Change Password</p>
-            <p className="mt-1 text-xs text-gray-500">{PASSWORD_POLICY_MESSAGE}</p>
+            {passwordUpdated && section !== "password" ? (
+              <p className="mt-1 text-sm text-green-700">Password updated successfully. You stay signed in and can keep using the portal.</p>
+            ) : null}
             {section === "password" ? (
-              <form onSubmit={savePassword} className="mt-3 grid max-w-md gap-3">
-                <input type="password" autoComplete="current-password" className={inputClass} placeholder="Current password" value={password.currentPassword} onChange={(e) => setPassword((p) => ({ ...p, currentPassword: e.target.value }))} required />
-                <input type="password" autoComplete="new-password" className={inputClass} placeholder="New password" value={password.newPassword} onChange={(e) => setPassword((p) => ({ ...p, newPassword: e.target.value }))} required />
-                <input type="password" autoComplete="new-password" className={inputClass} placeholder="Confirm new password" value={password.confirmPassword} onChange={(e) => setPassword((p) => ({ ...p, confirmPassword: e.target.value }))} required />
-                <SaveRow saving={saving} onCancel={() => setSection("")} />
+              <form onSubmit={savePassword} className="mt-3 grid max-w-md gap-3" noValidate>
+                <PasswordInput
+                  label="Current Password"
+                  autoComplete="current-password"
+                  shown={showPasswords}
+                  value={password.currentPassword}
+                  error={passwordErrors.currentPassword}
+                  onChange={(value) => setPassword((p) => ({ ...p, currentPassword: value }))}
+                />
+                <PasswordInput
+                  label="New Password"
+                  autoComplete="new-password"
+                  shown={showPasswords}
+                  value={password.newPassword}
+                  error={passwordErrors.newPassword}
+                  onChange={(value) => setPassword((p) => ({ ...p, newPassword: value }))}
+                />
+                <PasswordPolicyChecklist password={password.newPassword} showWhenEmpty id="applicant-password-requirements" />
+                <PasswordInput
+                  label="Confirm New Password"
+                  autoComplete="new-password"
+                  shown={showPasswords}
+                  value={password.confirmPassword}
+                  error={passwordErrors.confirmPassword}
+                  onChange={(value) => setPassword((p) => ({ ...p, confirmPassword: value }))}
+                />
+                <button type="button" onClick={() => setShowPasswords((open) => !open)} className="inline-flex w-fit items-center gap-1 text-xs font-semibold text-royal">
+                  {showPasswords ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showPasswords ? "Hide passwords" : "Show passwords"}
+                </button>
+                {passwordReauth ? (
+                  <p className="text-sm text-red-700">
+                    Your session has expired. <Link href="/login" className="font-semibold underline">Sign in</Link> and try again.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { setSection(""); setPasswordErrors({}); }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">Cancel</button>
+                  <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-royal px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {saving ? "Updating Password..." : "Update Password"}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Forgot your password?{" "}
+                  <Link href="/forgot-password" className="font-semibold text-royal">Use account recovery</Link>
+                  . That sends a reset email and is separate from this update.
+                </p>
               </form>
             ) : (
-              <button type="button" onClick={() => setSection("password")} className="mt-2 text-xs font-semibold text-royal">Change password</button>
+              <button type="button" onClick={() => { setPasswordUpdated(false); setPasswordErrors({}); setSection("password"); }} className="mt-2 text-xs font-semibold text-royal">Change password</button>
             )}
           </div>
         </div>
@@ -386,6 +441,23 @@ function Field({ label, children }) {
 
 function Read({ label, value }) {
   return <div><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-0.5 text-gray-900">{value || "—"}</dd></div>;
+}
+
+function PasswordInput({ label, value, onChange, error, shown, autoComplete }) {
+  return (
+    <label className="block text-xs font-medium text-gray-600">
+      {label}
+      <input
+        type={shown ? "text" : "password"}
+        autoComplete={autoComplete}
+        className={`${inputClass} mt-1`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? "true" : "false"}
+      />
+      {error ? <span className="mt-1 block text-xs text-red-700">{error}</span> : null}
+    </label>
+  );
 }
 
 function SaveRow({ saving, onCancel }) {
