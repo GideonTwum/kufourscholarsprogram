@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { syncVerifiedApplicantEmail } from "@/lib/applicant-email-sync";
 import {
+  emailChangedLoginPath,
+  isEmailChangeOtpType,
   logEmailVerificationEvent,
   normalizeEmailConfirmOtpType,
   verificationErrorLoginPath,
@@ -20,7 +24,8 @@ export async function GET(request) {
   const origin = requestUrl.origin;
   const token_hash = requestUrl.searchParams.get("token_hash");
   const rawType = requestUrl.searchParams.get("type");
-  const type = normalizeEmailConfirmOtpType(rawType);
+  const emailChange = isEmailChangeOtpType(rawType);
+  const type = emailChange ? "email_change" : normalizeEmailConfirmOtpType(rawType);
 
   if (!token_hash || typeof token_hash !== "string" || !token_hash.trim()) {
     logEmailVerificationEvent("verify_rejected", {
@@ -43,7 +48,7 @@ export async function GET(request) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.verifyOtp({
+  const { data, error } = await supabase.auth.verifyOtp({
     token_hash: token_hash.trim(),
     type,
   });
@@ -65,6 +70,19 @@ export async function GET(request) {
     message: null,
   });
 
+  try {
+    const user = data?.user || (await supabase.auth.getUser()).data.user;
+    if (user?.id) {
+      await syncVerifiedApplicantEmail(createAdminClient(), user);
+    }
+  } catch (syncErr) {
+    console.error("[auth/confirm]", {
+      event: "profile_email_sync_failed",
+      message: syncErr?.message ? String(syncErr.message).slice(0, 200) : "sync_error",
+      ts: new Date().toISOString(),
+    });
+  }
+
   // Verification proves email ownership only — require explicit password login.
   try {
     await supabase.auth.signOut();
@@ -77,5 +95,7 @@ export async function GET(request) {
     });
   }
 
-  return NextResponse.redirect(new URL(verifiedLoginPath(origin)));
+  return NextResponse.redirect(
+    new URL(emailChange ? emailChangedLoginPath(origin) : verifiedLoginPath(origin))
+  );
 }

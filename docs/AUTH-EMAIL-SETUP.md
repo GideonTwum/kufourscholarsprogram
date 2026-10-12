@@ -68,8 +68,11 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 Customize at least:
 
-- **Confirm signup** — applicant verification
+- **Confirm signup** — applicant verification (`docs/AUTH-CONFIRM-SIGNUP-TEMPLATE.md`)
+- **Change email address** — `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change`
 - **Invite user** — panel invite from director portal
+
+The change-email link must use `type=email_change`. Signup confirmation stays `type=email`. After that link is confirmed, the app copies the verified address onto `profiles.email` before signing the applicant out. A pending address is not shown as the current email.
 
 You can use your program name and support contact. Links in templates use `{{ .ConfirmationURL }}` (Supabase default).
 

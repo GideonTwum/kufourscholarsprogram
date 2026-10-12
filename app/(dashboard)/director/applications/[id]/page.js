@@ -29,6 +29,7 @@ import { evaluatorDisplayName } from "@/lib/staff-lifecycle";
 import DirectorStageActionBar from "../../components/DirectorStageActionBar";
 import DirectorAssessorAssignmentPanel from "@/components/director/DirectorAssessorAssignmentPanel";
 import DirectorEditApplicantDetails from "@/components/director/DirectorEditApplicantDetails";
+import DirectorProfileChanges from "@/components/director/DirectorProfileChanges";
 
 const statusFlow = [
   { key: "draft", label: "Draft", color: "bg-gray-100 text-gray-600" },
@@ -628,6 +629,8 @@ export default function ApplicationReviewPage() {
           </button>
         )}
       </div>
+
+      <DirectorProfileChanges applicationId={application.id} />
 
       {/* Stage 1 Tab */}
       {activeTab === "stage1" && (

@@ -1,13 +1,32 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { syncVerifiedApplicantEmail } from "@/lib/applicant-email-sync";
 import { safeAuthRedirectPath } from "@/lib/application-status-transition.mjs";
 import { isApplicantRole, resolvePostAuthRedirect } from "@/lib/portal-auth";
 import {
+  emailChangedLoginPath,
+  isEmailChangeOtpType,
   logEmailVerificationEvent,
   normalizeEmailConfirmOtpType,
   verificationErrorLoginPath,
   verifiedLoginPath,
 } from "@/lib/auth-email-confirm";
+
+async function syncSessionEmail(supabase) {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user?.id) await syncVerifiedApplicantEmail(createAdminClient(), user);
+  } catch (syncErr) {
+    console.error("[auth/callback]", {
+      event: "profile_email_sync_failed",
+      message: syncErr?.message ? String(syncErr.message).slice(0, 200) : "sync_error",
+      ts: new Date().toISOString(),
+    });
+  }
+}
 
 /**
  * Applicant email confirmation must not leave an authenticated session that
@@ -50,7 +69,8 @@ export async function GET(request) {
 
   // Cross-browser email confirmation via token_hash (no PKCE verifier required).
   if (token_hash && typeof token_hash === "string" && token_hash.trim()) {
-    const type = normalizeEmailConfirmOtpType(rawType) || "email";
+    const emailChange = isEmailChangeOtpType(rawType);
+    const type = emailChange ? "email_change" : normalizeEmailConfirmOtpType(rawType) || "email";
     const { error } = await supabase.auth.verifyOtp({
       token_hash: token_hash.trim(),
       type,
@@ -68,12 +88,15 @@ export async function GET(request) {
       method: "token_hash_via_callback",
       type,
     });
+    await syncSessionEmail(supabase);
     try {
       await supabase.auth.signOut();
     } catch {
       /* non-fatal */
     }
-    return NextResponse.redirect(new URL(verifiedLoginPath(origin)));
+    return NextResponse.redirect(
+      new URL(emailChange ? emailChangedLoginPath(origin) : verifiedLoginPath(origin))
+    );
   }
 
   if (code) {
@@ -88,6 +111,7 @@ export async function GET(request) {
       return NextResponse.redirect(new URL(verificationErrorLoginPath(origin)));
     }
     exchanged = true;
+    await syncSessionEmail(supabase);
   }
 
   // Password recovery must keep the recovery session on /reset-password.

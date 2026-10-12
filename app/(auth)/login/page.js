@@ -20,6 +20,17 @@ function VerifiedBanner() {
   );
 }
 
+function EmailUpdatedBanner() {
+  const searchParams = useSearchParams();
+  if (searchParams.get("email_updated") !== "1") return null;
+  return (
+    <div className="mb-4 flex items-start gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+      <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+      <span>Your email address has been updated. Sign in with the new address.</span>
+    </div>
+  );
+}
+
 function VerificationErrorBanner() {
   const searchParams = useSearchParams();
   const failed =
@@ -38,6 +49,7 @@ function LoginContent() {
   return (
     <>
       <VerifiedBanner />
+      <EmailUpdatedBanner />
       <VerificationErrorBanner />
       <PortalLoginForm
         expectedRole="applicant"
