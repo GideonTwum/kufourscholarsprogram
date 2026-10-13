@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { validateStage2Video } from "@/lib/application-validation";
+import { parseYoutubeVideoUrl } from "@/lib/youtube";
 import { assertStatusTransition } from "@/lib/application-status-transition.mjs";
 import { sendKspEmail } from "@/lib/email/send";
 import { escapeHtml } from "@/lib/email/escape";
@@ -59,6 +60,7 @@ export async function POST(request) {
       { status: 400 }
     );
   }
+  const canonicalVideoUrl = parseYoutubeVideoUrl(videoUrl).canonicalUrl;
 
   let db;
   try {
@@ -113,7 +115,7 @@ export async function POST(request) {
   const { error: updateError } = await db
     .from("applications")
     .update({
-      video_youtube_url: videoUrl,
+      video_youtube_url: canonicalVideoUrl,
       status: "stage_2_submitted",
       stage_2_submitted_at: nowIso,
       updated_at: nowIso,
