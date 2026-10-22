@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { buildDirectorApplicationsListHref } from "@/lib/director-applications-return";
 
 /**
  * Assessor filter dropdown for Director Applications.
@@ -13,6 +14,7 @@ import { useRouter } from "next/navigation";
  *   statusFilter?: string,
  *   workflowFilter?: string,
  *   stageFilter?: string,
+ *   stage2Filter?: string,
  *   searchQuery?: string,
  * }} props
  */
@@ -22,6 +24,7 @@ export default function DirectorAssessorFilter({
   statusFilter = "",
   workflowFilter = "all",
   stageFilter = "all",
+  stage2Filter = "",
   searchQuery = "",
 }) {
   const router = useRouter();
@@ -35,15 +38,14 @@ export default function DirectorAssessorFilter({
   }, [options, nameQuery]);
 
   function hrefForAssessor(assessorId) {
-    const params = new URLSearchParams();
-    if (statusFilter) params.set("status", statusFilter);
-    if (workflowFilter && workflowFilter !== "all") params.set("workflow", workflowFilter);
-    if (stageFilter && stageFilter !== "all") params.set("stage", stageFilter);
-    if (assessorId) params.set("assessor", assessorId);
-    const q = typeof searchQuery === "string" ? searchQuery.trim() : "";
-    if (q) params.set("q", q);
-    const qs = params.toString();
-    return qs ? `/director/applications?${qs}` : "/director/applications";
+    return buildDirectorApplicationsListHref({
+      status: statusFilter,
+      workflow: workflowFilter,
+      stage: stageFilter,
+      stage2: stage2Filter,
+      assessor: assessorId,
+      q: searchQuery,
+    });
   }
 
   const optionLabel = (o) => {

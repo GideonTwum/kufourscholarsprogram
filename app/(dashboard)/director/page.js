@@ -132,7 +132,7 @@ export default function DirectorDashboard() {
         </div>
       ) : metrics ? (
         <>
-          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <MetricCard
               label="Submitted applications"
               value={t.total_applications}
@@ -144,15 +144,37 @@ export default function DirectorDashboard() {
               href="/director/applications?status=stage_1_submitted"
               tone="amber"
             />
-            <MetricCard
-              label="Stage 2 pending"
-              value={t.stage_2_pending}
-              href="/director/applications?status=stage_2_submitted"
-              tone="indigo"
-            />
             <MetricCard label="Interviews" value={t.interviews} href="/director/interviews" tone="indigo" />
             <MetricCard label="Accepted" value={t.accepted} href="/director/applications?status=accepted" tone="green" />
             <MetricCard label="Rejected" value={t.rejected} href="/director/applications?status=rejected" tone="red" />
+          </div>
+
+          <h2 className="mb-3 text-sm font-bold text-gray-900">Stage 2 review</h2>
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              label="Stage 2 Submitted"
+              value={t.stage_2_submitted}
+              href="/director/applications?status=stage_2_submitted"
+              tone="indigo"
+            />
+            <MetricCard
+              label="Stage 2 Approved"
+              value={t.stage_2_approved}
+              href="/director/applications?stage2=approved"
+              tone="green"
+            />
+            <MetricCard
+              label="Stage 2 Pending Review"
+              value={t.stage_2_pending_review}
+              href="/director/applications?stage2=pending"
+              tone="amber"
+            />
+            <MetricCard
+              label="Stage 2 Rejected"
+              value={t.stage_2_rejected}
+              href="/director/applications?stage2=rejected"
+              tone="red"
+            />
           </div>
 
           {(t.draft_applications ?? 0) > 0 ? (

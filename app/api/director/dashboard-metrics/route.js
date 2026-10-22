@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
 import { fetchDirectorApplicationCountSummary } from "@/lib/director-application-scope";
+import { fetchDirectorStage2RejectedCount } from "@/lib/director-stage2-review";
 import { VALID_APPLICATION_STATUSES } from "@/lib/application-status-transition.mjs";
 
 export async function GET() {
@@ -27,6 +28,7 @@ export async function GET() {
     { data: deadlineSetting },
     { data: classSetting },
     { data: recentAudit },
+    stage2RejectedCount,
   ] = await Promise.all([
     fetchDirectorApplicationCountSummary(admin),
     admin
@@ -64,14 +66,19 @@ export async function GET() {
       .select("id, action, entity_type, entity_id, actor_name_snapshot, actor_email_snapshot, created_at")
       .order("created_at", { ascending: false })
       .limit(12),
+    fetchDirectorStage2RejectedCount(admin),
   ]);
 
   const byStatus = { ...emptyCounts, ...countBundle.byStatus };
   const summary = countBundle.summary;
 
   const stage1Pending = (byStatus.stage_1_submitted || 0) + (byStatus.review_pending || 0);
+  const stage2Submitted = byStatus.stage_2_submitted || 0;
   const stage2Pending =
-    (byStatus.stage_2_submitted || 0) + (byStatus.stage_2_review_pending || 0);
+    stage2Submitted + (byStatus.stage_2_review_pending || 0);
+  const stage2Approved = byStatus.stage_2_approved || 0;
+  const stage2Rejected = stage2RejectedCount || 0;
+  const stage2All = stage2Pending + stage2Approved;
   const interviews =
     (byStatus.called_for_interview || 0) +
     (byStatus.interview || 0) +
@@ -91,6 +98,11 @@ export async function GET() {
       total_including_drafts: summary.total_including_drafts,
       stage_1_pending: stage1Pending,
       stage_2_pending: stage2Pending,
+      stage_2_submitted: stage2Submitted,
+      stage_2_approved: stage2Approved,
+      stage_2_pending_review: stage2Pending,
+      stage_2_rejected: stage2Rejected,
+      stage_2_all: stage2All,
       interviews,
       accepted: summary.accepted,
       rejected: summary.rejected,

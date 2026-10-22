@@ -23,6 +23,10 @@ import {
   buildDirectorApplicationDetailHref,
   buildDirectorApplicationsListHref,
 } from "@/lib/director-applications-return";
+import {
+  DIRECTOR_STAGE2_REVIEW_BADGE,
+  classifyDirectorStage2Review,
+} from "@/lib/director-stage2-review";
 
 const statusConfig = {
   pending: {
@@ -46,19 +50,19 @@ const statusConfig = {
     icon: Users,
   },
   stage_2_submitted: {
-    label: "Stage 2 review",
-    color: "bg-indigo-50 text-indigo-700",
+    label: "Stage 2 Pending Review",
+    color: "bg-amber-50 text-amber-700",
     icon: Video,
   },
   stage_2_review_pending: {
-    label: "Stage 2 deferred",
-    color: "bg-slate-100 text-slate-700",
+    label: "Stage 2 Pending Review",
+    color: "bg-amber-50 text-amber-700",
     icon: Clock,
   },
   stage_2_approved: {
-    label: "Stage 2 ✓",
-    color: "bg-indigo-50 text-indigo-700",
-    icon: Video,
+    label: "Stage 2 Approved",
+    color: "bg-green-50 text-green-700",
+    icon: CheckCircle2,
   },
   interview_review_pending: {
     label: "Interview pending",
@@ -109,6 +113,7 @@ export default function DirectorApplicationsList({
   workflowFilter = "all",
   statusFilter = "",
   stageFilter = "all",
+  stage2Filter = "",
   assessorFilter = "",
   initialSearchQuery = "",
 }) {
@@ -130,6 +135,7 @@ export default function DirectorApplicationsList({
       status: statusFilter,
       workflow: workflowFilter,
       stage: stageFilter,
+      stage2: stage2Filter,
       assessor: assessorFilter,
       q: searchQuery,
     });
@@ -139,7 +145,7 @@ export default function DirectorApplicationsList({
       router.replace(href, { scroll: false });
     }, 250);
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, workflowFilter, stageFilter, assessorFilter, router]);
+  }, [searchQuery, statusFilter, workflowFilter, stageFilter, stage2Filter, assessorFilter, router]);
 
   const listHref = useMemo(
     () =>
@@ -147,10 +153,11 @@ export default function DirectorApplicationsList({
         status: statusFilter,
         workflow: workflowFilter,
         stage: stageFilter,
+        stage2: stage2Filter,
         assessor: assessorFilter,
         q: searchQuery,
       }),
-    [statusFilter, workflowFilter, stageFilter, assessorFilter, searchQuery]
+    [statusFilter, workflowFilter, stageFilter, stage2Filter, assessorFilter, searchQuery]
   );
 
   const filtered = useMemo(() => {
@@ -169,6 +176,10 @@ export default function DirectorApplicationsList({
     if (stageFilter === "stage_1") return "No Stage 1 applications in this view.";
     if (stageFilter === "stage_2") return "No Stage 2 applications in this view.";
     if (stageFilter === "interview") return "No Interview-stage applications in this view.";
+    if (stage2Filter === "all") return "No Stage 2 applicants in this view.";
+    if (stage2Filter === "approved") return "No Stage 2 approved applications in this view.";
+    if (stage2Filter === "pending") return "No Stage 2 applications pending review in this view.";
+    if (stage2Filter === "rejected") return "No Stage 2 rejected applications in this view.";
     if (workflowFilter === "unassigned") return "No unassigned applications.";
     if (workflowFilter === "assigned") return "No applications awaiting assessor review.";
     if (workflowFilter === "assessed") return "No assessed applications awaiting Director action.";
@@ -238,6 +249,11 @@ export default function DirectorApplicationsList({
         <div className="space-y-3">
           {filtered.map(({ app, workflow, assignment, workflowLabel }) => {
             const config = statusConfig[app.status] || statusConfig.pending;
+            const stage2Review = classifyDirectorStage2Review(app);
+            const stage2Badge =
+              stage2Review === "rejected" || stage2Review === "not_submitted"
+                ? DIRECTOR_STAGE2_REVIEW_BADGE[stage2Review]
+                : null;
             return (
               <Link
                 key={app.id}
@@ -278,6 +294,13 @@ export default function DirectorApplicationsList({
                       }`}
                     >
                       {workflowLabel || DIRECTOR_WORKFLOW_LABELS[workflow]}
+                    </span>
+                  ) : null}
+                  {stage2Badge ? (
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${stage2Badge.color}`}
+                    >
+                      {stage2Badge.label}
                     </span>
                   ) : null}
                   <span

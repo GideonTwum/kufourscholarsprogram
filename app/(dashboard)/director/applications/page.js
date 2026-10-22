@@ -32,9 +32,22 @@ import {
 } from "@/lib/director-application-workflow";
 import { loadDirectorAssignmentWorkflowMeta } from "@/lib/director-assignment-workflow-meta";
 import { buildDirectorApplicationsListHref } from "@/lib/director-applications-return";
+import {
+  DIRECTOR_STAGE2_REVIEW_FILTERS,
+  filterByDirectorStage2Review,
+  normalizeDirectorStage2ReviewParam,
+  summarizeDirectorStage2ReviewCounts,
+} from "@/lib/director-stage2-review";
 
-function hrefForFilters({ status = "", workflow = "all", stage = "all", assessor = "", q = "" }) {
-  return buildDirectorApplicationsListHref({ status, workflow, stage, assessor, q });
+function hrefForFilters({
+  status = "",
+  workflow = "all",
+  stage = "all",
+  stage2 = "",
+  assessor = "",
+  q = "",
+}) {
+  return buildDirectorApplicationsListHref({ status, workflow, stage, stage2, assessor, q });
 }
 
 async function fetchWithAdmin(statusFilter) {
@@ -171,6 +184,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
   const statusFilter = params?.status || "";
   const workflowFilter = normalizeWorkflowParam(params?.workflow);
   const stageFilter = normalizeDirectorApplicationStageParam(params?.stage);
+  const stage2Filter = normalizeDirectorStage2ReviewParam(params?.stage2);
   const assessorFilter = normalizeDirectorAssessorParam(params?.assessor);
   const searchQuery =
     typeof params?.q === "string" ? params.q.trim().slice(0, 500) : "";
@@ -185,12 +199,13 @@ export default async function DirectorApplicationsPage({ searchParams }) {
   const classifiedAll = classifyDirectorApplications(allOperational, assignmentMap);
   const workflowCounts = summarizeDirectorWorkflowCounts(classifiedAll);
   const stageCounts = summarizeDirectorApplicationStageCounts(classifiedAll);
+  const stage2Counts = summarizeDirectorStage2ReviewCounts(classifiedAll);
   const assessorOptions = summarizeDirectorAssessorOptions(classifiedAll);
   const assessorSummary = assessorFilter
     ? summarizeSelectedAssessorWorkload(classifiedAll, assessorFilter)
     : null;
 
-  // Composition: operational → Status → Application Stage → Workflow → Assessor → (client search)
+  // Composition: operational → Status → Application Stage → Stage 2 Review → Workflow → Assessor → (client search)
   const statusScoped = statusFilter
     ? classifiedAll.filter(({ app }) => {
         if (statusFilter === "pending") {
@@ -201,7 +216,8 @@ export default async function DirectorApplicationsPage({ searchParams }) {
     : classifiedAll;
 
   const stageScoped = filterByDirectorApplicationStage(statusScoped, stageFilter);
-  const workflowScoped = filterByDirectorWorkflow(stageScoped, workflowFilter);
+  const stage2Scoped = filterByDirectorStage2Review(stageScoped, stage2Filter);
+  const workflowScoped = filterByDirectorWorkflow(stage2Scoped, workflowFilter);
   const listItems = filterByDirectorAssessor(workflowScoped, assessorFilter);
 
   const countForStatusFilter = (key) => {
@@ -222,6 +238,11 @@ export default async function DirectorApplicationsPage({ searchParams }) {
     return stageCounts[key] || 0;
   };
 
+  const countForStage2 = (key) => {
+    if (key === "all") return stage2Counts.all;
+    return stage2Counts[key] || 0;
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -235,7 +256,9 @@ export default async function DirectorApplicationsPage({ searchParams }) {
           <span className="font-medium text-gray-600">Assessment Workflow</span> is where the
           application is in assessor processing.{" "}
           <span className="font-medium text-gray-600">Assessor</span> shows applications with a
-          current active assignment to that person. These filters combine.
+          current active assignment to that person.{" "}
+          <span className="font-medium text-gray-600">Stage 2 Review</span> is the Director
+          Stage 2 approval decision, not video upload alone. These filters combine.
         </p>
       </div>
 
@@ -262,6 +285,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
               status: statusFilter,
               workflow: workflowFilter,
               stage: key,
+              stage2: stage2Filter,
               assessor: assessorFilter,
               q: searchQuery,
             })}
@@ -276,6 +300,48 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         ))}
       </div>
 
+      {/* Stage 2 review — Director Stage 2 approval, not video upload alone */}
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Stage 2 Review:</span>
+        </div>
+        {DIRECTOR_STAGE2_REVIEW_FILTERS.map(({ key, label }) => (
+          <Link
+            key={key}
+            href={hrefForFilters({
+              status: statusFilter,
+              workflow: workflowFilter,
+              stage: stageFilter,
+              stage2: key,
+              assessor: assessorFilter,
+              q: searchQuery,
+            })}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              stage2Filter === key
+                ? "bg-royal text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {label} ({countForStage2(key)})
+          </Link>
+        ))}
+        {stage2Filter ? (
+          <Link
+            href={hrefForFilters({
+              status: statusFilter,
+              workflow: workflowFilter,
+              stage: stageFilter,
+              stage2: "",
+              assessor: assessorFilter,
+              q: searchQuery,
+            })}
+            className="rounded-full px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+          >
+            Clear Stage 2 Review
+          </Link>
+        ) : null}
+      </div>
+
       {/* Assessment Workflow queues — mutually exclusive current processing stages */}
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
@@ -288,6 +354,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
               status: statusFilter,
               workflow: key,
               stage: stageFilter,
+              stage2: stage2Filter,
               assessor: assessorFilter,
               q: searchQuery,
             })}
@@ -314,6 +381,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
               status: key,
               workflow: workflowFilter,
               stage: stageFilter,
+              stage2: stage2Filter,
               assessor: assessorFilter,
               q: searchQuery,
             })}
@@ -334,6 +402,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         statusFilter={statusFilter}
         workflowFilter={workflowFilter}
         stageFilter={stageFilter}
+        stage2Filter={stage2Filter}
         searchQuery={searchQuery}
       />
 
@@ -343,6 +412,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
           workflowFilter={workflowFilter}
           statusFilter={statusFilter}
           stageFilter={stageFilter}
+          stage2Filter={stage2Filter}
           searchQuery={searchQuery}
         />
       ) : null}
@@ -359,6 +429,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         workflowFilter={workflowFilter}
         statusFilter={statusFilter}
         stageFilter={stageFilter}
+        stage2Filter={stage2Filter}
         assessorFilter={assessorFilter}
         initialSearchQuery={searchQuery}
       />

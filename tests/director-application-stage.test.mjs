@@ -328,11 +328,12 @@ test("Director Applications page wires stage URL and filter composition", () => 
   assert.match(page, /Application Stage/);
   assert.match(page, /Assessment Workflow/);
   assert.match(page, /DIRECTOR_APPLICATION_STAGE_FILTERS/);
-  // Composition order: status then stage then workflow
+  // Composition order: status then stage then Stage 2 review then workflow
   const statusIdx = page.indexOf("statusScoped");
   const stageIdx = page.indexOf("stageScoped");
-  const listIdx = page.indexOf("filterByDirectorWorkflow(stageScoped");
-  assert.ok(statusIdx > 0 && stageIdx > statusIdx && listIdx > stageIdx);
+  const stage2Idx = page.indexOf("stage2Scoped");
+  const listIdx = page.indexOf("filterByDirectorWorkflow(stage2Scoped");
+  assert.ok(statusIdx > 0 && stageIdx > statusIdx && stage2Idx > stageIdx && listIdx > stage2Idx);
 });
 
 test("stage helpers are read-only classification (no DB mutation helpers)", () => {

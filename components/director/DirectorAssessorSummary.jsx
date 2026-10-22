@@ -19,6 +19,7 @@ import { buildDirectorApplicationsListHref } from "@/lib/director-applications-r
  *   workflowFilter?: string,
  *   statusFilter?: string,
  *   stageFilter?: string,
+ *   stage2Filter?: string,
  *   searchQuery?: string,
  * }} props
  */
@@ -27,6 +28,7 @@ export default function DirectorAssessorSummary({
   workflowFilter = "all",
   statusFilter = "",
   stageFilter = "all",
+  stage2Filter = "",
   searchQuery = "",
 }) {
   if (!summary) return null;
@@ -42,6 +44,7 @@ export default function DirectorAssessorSummary({
       status: statusFilter,
       workflow,
       stage: stageFilter,
+      stage2: stage2Filter,
       assessor: summary.assessorId,
       q: searchQuery,
     });
