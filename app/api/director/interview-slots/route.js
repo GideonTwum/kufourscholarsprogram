@@ -1,5 +1,19 @@
 import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
+import { INTERVIEW_ALLOCATION_TABLE } from "@/lib/director-interview-allocation";
+import { occupancyFromRows, summarizeBatchOccupancy } from "@/lib/director-interview-batches";
+import { summarizeInvitationDelivery } from "@/lib/director-interview-capacity";
+import {
+  attachLocationConfirmations,
+  fetchInterviewLocationConfirmationsMap,
+} from "@/lib/director-interview-location";
+import {
+  STUDY_LOCATION_UNCONFIRMED_LABEL,
+  hasLocationConfirmation,
+  studyInstitutionDisplay,
+  studyRegionLabel,
+  studyTownDisplay,
+} from "@/lib/director-location-filter";
 
 const INTERVIEW_APP_STATUSES = [
   "stage_2_approved",
@@ -69,12 +83,30 @@ export async function GET() {
     }
   }
 
-  const enriched = applications.map((app) => ({
-    ...app,
-    applicant_name: app.full_name || app.profiles?.full_name || null,
-    email: app.profiles?.email || null,
-    latest_assessment: assessmentByApp[app.id] || null,
-  }));
+  const confirmationsById = await fetchInterviewLocationConfirmationsMap(admin, appIds);
+  const confirmations = confirmationsById.__error ? {} : confirmationsById;
+  const withLocations = attachLocationConfirmations(
+    applications.map((app) => ({ id: app.id, app, location_confirmation: confirmations[app.id] || null })),
+    confirmations
+  );
+  const confirmationByAppId = Object.fromEntries(
+    withLocations.map((row) => [row.id || row.app?.id, row.location_confirmation])
+  );
+  const enriched = applications.map((app) => {
+    const wrapped = { location_confirmation: confirmationByAppId[app.id] || null };
+    const confirmed = hasLocationConfirmation(wrapped);
+    return {
+      ...app,
+      location_confirmation: wrapped.location_confirmation,
+      location_confirmed: confirmed,
+      study_region: confirmed ? studyRegionLabel(wrapped) : STUDY_LOCATION_UNCONFIRMED_LABEL,
+      study_town: confirmed ? studyTownDisplay(wrapped) : STUDY_LOCATION_UNCONFIRMED_LABEL,
+      study_institution: confirmed ? studyInstitutionDisplay(wrapped) : STUDY_LOCATION_UNCONFIRMED_LABEL,
+      applicant_name: app.full_name || app.profiles?.full_name || null,
+      email: app.profiles?.email || null,
+      latest_assessment: assessmentByApp[app.id] || null,
+    };
+  });
 
   const unscheduled = enriched.filter(
     (a) => a.status === "interview_review_pending" && !a.interview_slot_id
@@ -87,12 +119,46 @@ export async function GET() {
   );
   const completedApps = enriched.filter((a) => a.status === "interview");
 
-  const scheduledSlots = (slots || []).filter((s) => (s.status || "scheduled") === "scheduled");
-  const completedSlots = (slots || []).filter((s) => s.status === "completed");
-  const cancelledSlots = (slots || []).filter((s) => s.status === "cancelled");
+  const slotIds = (slots || []).map((s) => s.id);
+  let allocs = [];
+  if (slotIds.length) {
+    const allocResult = await admin
+      .from(INTERVIEW_ALLOCATION_TABLE)
+      .select("application_id, interview_slot_id, invitation_sent_at, invitation_delivery_status, invitation_last_error, response_status")
+      .in("interview_slot_id", slotIds);
+    if (!allocResult.error) allocs = allocResult.data || [];
+    else {
+      const fallback = await admin
+        .from(INTERVIEW_ALLOCATION_TABLE)
+        .select("application_id, interview_slot_id, invitation_sent_at, response_status")
+        .in("interview_slot_id", slotIds);
+      if (!fallback.error) allocs = fallback.data || [];
+    }
+  }
+  const bookedBySlot = occupancyFromRows([
+    ...(allocs || []),
+    ...enriched.map((app) => ({ id: app.id, interview_slot_id: app.interview_slot_id })),
+  ]);
+  const presentedSlots = summarizeBatchOccupancy(slots || [], bookedBySlot).map((slot) => {
+    const slotAllocs = (allocs || []).filter((row) => row.interview_slot_id === slot.id);
+    return {
+      ...slot,
+      assigned_ids: [
+        ...new Set(
+          slotAllocs
+            .map((row) => row.application_id)
+            .concat(enriched.filter((app) => app.interview_slot_id === slot.id).map((app) => app.id))
+        ),
+      ],
+      invitation_delivery: summarizeInvitationDelivery(slotAllocs),
+    };
+  });
+  const scheduledSlots = presentedSlots.filter((s) => (s.status || "scheduled") === "scheduled");
+  const completedSlots = presentedSlots.filter((s) => s.status === "completed");
+  const cancelledSlots = presentedSlots.filter((s) => s.status === "cancelled");
 
   return NextResponse.json({
-    slots: slots || [],
+    slots: presentedSlots,
     applications: enriched,
     queue: {
       unscheduled,

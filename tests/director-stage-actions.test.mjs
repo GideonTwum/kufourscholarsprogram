@@ -106,12 +106,13 @@ test("migration and interviews page support queue workflow", () => {
     existsSync(resolve("supabase/migrations/202608050001_interview_queue_batch_workflow.sql"))
   );
   const page = readFileSync(
-    resolve("app/(dashboard)/director/interviews/page.js"),
+    resolve("components/director/DirectorPublishedInterviews.jsx"),
     "utf8"
   );
-  assert.match(page, /Unscheduled Interview Candidates/);
-  assert.match(page, /Schedule Selected Candidates/);
-  assert.match(page, /allow_unshortlisted/);
+  assert.match(page, /Shortlisted applicants/);
+  assert.match(page, /Assign selected/);
+  const slotsApi = readFileSync(resolve("app/api/interview-slots/route.js"), "utf8");
+  assert.match(slotsApi, /allow_unshortlisted/);
   const detail = readFileSync(
     resolve("app/(dashboard)/director/applications/[id]/page.js"),
     "utf8"

@@ -39,15 +39,8 @@ import {
   summarizeDirectorStage2ReviewCounts,
 } from "@/lib/director-stage2-review";
 
-function hrefForFilters({
-  status = "",
-  workflow = "all",
-  stage = "all",
-  stage2 = "",
-  assessor = "",
-  q = "",
-}) {
-  return buildDirectorApplicationsListHref({ status, workflow, stage, stage2, assessor, q });
+function hrefForFilters(filters) {
+  return buildDirectorApplicationsListHref(filters);
 }
 
 async function fetchWithAdmin(statusFilter) {
@@ -189,6 +182,15 @@ export default async function DirectorApplicationsPage({ searchParams }) {
   const searchQuery =
     typeof params?.q === "string" ? params.q.trim().slice(0, 500) : "";
 
+  const listFilters = {
+    status: statusFilter,
+    workflow: workflowFilter,
+    stage: stageFilter,
+    stage2: stage2Filter,
+    assessor: assessorFilter,
+    q: searchQuery,
+  };
+
   // Load full operational set for accurate stage/workflow/assessor counts, then filter in memory.
   const [{ applications: allOperational, loadError }, statusCounts] = await Promise.all([
     loadApplications(""),
@@ -205,7 +207,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
     ? summarizeSelectedAssessorWorkload(classifiedAll, assessorFilter)
     : null;
 
-  // Composition: operational → Status → Application Stage → Stage 2 Review → Workflow → Assessor → (client search)
+  // Composition: operational → Status → Stage → Stage 2 Review → Workflow → Assessor → (client search)
   const statusScoped = statusFilter
     ? classifiedAll.filter(({ app }) => {
         if (statusFilter === "pending") {
@@ -281,14 +283,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_APPLICATION_STAGE_FILTERS.map(({ key, label }) => (
           <Link
             key={key}
-            href={hrefForFilters({
-              status: statusFilter,
-              workflow: workflowFilter,
-              stage: key,
-              stage2: stage2Filter,
-              assessor: assessorFilter,
-              q: searchQuery,
-            })}
+            href={hrefForFilters({ ...listFilters, stage: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               stageFilter === key
                 ? "bg-royal text-white"
@@ -308,14 +303,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_STAGE2_REVIEW_FILTERS.map(({ key, label }) => (
           <Link
             key={key}
-            href={hrefForFilters({
-              status: statusFilter,
-              workflow: workflowFilter,
-              stage: stageFilter,
-              stage2: key,
-              assessor: assessorFilter,
-              q: searchQuery,
-            })}
+            href={hrefForFilters({ ...listFilters, stage2: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               stage2Filter === key
                 ? "bg-royal text-white"
@@ -327,14 +315,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         ))}
         {stage2Filter ? (
           <Link
-            href={hrefForFilters({
-              status: statusFilter,
-              workflow: workflowFilter,
-              stage: stageFilter,
-              stage2: "",
-              assessor: assessorFilter,
-              q: searchQuery,
-            })}
+            href={hrefForFilters({ ...listFilters, stage2: "" })}
             className="rounded-full px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
           >
             Clear Stage 2 Review
@@ -350,14 +331,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_WORKFLOW_FILTERS.map(({ key, label }) => (
           <Link
             key={key}
-            href={hrefForFilters({
-              status: statusFilter,
-              workflow: key,
-              stage: stageFilter,
-              stage2: stage2Filter,
-              assessor: assessorFilter,
-              q: searchQuery,
-            })}
+            href={hrefForFilters({ ...listFilters, workflow: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               workflowFilter === key
                 ? "bg-royal text-white"
@@ -377,14 +351,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_PRIMARY_FILTERS.map(({ key, label }) => (
           <Link
             key={key || "all-status"}
-            href={hrefForFilters({
-              status: key,
-              workflow: workflowFilter,
-              stage: stageFilter,
-              stage2: stage2Filter,
-              assessor: assessorFilter,
-              q: searchQuery,
-            })}
+            href={hrefForFilters({ ...listFilters, status: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === key
                 ? "bg-royal text-white"

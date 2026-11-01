@@ -177,6 +177,29 @@ export default function DirectorDashboard() {
             />
           </div>
 
+          <h2 className="mb-3 text-sm font-bold text-gray-900">Interviews</h2>
+          <p className="mb-3 text-xs text-gray-500">
+            Create batches, assign shortlisted applicants, then publish to send invitations.
+          </p>
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              label="Eligible shortlisted"
+              value={t.interview_allocation_eligible}
+              href="/director/interviews?tab=batches"
+            />
+            <MetricCard
+              label="Study location not confirmed"
+              value={t.interview_allocation_unconfirmed_location}
+              href="/director/interviews?tab=batches&loc=unconfirmed"
+              tone="amber"
+            />
+            <MetricCard
+              label="Unassigned shortlisted"
+              value={t.interview_allocation_unallocated}
+              href="/director/interviews?tab=batches"
+            />
+          </div>
+
           {(t.draft_applications ?? 0) > 0 ? (
             <p className="mb-6 text-xs text-gray-500">
               {t.draft_applications} draft application{t.draft_applications === 1 ? "" : "s"} in

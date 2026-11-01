@@ -15,6 +15,10 @@ import { buildDirectorApplicationsListHref } from "@/lib/director-applications-r
  *   workflowFilter?: string,
  *   stageFilter?: string,
  *   stage2Filter?: string,
+ *   regionFilter?: string,
+ *   townFilter?: string,
+ *   allocFilter?: string,
+ *   idateFilter?: string,
  *   searchQuery?: string,
  * }} props
  */
@@ -25,6 +29,10 @@ export default function DirectorAssessorFilter({
   workflowFilter = "all",
   stageFilter = "all",
   stage2Filter = "",
+  regionFilter = "",
+  townFilter = "",
+  allocFilter = "",
+  idateFilter = "",
   searchQuery = "",
 }) {
   const router = useRouter();
@@ -44,6 +52,10 @@ export default function DirectorAssessorFilter({
       stage: stageFilter,
       stage2: stage2Filter,
       assessor: assessorId,
+      region: regionFilter,
+      town: townFilter,
+      alloc: allocFilter,
+      idate: idateFilter,
       q: searchQuery,
     });
   }

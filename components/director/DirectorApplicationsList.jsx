@@ -115,6 +115,10 @@ export default function DirectorApplicationsList({
   stageFilter = "all",
   stage2Filter = "",
   assessorFilter = "",
+  regionFilter = "",
+  townFilter = "",
+  allocFilter = "",
+  idateFilter = "",
   initialSearchQuery = "",
 }) {
   const router = useRouter();
@@ -137,6 +141,10 @@ export default function DirectorApplicationsList({
       stage: stageFilter,
       stage2: stage2Filter,
       assessor: assessorFilter,
+      region: regionFilter,
+      town: townFilter,
+      alloc: allocFilter,
+      idate: idateFilter,
       q: searchQuery,
     });
     const current = `${window.location.pathname}${window.location.search}`;
@@ -145,7 +153,19 @@ export default function DirectorApplicationsList({
       router.replace(href, { scroll: false });
     }, 250);
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, workflowFilter, stageFilter, stage2Filter, assessorFilter, router]);
+  }, [
+    searchQuery,
+    statusFilter,
+    workflowFilter,
+    stageFilter,
+    stage2Filter,
+    assessorFilter,
+    regionFilter,
+    townFilter,
+    allocFilter,
+    idateFilter,
+    router,
+  ]);
 
   const listHref = useMemo(
     () =>
@@ -155,9 +175,24 @@ export default function DirectorApplicationsList({
         stage: stageFilter,
         stage2: stage2Filter,
         assessor: assessorFilter,
+        region: regionFilter,
+        town: townFilter,
+        alloc: allocFilter,
+        idate: idateFilter,
         q: searchQuery,
       }),
-    [statusFilter, workflowFilter, stageFilter, stage2Filter, assessorFilter, searchQuery]
+    [
+      statusFilter,
+      workflowFilter,
+      stageFilter,
+      stage2Filter,
+      assessorFilter,
+      regionFilter,
+      townFilter,
+      allocFilter,
+      idateFilter,
+      searchQuery,
+    ]
   );
 
   const filtered = useMemo(() => {

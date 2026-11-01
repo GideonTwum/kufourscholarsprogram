@@ -20,6 +20,10 @@ import { buildDirectorApplicationsListHref } from "@/lib/director-applications-r
  *   statusFilter?: string,
  *   stageFilter?: string,
  *   stage2Filter?: string,
+ *   regionFilter?: string,
+ *   townFilter?: string,
+ *   allocFilter?: string,
+ *   idateFilter?: string,
  *   searchQuery?: string,
  * }} props
  */
@@ -29,6 +33,10 @@ export default function DirectorAssessorSummary({
   statusFilter = "",
   stageFilter = "all",
   stage2Filter = "",
+  regionFilter = "",
+  townFilter = "",
+  allocFilter = "",
+  idateFilter = "",
   searchQuery = "",
 }) {
   if (!summary) return null;
@@ -46,6 +54,10 @@ export default function DirectorAssessorSummary({
       stage: stageFilter,
       stage2: stage2Filter,
       assessor: summary.assessorId,
+      region: regionFilter,
+      town: townFilter,
+      alloc: allocFilter,
+      idate: idateFilter,
       q: searchQuery,
     });
   }

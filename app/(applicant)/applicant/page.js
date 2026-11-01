@@ -26,6 +26,7 @@ import {
   STAGE_2_DEADLINE_SETTING_KEY,
   evaluateStage2DeadlineGate,
 } from "@/lib/stage-2-deadline-gate";
+import { GHANA_REGIONS } from "@/lib/ghana-regions";
 
 function InterviewScheduledCard({ slot, onFirstView }) {
   useEffect(() => {
@@ -87,6 +88,190 @@ function InterviewScheduledCard({ slot, onFirstView }) {
       <p className="mt-4 text-xs text-gray-500">
         Please arrive 15 minutes early. We look forward to meeting you!
       </p>
+    </div>
+  );
+}
+
+function PublishedInterviewPanel() {
+  const [data, setData] = useState(null);
+  const [reason, setReason] = useState("");
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [locationForm, setLocationForm] = useState({
+    confirmed_region: "",
+    confirmed_town: "",
+    study_institution: "",
+  });
+
+  async function load() {
+    const res = await fetch("/api/applicant/interview");
+    const json = await res.json();
+    if (res.ok) {
+      setData(json);
+      const confirmation = json.location_confirmation || {};
+      setLocationForm({
+        confirmed_region: confirmation.confirmed_region || confirmation.study_region || "",
+        confirmed_town: confirmation.confirmed_town || "",
+        study_institution: confirmation.study_institution || json.university || "",
+      });
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  if (!data?.interview && !data?.can_confirm_location) return null;
+  const interview = data.interview;
+
+  async function respond(action) {
+    setSaving(true);
+    setMessage("");
+    const res = await fetch("/api/applicant/interview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, reason }),
+    });
+    const json = await res.json();
+    setSaving(false);
+    if (!res.ok) {
+      setMessage(json.error || "Could not save response");
+      return;
+    }
+    setMessage("Response saved. Your assigned batch was not changed.");
+    await load();
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-royal/20 bg-white p-6 shadow-sm">
+      {interview ? (
+        <>
+          <h3 className="text-lg font-bold text-gray-900">Your interview</h3>
+          <p className="mt-2 text-sm text-gray-700">
+            {interview.date} · {interview.start_time}–{interview.end_time} ·{" "}
+            {interview.format === "virtual" ? "Virtual" : "In person"}
+          </p>
+          {interview.venue ? <p className="mt-1 text-sm text-gray-700">{interview.venue}</p> : null}
+          {interview.meeting_link ? (
+            <p className="mt-1 text-sm text-royal">
+              Meeting link: {interview.meeting_link}
+            </p>
+          ) : null}
+          <p className="mt-3 text-sm text-gray-600">{interview.instructions}</p>
+          <p className="mt-2 text-sm text-gray-600">{interview.documents}</p>
+          <p className="mt-2 text-sm text-gray-600">{interview.policy}</p>
+          <p className="mt-2 text-xs text-gray-500">{interview.reschedule_policy}</p>
+          <p className="mt-3 text-sm font-medium text-gray-800">
+            Status: {interview.response_status || "awaiting_response"}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => respond("confirm_attendance")}
+              className="rounded-lg bg-royal px-3 py-2 text-xs font-semibold text-white"
+            >
+              Confirm attendance
+            </button>
+          </div>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason for a virtual, reschedule, or unable-to-attend request"
+            className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" disabled={saving} onClick={() => respond("virtual")} className="text-xs font-medium text-royal">
+              Request virtual interview
+            </button>
+            <button type="button" disabled={saving} onClick={() => respond("reschedule")} className="text-xs font-medium text-royal">
+              Request reschedule
+            </button>
+            <button type="button" disabled={saving} onClick={() => respond("unable")} className="text-xs font-medium text-royal">
+              Unable to attend
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">Requests do not change your assigned batch until a director decides.</p>
+        </>
+      ) : (
+        <p className="text-sm text-gray-600">
+          If you are shortlisted, confirm where you are currently studying. This does not overwrite
+          your original application answers.
+        </p>
+      )}
+      {data?.can_confirm_location ? (
+        <form
+          className="mt-4 grid gap-3 sm:grid-cols-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setSaving(true);
+            setMessage("");
+            const res = await fetch("/api/applicant/interview", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "confirm_location", ...locationForm }),
+            });
+            const json = await res.json();
+            setSaving(false);
+            if (!res.ok) {
+              setMessage(json.error || "Could not save location confirmation");
+              return;
+            }
+            setMessage("Location confirmation saved.");
+            await load();
+          }}
+        >
+          <h4 className="sm:col-span-2 text-sm font-semibold text-gray-900">Confirm study location</h4>
+          <label className="text-xs font-medium text-gray-500">
+            Region of Study
+            <select
+              required
+              value={locationForm.confirmed_region}
+              onChange={(e) =>
+                setLocationForm((prev) => ({ ...prev, confirmed_region: e.target.value }))
+              }
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            >
+              <option value="">Select region</option>
+              {GHANA_REGIONS.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-gray-500">
+            Town/City of Study
+            <input
+              required
+              value={locationForm.confirmed_town}
+              onChange={(e) =>
+                setLocationForm((prev) => ({ ...prev, confirmed_town: e.target.value }))
+              }
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-xs font-medium text-gray-500 sm:col-span-2">
+            Current Institution
+            <input
+              required
+              value={locationForm.study_institution}
+              onChange={(e) =>
+                setLocationForm((prev) => ({ ...prev, study_institution: e.target.value }))
+              }
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={saving}
+            className="sm:col-span-2 rounded-lg bg-royal px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            Save location confirmation
+          </button>
+        </form>
+      ) : null}
+      {message ? <p className="mt-2 text-sm text-green-700">{message}</p> : null}
     </div>
   );
 }
@@ -286,6 +471,8 @@ export default function ApplicantDashboard() {
           </p>
         ) : null}
       </div>
+
+      <PublishedInterviewPanel />
 
       <div className="mb-8 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="mb-4 font-bold text-gray-900">Application Status</h2>

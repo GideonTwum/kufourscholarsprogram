@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
 import { fetchDirectorApplicationCountSummary } from "@/lib/director-application-scope";
 import { fetchDirectorStage2RejectedCount } from "@/lib/director-stage2-review";
+import { fetchInterviewAllocationDashboardCounts } from "@/lib/director-interview-allocation";
+import { APPLICATION_CLASS_SETTING_KEY, DEFAULT_APPLICATION_CLASS_NAME } from "@/lib/application-class";
+import {
+  ensureInterviewSchedule,
+  fetchInterviewScheduleDays,
+} from "@/lib/director-interview-schedule";
 import { VALID_APPLICATION_STATUSES } from "@/lib/application-status-transition.mjs";
 
 export async function GET() {
@@ -60,7 +66,7 @@ export async function GET() {
     admin.from("interview_slots").select("id, status, interview_date"),
     admin.from("site_settings").select("value").eq("key", "applications_open").maybeSingle(),
     admin.from("site_settings").select("value").eq("key", "application_deadline").maybeSingle(),
-    admin.from("site_settings").select("value").eq("key", "application_class_name").maybeSingle(),
+    admin.from("site_settings").select("value").eq("key", APPLICATION_CLASS_SETTING_KEY).maybeSingle(),
     admin
       .from("director_audit_events")
       .select("id, action, entity_type, entity_id, actor_name_snapshot, actor_email_snapshot, created_at")
@@ -68,6 +74,21 @@ export async function GET() {
       .limit(12),
     fetchDirectorStage2RejectedCount(admin),
   ]);
+
+  const className =
+    (typeof classSetting?.value === "string" && classSetting.value.trim()) ||
+    DEFAULT_APPLICATION_CLASS_NAME;
+  let interviewDays = [];
+  try {
+    const { schedule } = await ensureInterviewSchedule(admin, className);
+    if (schedule?.id) {
+      const loaded = await fetchInterviewScheduleDays(admin, schedule.id);
+      interviewDays = loaded.days || [];
+    }
+  } catch {
+    interviewDays = [];
+  }
+  const interviewAllocation = await fetchInterviewAllocationDashboardCounts(admin, interviewDays);
 
   const byStatus = { ...emptyCounts, ...countBundle.byStatus };
   const summary = countBundle.summary;
@@ -107,7 +128,15 @@ export async function GET() {
       accepted: summary.accepted,
       rejected: summary.rejected,
       pending: summary.pending,
+      interview_allocation_eligible: interviewAllocation.eligible,
+      interview_allocation_physical: interviewAllocation.physical,
+      interview_allocation_pending_remote: interviewAllocation.pending_remote,
+      interview_allocation_unallocated: interviewAllocation.unallocated,
+      interview_allocation_missing_region: interviewAllocation.missing_region,
+      interview_allocation_unconfirmed_location: interviewAllocation.unconfirmed_location,
+      interview_allocation_by_date: interviewAllocation.by_date || [],
     },
+    interview_allocation: interviewAllocation,
     by_status: byStatus,
     staff: {
       active_assessors: activeAssessors || 0,

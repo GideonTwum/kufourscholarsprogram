@@ -50,6 +50,8 @@ export async function PATCH(request, { params }) {
     if (body.batch_name != null) patch.batch_name = String(body.batch_name).trim();
     if (body.interview_date != null) patch.interview_date = body.interview_date;
     if (body.interview_time != null) patch.interview_time = String(body.interview_time).trim();
+    if (body.end_time != null) patch.end_time = String(body.end_time).trim() || null;
+    if (body.capacity != null && Number(body.capacity) > 0) patch.capacity = Number(body.capacity);
     if (body.location != null) patch.location = String(body.location).trim();
     if (body.meeting_link != null) patch.meeting_link = String(body.meeting_link).trim() || null;
     if (body.congratulations_message != null) {
@@ -98,6 +100,12 @@ export async function PATCH(request, { params }) {
   }
 
   if (body.action === "cancel") {
+    await admin
+      .from("application_interview_allocations")
+      .delete()
+      .eq("interview_slot_id", id)
+      .is("published_at", null);
+
     const { data: appsToReturn } = await admin
       .from("applications")
       .select("id, status")
@@ -141,8 +149,9 @@ export async function PATCH(request, { params }) {
     request,
   });
 
-  // Notify applicants on cancel or reschedule
-  if (body.action === "cancel" || body.interview_date || body.interview_time || body.location) {
+  const wasPublished = Boolean(slot.published_at || slot.invitation_sent_at);
+  // Notify only previously published batches. Draft create/edit never emails.
+  if (wasPublished && (body.action === "cancel" || body.interview_date || body.interview_time || body.location)) {
     const { data: apps } = await admin
       .from("applications")
       .select("id, user_id, full_name, profiles!applications_user_id_fkey(email)")
@@ -208,8 +217,12 @@ export async function DELETE(request, { params }) {
     .from("applications")
     .select("id", { count: "exact", head: true })
     .eq("interview_slot_id", id);
+  const { count: draftCount } = await admin
+    .from("application_interview_allocations")
+    .select("application_id", { count: "exact", head: true })
+    .eq("interview_slot_id", id);
 
-  if ((count || 0) > 0) {
+  if ((count || 0) > 0 || (draftCount || 0) > 0) {
     return NextResponse.json(
       {
         error:
