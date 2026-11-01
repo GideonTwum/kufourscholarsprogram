@@ -140,6 +140,8 @@ test("Location filters live in Interviews, not Applications", () => {
   assert.match(batchesUi, /STUDY_LOCATION_UNCONFIRMED_LABEL/);
   assert.match(batchesUi, /Create Batch/);
   assert.match(batchesUi, /Assign selected/);
+  assert.match(batchesUi, /Not Assigned/);
+  assert.match(batchesUi, /Assigned to This Batch/);
   assert.doesNotMatch(batchesUi, /Generate hourly/);
   assert.doesNotMatch(batchesUi, /interview_slots/);
 });

@@ -14,6 +14,10 @@ import {
   studyRegionLabel,
   studyTownDisplay,
 } from "@/lib/director-location-filter";
+import {
+  presentApplicantAssignment,
+  summarizeAssignmentCounts,
+} from "@/lib/director-interview-assignment";
 
 const INTERVIEW_APP_STATUSES = [
   "stage_2_approved",
@@ -92,9 +96,42 @@ export async function GET() {
   const confirmationByAppId = Object.fromEntries(
     withLocations.map((row) => [row.id || row.app?.id, row.location_confirmation])
   );
+
+  const slotIds = (slots || []).map((s) => s.id);
+  const slotsById = Object.fromEntries((slots || []).map((slot) => [slot.id, slot]));
+  let allocs = [];
+  if (appIds.length) {
+    const allocResult = await admin
+      .from(INTERVIEW_ALLOCATION_TABLE)
+      .select(
+        "application_id, interview_slot_id, published_at, invitation_sent_at, invitation_delivery_status, invitation_last_error, response_status"
+      )
+      .in("application_id", appIds);
+    if (!allocResult.error) allocs = allocResult.data || [];
+    else {
+      const fallback = await admin
+        .from(INTERVIEW_ALLOCATION_TABLE)
+        .select("application_id, interview_slot_id, published_at, invitation_sent_at, response_status")
+        .in("application_id", appIds);
+      if (!fallback.error) allocs = fallback.data || [];
+    }
+  }
+  if (!allocs.length && slotIds.length) {
+    const bySlot = await admin
+      .from(INTERVIEW_ALLOCATION_TABLE)
+      .select("application_id, interview_slot_id, published_at, invitation_sent_at, response_status")
+      .in("interview_slot_id", slotIds);
+    if (!bySlot.error) allocs = bySlot.data || [];
+  }
+  const allocByApp = {};
+  for (const row of allocs || []) {
+    if (row?.application_id) allocByApp[row.application_id] = row;
+  }
+
   const enriched = applications.map((app) => {
     const wrapped = { location_confirmation: confirmationByAppId[app.id] || null };
     const confirmed = hasLocationConfirmation(wrapped);
+    const assignment = presentApplicantAssignment(app, allocByApp[app.id] || null, slotsById);
     return {
       ...app,
       location_confirmation: wrapped.location_confirmation,
@@ -105,39 +142,28 @@ export async function GET() {
       applicant_name: app.full_name || app.profiles?.full_name || null,
       email: app.profiles?.email || null,
       latest_assessment: assessmentByApp[app.id] || null,
+      ...assignment,
     };
   });
 
-  const unscheduled = enriched.filter(
-    (a) => a.status === "interview_review_pending" && !a.interview_slot_id
+  const shortlisted = enriched.filter(
+    (a) =>
+      a.status === "interview_review_pending" ||
+      a.status === "called_for_interview" ||
+      a.assigned_slot_id
   );
+  const unscheduled = shortlisted.filter((a) => !a.assigned_slot_id && a.status === "interview_review_pending");
   const readyToShortlist = enriched.filter(
-    (a) => a.status === "stage_2_approved" && !a.interview_slot_id
+    (a) => a.status === "stage_2_approved" && !a.interview_slot_id && !a.assigned_slot_id
   );
   const scheduled = enriched.filter(
     (a) => a.status === "called_for_interview" || (a.interview_slot_id && a.status !== "interview")
   );
   const completedApps = enriched.filter((a) => a.status === "interview");
-
-  const slotIds = (slots || []).map((s) => s.id);
-  let allocs = [];
-  if (slotIds.length) {
-    const allocResult = await admin
-      .from(INTERVIEW_ALLOCATION_TABLE)
-      .select("application_id, interview_slot_id, invitation_sent_at, invitation_delivery_status, invitation_last_error, response_status")
-      .in("interview_slot_id", slotIds);
-    if (!allocResult.error) allocs = allocResult.data || [];
-    else {
-      const fallback = await admin
-        .from(INTERVIEW_ALLOCATION_TABLE)
-        .select("application_id, interview_slot_id, invitation_sent_at, response_status")
-        .in("interview_slot_id", slotIds);
-      if (!fallback.error) allocs = fallback.data || [];
-    }
-  }
+  const assignmentSummary = summarizeAssignmentCounts(shortlisted);
   const bookedBySlot = occupancyFromRows([
     ...(allocs || []),
-    ...enriched.map((app) => ({ id: app.id, interview_slot_id: app.interview_slot_id })),
+    ...enriched.map((app) => ({ id: app.id, interview_slot_id: app.assigned_slot_id || app.interview_slot_id })),
   ]);
   const presentedSlots = summarizeBatchOccupancy(slots || [], bookedBySlot).map((slot) => {
     const slotAllocs = (allocs || []).filter((row) => row.interview_slot_id === slot.id);
@@ -147,7 +173,11 @@ export async function GET() {
         ...new Set(
           slotAllocs
             .map((row) => row.application_id)
-            .concat(enriched.filter((app) => app.interview_slot_id === slot.id).map((app) => app.id))
+            .concat(
+              enriched
+                .filter((app) => (app.assigned_slot_id || app.interview_slot_id) === slot.id)
+                .map((app) => app.id)
+            )
         ),
       ],
       invitation_delivery: summarizeInvitationDelivery(slotAllocs),
@@ -161,9 +191,11 @@ export async function GET() {
     slots: presentedSlots,
     applications: enriched,
     queue: {
+      shortlisted,
       unscheduled,
       ready_to_shortlist: readyToShortlist,
     },
+    assignment_summary: assignmentSummary,
     batches: {
       scheduled: scheduledSlots,
       completed: completedSlots,

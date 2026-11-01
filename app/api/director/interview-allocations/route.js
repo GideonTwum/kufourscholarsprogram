@@ -361,6 +361,25 @@ export async function POST(request) {
   }
 
   const withDays = attachScheduleDaysToAllocations(allocationsById, days);
+  const allowMove = body?.allow_move === true;
+  const slotsById = {};
+  const currentSlotIds = [
+    ...new Set(
+      uniqueIds
+        .map((id) => withDays[id]?.interview_slot_id)
+        .concat((applications || []).map((app) => app.interview_slot_id))
+        .filter(Boolean)
+    ),
+  ];
+  if (currentSlotIds.length) {
+    const { data: currentSlots } = await admin
+      .from(INTERVIEW_SLOTS_TABLE)
+      .select(
+        "id, batch_name, interview_date, interview_time, end_time, capacity, published_at, invitation_sent_at, schedule_day_id, status"
+      )
+      .in("id", currentSlotIds);
+    for (const slot of currentSlots || []) slotsById[slot.id] = slot;
+  }
   let assignments = Array.isArray(body.assignments) ? body.assignments : [];
   let interviewSlot = null;
   if (action === "allocate_batch") {
@@ -386,6 +405,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "batch_already_published" }, { status: 409 });
     }
     interviewSlot = slot;
+    slotsById[slot.id] = slot;
     const { data: occupiedAllocations } = await admin
       .from(INTERVIEW_ALLOCATION_TABLE)
       .select("application_id, interview_slot_id")
@@ -425,6 +445,8 @@ export async function POST(request) {
     assignments,
     interviewSlot,
     interviewFormat: body.interview_format === "virtual" ? "virtual" : "in_person",
+    allowMove,
+    slotsById,
   });
 
   if (!plan.ok) {
@@ -433,6 +455,25 @@ export async function POST(request) {
       { error: plan.error, skipped: plan.skipped, errors: plan.errors },
       { status }
     );
+  }
+
+  if (action === "allocate_batch") {
+    const conflicts = (plan.skipped || []).filter((row) =>
+      ["already_assigned_other_batch", "already_on_published_batch", "published_locked"].includes(
+        row.reason
+      )
+    );
+    if (conflicts.length) {
+      return NextResponse.json(
+        {
+          error: conflicts[0].reason,
+          conflicts,
+          skipped: plan.skipped,
+          notify_applicants: false,
+        },
+        { status: 409 }
+      );
+    }
   }
 
   if (!confirm) {
@@ -501,6 +542,8 @@ export async function POST(request) {
     updated: plan.changing.length,
     skipped: plan.skipped,
     unchanged: plan.apply.filter((row) => row.unchanged).length,
+    batch_name: interviewSlot?.batch_name || null,
+    moved: allowMove,
     notify_applicants: false,
   });
   } catch (error) {

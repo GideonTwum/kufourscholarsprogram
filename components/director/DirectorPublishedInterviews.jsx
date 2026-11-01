@@ -9,6 +9,8 @@ import {
   Users,
   Loader2,
   CheckCircle2,
+  Circle,
+  Lock,
   Plus,
   Search,
 } from "lucide-react";
@@ -20,6 +22,10 @@ import {
   filterByDirectorStudyRegion,
 } from "@/lib/director-location-filter";
 import { GHANA_REGIONS } from "@/lib/ghana-regions";
+import {
+  assignmentRowState,
+  summarizeAssignmentCounts,
+} from "@/lib/director-interview-assignment";
 
 function applicantLabel(app) {
   return app.applicant_name || app.full_name || app.profiles?.full_name || "Unknown";
@@ -53,6 +59,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
   const [search, setSearch] = useState(initialFilters.q || "");
   const [region, setRegion] = useState(initialFilters.region || "");
   const [loc, setLoc] = useState(initialFilters.loc || "");
+  const [assignmentFilter, setAssignmentFilter] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [targetBatchId, setTargetBatchId] = useState("");
@@ -72,7 +79,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
     }
     setApplications(data.applications || []);
     setSlots(data.slots || []);
-    setQueueUnscheduled(data.queue?.unscheduled || []);
+    setQueueUnscheduled(data.queue?.shortlisted || data.queue?.unscheduled || []);
     setReadyToShortlist(data.queue?.ready_to_shortlist || []);
     return true;
   }
@@ -98,13 +105,20 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
     let list = queueUnscheduled.map((app) => ({ ...app, location_confirmation: app.location_confirmation || null }));
     if (region) list = filterByDirectorStudyRegion(list, region);
     if (loc) list = filterByDirectorLocationConfirmation(list, loc);
+    if (assignmentFilter === "unassigned") list = list.filter((app) => !app.assigned_slot_id);
+    if (assignmentFilter === "assigned") list = list.filter((app) => app.assigned_slot_id);
     const q = search.trim().toLowerCase();
     if (!q) return list;
     return list.filter((app) => {
-      const hay = `${applicantLabel(app)} ${applicantEmail(app)} ${app.university || ""} ${app.study_region || ""}`.toLowerCase();
+      const hay = `${applicantLabel(app)} ${applicantEmail(app)} ${app.university || ""} ${app.study_region || ""} ${app.assigned_batch_name || ""}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [queueUnscheduled, region, loc, search]);
+  }, [queueUnscheduled, region, loc, assignmentFilter, search]);
+
+  const assignmentCounts = useMemo(
+    () => summarizeAssignmentCounts(queueUnscheduled),
+    [queueUnscheduled]
+  );
 
   const draftSlots = useMemo(
     () => (slots || []).filter((s) => (s.status || "scheduled") === "scheduled" && !s.published),
@@ -120,6 +134,8 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
   );
 
   function toggleSelect(id) {
+    const app = queueUnscheduled.find((row) => row.id === id);
+    if (!assignmentRowState(app, targetBatchId).selectable) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -171,42 +187,112 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
     setSuccess("Draft batch created. No invitations were sent.");
   }
 
+  function assignmentErrorMessage(data) {
+    if (data.error === "insufficient_batch_capacity") {
+      return `This batch only has ${data.available ?? 0} place(s) left.`;
+    }
+    if (data.error === "already_assigned_other_batch") {
+      const first = data.conflicts?.[0];
+      return first?.assigned_batch_label
+        ? `Some applicants are already assigned to ${first.assigned_batch_label}. Remove or move them first.`
+        : "Some applicants are already assigned to another batch.";
+    }
+    if (data.error === "already_on_published_batch" || data.error === "published_locked") {
+      return "Published assignments cannot be moved here. Use Applicant Responses to reschedule.";
+    }
+    return data.error || "Could not assign applicants";
+  }
+
   async function assignSelected() {
     const slotId = targetBatchId;
     if (!slotId) {
       setError("Choose a draft batch first.");
       return;
     }
-    if (selectedIds.size === 0) {
-      setError("Select at least one shortlisted applicant.");
+    const target = draftSlots.find((slot) => slot.id === slotId);
+    const assignableIds = Array.from(selectedIds).filter((id) => {
+      const app = queueUnscheduled.find((row) => row.id === id);
+      return assignmentRowState(app, slotId).selectable;
+    });
+    if (assignableIds.length === 0) {
+      setError("Select at least one unassigned applicant.");
       return;
     }
     setSaving(true);
     setError(null);
-    const target = draftSlots.find((slot) => slot.id === slotId);
+    setSuccess(null);
     const { ok, data } = await fetchJson("/api/director/interview-allocations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "allocate_batch",
         interview_slot_id: slotId,
-        application_ids: Array.from(selectedIds),
+        application_ids: assignableIds,
         interview_format: target?.meeting_link ? "virtual" : "in_person",
         confirm: true,
       }),
     });
+    await loadData();
     setSaving(false);
     if (!ok) {
-      setError(
-        data.error === "insufficient_batch_capacity"
-          ? `This batch only has ${data.available ?? 0} place(s) left.`
-          : data.error || "Could not assign applicants"
-      );
+      setError(assignmentErrorMessage(data));
+      return;
+    }
+    const count = data.updated || 0;
+    if (!count) {
+      setError("No applicants were assigned. Refresh and try again.");
       return;
     }
     setSelectedIds(new Set());
+    const batchName = data.batch_name || target?.batch_name || "the selected batch";
+    setSuccess(`${count} applicant${count === 1 ? "" : "s"} assigned to ${batchName}.`);
+  }
+
+  async function moveApplicant(app) {
+    const slotId = targetBatchId;
+    const target = draftSlots.find((slot) => slot.id === slotId);
+    if (!slotId || !target) {
+      setError("Choose a draft batch first.");
+      return;
+    }
+    const fromLabel = app.assigned_batch_label || app.assigned_batch_name || "the current batch";
+    const toLabel = [target.batch_name, target.interview_date, target.interview_time]
+      .filter(Boolean)
+      .join(" · ");
+    if (
+      !window.confirm(
+        `Move ${applicantLabel(app)} from ${fromLabel} to ${toLabel}? This does not send an invitation.`
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    const { ok, data } = await fetchJson("/api/director/interview-allocations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "allocate_batch",
+        interview_slot_id: slotId,
+        application_ids: [app.id],
+        interview_format: target.meeting_link ? "virtual" : "in_person",
+        allow_move: true,
+        confirm: true,
+      }),
+    });
     await loadData();
-    setSuccess(`Assigned ${data.updated || 0} applicant(s). No invitations were sent.`);
+    setSaving(false);
+    if (!ok) {
+      setError(assignmentErrorMessage(data));
+      return;
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(app.id);
+      return next;
+    });
+    setSuccess(`${applicantLabel(app)} moved from ${fromLabel} to ${toLabel}.`);
   }
 
   async function removeApplicant(applicationId) {
@@ -221,12 +307,12 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
         confirm: true,
       }),
     });
+    await loadData();
     setSaving(false);
     if (!ok) {
       setError(data.error || "Could not remove applicant");
       return;
     }
-    await loadData();
     setSuccess("Applicant removed from the draft batch.");
   }
 
@@ -524,12 +610,13 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
                   <Users size={18} /> Shortlisted applicants
                 </h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  {selectedIds.size} selected. Assign them to a draft batch below.
+                  {assignmentCounts.total} eligible · {assignmentCounts.assigned} Assigned ·{" "}
+                  {assignmentCounts.unassigned} Not Assigned. {selectedIds.size} selected.
                 </p>
               </div>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="relative sm:col-span-1">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={search}
@@ -549,6 +636,15 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
                 <option value="">All study locations</option>
                 <option value="confirmed">Study location confirmed</option>
                 <option value="unconfirmed">{STUDY_LOCATION_UNCONFIRMED_LABEL}</option>
+              </select>
+              <select
+                value={assignmentFilter}
+                onChange={(e) => setAssignmentFilter(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">All Applicants</option>
+                <option value="unassigned">Not Assigned</option>
+                <option value="assigned">Assigned</option>
               </select>
             </div>
             <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -585,49 +681,95 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
               </p>
             ) : (
               <div className="mt-4 max-h-[420px] space-y-2 overflow-y-auto">
-                {selectablePool.map((app) => (
-                  <label
-                    key={app.id}
-                    className="flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border border-gray-100 p-3 hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(app.id)}
-                      onChange={() => toggleSelect(app.id)}
-                      className="mt-1"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-medium text-gray-900">{applicantLabel(app)}</p>
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-royal"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setLocationForm({
-                              id: app.id,
-                              name: applicantLabel(app),
-                              confirmed_region: app.location_confirmed ? app.study_region || "" : "",
-                              confirmed_town: app.location_confirmed ? app.study_town || "" : "",
-                              study_institution: app.location_confirmed
-                                ? app.study_institution || ""
-                                : app.university || "",
-                            });
-                          }}
-                        >
-                          Confirm study location
-                        </button>
+                {selectablePool.map((app) => {
+                  const row = assignmentRowState(app, targetBatchId);
+                  const rowClass =
+                    row.kind === "this_batch"
+                      ? "border-green-200 bg-green-50"
+                      : row.kind === "other_batch"
+                        ? "border-slate-200 bg-slate-50"
+                        : "border-gray-100 bg-white hover:bg-gray-50";
+                  return (
+                    <label
+                      key={app.id}
+                      className={`flex min-w-0 items-start gap-3 rounded-lg border p-3 ${rowClass} ${
+                        row.selectable ? "cursor-pointer" : "cursor-default"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(app.id)}
+                        disabled={!row.selectable}
+                        onChange={() => toggleSelect(app.id)}
+                        className="mt-1"
+                        title={row.reason || undefined}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-medium text-gray-900">{applicantLabel(app)}</p>
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-royal"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setLocationForm({
+                                id: app.id,
+                                name: applicantLabel(app),
+                                assigned_batch_label: app.assigned_batch_label,
+                                assignment_status_label: row.status_label,
+                                confirmed_region: app.location_confirmed ? app.study_region || "" : "",
+                                confirmed_town: app.location_confirmed ? app.study_town || "" : "",
+                                study_institution: app.location_confirmed
+                                  ? app.study_institution || ""
+                                  : app.university || "",
+                              });
+                            }}
+                          >
+                            Confirm study location
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {applicantEmail(app)} · {app.university || "No university"}
+                        </p>
+                        <p className="mt-1 flex flex-wrap items-center gap-1 text-xs font-medium text-gray-800">
+                          {row.kind === "this_batch" ? (
+                            <CheckCircle2 size={14} className="text-green-700" aria-hidden="true" />
+                          ) : row.kind === "other_batch" ? (
+                            <Lock size={14} className="text-slate-600" aria-hidden="true" />
+                          ) : (
+                            <Circle size={14} className="text-gray-400" aria-hidden="true" />
+                          )}
+                          <span>{row.status_label}</span>
+                          {app.assigned_batch_label ? (
+                            <span className="font-normal text-gray-600">
+                              · {app.assigned_batch_label}
+                            </span>
+                          ) : null}
+                        </p>
+                        {row.reason && !row.selectable ? (
+                          <p className="mt-1 text-xs text-gray-500">{row.reason}</p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-gray-600">
+                          Study location: {app.study_region || STUDY_LOCATION_UNCONFIRMED_LABEL}
+                          {app.location_confirmed ? ` · ${app.study_town} · ${app.study_institution}` : ""}
+                        </p>
+                        {row.can_move ? (
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              moveApplicant(app);
+                            }}
+                            className="mt-2 text-xs font-semibold text-royal disabled:opacity-50"
+                          >
+                            Move to selected batch
+                          </button>
+                        ) : null}
                       </div>
-                      <p className="text-xs text-gray-500">
-                        {applicantEmail(app)} · {app.university || "No university"}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-600">
-                        Study location: {app.study_region || STUDY_LOCATION_UNCONFIRMED_LABEL}
-                        {app.location_confirmed ? ` · ${app.study_town} · ${app.study_institution}` : ""}
-                      </p>
-                    </div>
-                  </label>
-                ))}
+                    </label>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -671,6 +813,12 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-bold text-gray-900">Study location</h3>
             <p className="mt-1 text-sm text-gray-600">{locationForm.name}</p>
+            {locationForm.assignment_status_label ? (
+              <p className="mt-1 text-xs font-medium text-gray-700">
+                {locationForm.assignment_status_label}
+                {locationForm.assigned_batch_label ? ` · ${locationForm.assigned_batch_label}` : ""}
+              </p>
+            ) : null}
             <p className="mt-1 text-xs text-gray-500">
               Confirm the region, town/city, and institution where the applicant currently studies.
               Do not use hometown or residential address.
@@ -775,7 +923,10 @@ function BatchList({
           {slots.map((slot) => {
             const assignedIds = new Set(slot.assigned_ids || []);
             const assignedApps = applications.filter(
-              (a) => a.interview_slot_id === slot.id || assignedIds.has(a.id)
+              (a) =>
+                a.assigned_slot_id === slot.id ||
+                a.interview_slot_id === slot.id ||
+                assignedIds.has(a.id)
             );
             const status = slot.status || "scheduled";
             const draft = !slot.published;
@@ -812,12 +963,16 @@ function BatchList({
                   {assignedApps.map((app) => (
                     <span
                       key={app.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-green-50 px-3 py-1 text-xs text-green-800"
                     >
-                      <CheckCircle2 size={12} className="text-green-500" />
+                      <CheckCircle2 size={12} className="text-green-700" />
                       <Link href={`/director/applications/${app.id}`} className="hover:text-royal">
                         {applicantLabel(app)}
                       </Link>
+                      <span className="text-green-700">
+                        Assigned to This Batch
+                        {app.assigned_batch_label ? ` · ${app.assigned_batch_label}` : ""}
+                      </span>
                       {draft && onRemove ? (
                         <button
                           type="button"
