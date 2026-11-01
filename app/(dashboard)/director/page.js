@@ -198,6 +198,16 @@ export default function DirectorDashboard() {
               value={t.interview_allocation_unallocated}
               href="/director/interviews?tab=batches"
             />
+            <MetricCard
+              label="University invitees"
+              value={t.special_invitees_total}
+              href="/director/interviews?tab=invitees"
+            />
+            <MetricCard
+              label="Unassigned invitees"
+              value={t.special_invitees_unassigned}
+              href="/director/interviews?tab=invitees"
+            />
           </div>
 
           {(t.draft_applications ?? 0) > 0 ? (

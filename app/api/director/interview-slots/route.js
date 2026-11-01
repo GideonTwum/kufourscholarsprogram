@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireActiveDirector, getAdminOrError } from "@/lib/director-auth";
 import { INTERVIEW_ALLOCATION_TABLE } from "@/lib/director-interview-allocation";
-import { occupancyFromRows, summarizeBatchOccupancy } from "@/lib/director-interview-batches";
+import { summarizeBatchOccupancy } from "@/lib/director-interview-batches";
 import { summarizeInvitationDelivery } from "@/lib/director-interview-capacity";
+import {
+  fetchInterviewInvitees,
+  occupancyIncludingInvitees,
+  summarizeInviteeCounts,
+} from "@/lib/director-interview-invitees";
 import {
   attachLocationConfirmations,
   fetchInterviewLocationConfirmationsMap,
@@ -161,12 +166,18 @@ export async function GET() {
   );
   const completedApps = enriched.filter((a) => a.status === "interview");
   const assignmentSummary = summarizeAssignmentCounts(shortlisted);
-  const bookedBySlot = occupancyFromRows([
-    ...(allocs || []),
-    ...enriched.map((app) => ({ id: app.id, interview_slot_id: app.assigned_slot_id || app.interview_slot_id })),
-  ]);
+  const loadedInvitees = await fetchInterviewInvitees(admin, { slotsById });
+  const invitees = loadedInvitees.invitees || [];
+  const bookedBySlot = occupancyIncludingInvitees(
+    [
+      ...(allocs || []),
+      ...enriched.map((app) => ({ id: app.id, interview_slot_id: app.assigned_slot_id || app.interview_slot_id })),
+    ],
+    invitees
+  );
   const presentedSlots = summarizeBatchOccupancy(slots || [], bookedBySlot).map((slot) => {
     const slotAllocs = (allocs || []).filter((row) => row.interview_slot_id === slot.id);
+    const slotInvitees = invitees.filter((row) => (row.assigned_slot_id || row.interview_slot_id) === slot.id);
     return {
       ...slot,
       assigned_ids: [
@@ -180,7 +191,10 @@ export async function GET() {
             )
         ),
       ],
-      invitation_delivery: summarizeInvitationDelivery(slotAllocs),
+      assigned_invitee_ids: slotInvitees.map((row) => row.id),
+      applicant_booked: Math.max(0, (bookedBySlot[slot.id] || 0) - slotInvitees.length),
+      invitee_booked: slotInvitees.length,
+      invitation_delivery: summarizeInvitationDelivery([...slotAllocs, ...slotInvitees]),
     };
   });
   const scheduledSlots = presentedSlots.filter((s) => (s.status || "scheduled") === "scheduled");
@@ -196,6 +210,9 @@ export async function GET() {
       ready_to_shortlist: readyToShortlist,
     },
     assignment_summary: assignmentSummary,
+    invitees,
+    invitee_summary: summarizeInviteeCounts(invitees),
+    invitees_unavailable: loadedInvitees.unavailable === true,
     batches: {
       scheduled: scheduledSlots,
       completed: completedSlots,

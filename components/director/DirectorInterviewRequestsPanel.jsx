@@ -115,8 +115,9 @@ export default function DirectorInterviewRequestsPanel() {
     <div className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-bold text-gray-900">Applicant responses and requests</h2>
       <p className="mt-1 text-xs text-gray-500">
-        Requests never change a batch assignment automatically. Approve a reschedule only after choosing a
-        replacement batch. Email replies are not imported.
+        Regular applicant requests and university invitee responses are listed separately. Requests never
+        change a batch assignment automatically. Approve a reschedule only after choosing a replacement
+        batch. Email replies are not imported.
       </p>
       {error ? (
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
@@ -139,6 +140,9 @@ export default function DirectorInterviewRequestsPanel() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{row.full_name}</p>
+                  {row.source_kind === "invitee" ? (
+                    <p className="text-xs font-medium uppercase tracking-wide text-royal">{row.source_label}</p>
+                  ) : null}
                   <p className="text-xs uppercase tracking-wide text-amber-800">{row.request_type}</p>
                   <p className="mt-1 text-xs text-gray-600">
                     Study location: {row.study_region} · {row.study_town} · {row.study_institution}
@@ -157,13 +161,17 @@ export default function DirectorInterviewRequestsPanel() {
                     </p>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openReview(row)}
-                  className="rounded-lg bg-royal px-3 py-1.5 text-xs font-semibold text-white"
-                >
-                  Review
-                </button>
+                {row.reviewable === false ? (
+                  <p className="text-[11px] text-gray-500">Invitee responses do not change the assigned batch.</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openReview(row)}
+                    className="rounded-lg bg-royal px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Review
+                  </button>
+                )}
               </div>
             </li>
           ))}

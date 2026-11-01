@@ -9,6 +9,7 @@ import {
   fetchInterviewScheduleDays,
 } from "@/lib/director-interview-schedule";
 import { VALID_APPLICATION_STATUSES } from "@/lib/application-status-transition.mjs";
+import { fetchInterviewInvitees, summarizeInviteeCounts } from "@/lib/director-interview-invitees";
 
 export async function GET() {
   const gate = await requireActiveDirector();
@@ -89,6 +90,8 @@ export async function GET() {
     interviewDays = [];
   }
   const interviewAllocation = await fetchInterviewAllocationDashboardCounts(admin, interviewDays);
+  const loadedInvitees = await fetchInterviewInvitees(admin);
+  const inviteeSummary = summarizeInviteeCounts(loadedInvitees.invitees || []);
 
   const byStatus = { ...emptyCounts, ...countBundle.byStatus };
   const summary = countBundle.summary;
@@ -135,6 +138,9 @@ export async function GET() {
       interview_allocation_missing_region: interviewAllocation.missing_region,
       interview_allocation_unconfirmed_location: interviewAllocation.unconfirmed_location,
       interview_allocation_by_date: interviewAllocation.by_date || [],
+      special_invitees_total: inviteeSummary.total,
+      special_invitees_assigned: inviteeSummary.assigned,
+      special_invitees_unassigned: inviteeSummary.unassigned,
     },
     interview_allocation: interviewAllocation,
     by_status: byStatus,

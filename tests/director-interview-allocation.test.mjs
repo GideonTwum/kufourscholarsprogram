@@ -111,6 +111,7 @@ test("Interview navigation is consolidated under Interviews", () => {
     "utf8"
   );
   assert.match(workspace, /Interview Batches/);
+  assert.match(workspace, /Special Invitees/);
   assert.match(workspace, /Published Invitations/);
   assert.match(workspace, /Applicant Responses/);
   assert.doesNotMatch(workspace, /Applicant Allocation/);
@@ -405,10 +406,13 @@ test("Metrics support a varying number of interview dates", () => {
   const dash = readFileSync(resolve("app/(dashboard)/director/page.js"), "utf8");
   assert.match(dash, /Eligible shortlisted/);
   assert.match(dash, /Unassigned shortlisted/);
+  assert.match(dash, /University invitees/);
+  assert.match(dash, /Unassigned invitees/);
   assert.doesNotMatch(dash, /Day 1 — 17 Nov/);
   assert.doesNotMatch(dash, /value=\{217\}/);
   const metrics = readFileSync(resolve("app/api/director/dashboard-metrics/route.js"), "utf8");
   assert.match(metrics, /interview_allocation_by_date/);
+  assert.match(metrics, /special_invitees_total/);
 });
 
 test("Moving between configured days", () => {

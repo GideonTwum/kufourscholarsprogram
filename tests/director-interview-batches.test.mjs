@@ -208,12 +208,12 @@ test("Invitation copy uses batch reporting time and study-location virtual polic
     },
   });
   assert.match(email.html, /Ama Mensah/);
-  assert.match(email.html, /15 minutes before your assigned batch begins/);
-  assert.match(email.html, /three printed copies of your CV/);
+  assert.match(email.html, /John A\. Kufuor Foundation 15 minutes before the assigned batch time/);
+  assert.match(email.html, /three hard copies of an updated CV/);
   assert.match(email.html, /WASSCE and\/or NovDec/);
   assert.match(email.html, /currently studying in northern Ghana/);
   assert.match(email.html, /confirm attendance/);
-  assert.match(email.html, /official WhatsApp contact will be provided/i);
+  assert.match(email.html, /Official WhatsApp contact: 0246672876/);
   assert.doesNotMatch(email.html, /hometown|residential/i);
   assert.equal(email.event, "interview_batch_assigned");
 });

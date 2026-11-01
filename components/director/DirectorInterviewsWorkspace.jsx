@@ -4,9 +4,11 @@ import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DirectorPublishedInterviews from "@/components/director/DirectorPublishedInterviews";
 import DirectorInterviewRequestsPanel from "@/components/director/DirectorInterviewRequestsPanel";
+import DirectorSpecialInviteesPanel from "@/components/director/DirectorSpecialInviteesPanel";
 
 const TABS = [
   { id: "batches", label: "Interview Batches" },
+  { id: "invitees", label: "Special Invitees" },
   { id: "published", label: "Published Invitations" },
   { id: "requests", label: "Applicant Responses" },
 ];
@@ -45,8 +47,8 @@ export default function DirectorInterviewsWorkspace() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Interviews</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Create a batch, assign shortlisted applicants, review the list, then publish to send
-          invitations. Draft batches never email applicants.
+          Create a batch, assign shortlisted applicants or university invitees, review the list,
+          then publish to send invitations. Draft batches never send messages.
         </p>
       </div>
 
@@ -68,6 +70,7 @@ export default function DirectorInterviewsWorkspace() {
       </div>
 
       {tab === "batches" ? <DirectorPublishedInterviews mode="manage" initialFilters={initialFilters} /> : null}
+      {tab === "invitees" ? <DirectorSpecialInviteesPanel /> : null}
       {tab === "published" ? <DirectorPublishedInterviews mode="published" /> : null}
       {tab === "requests" ? <DirectorInterviewRequestsPanel /> : null}
     </div>

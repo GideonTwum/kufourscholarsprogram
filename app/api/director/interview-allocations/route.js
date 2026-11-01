@@ -414,12 +414,19 @@ export async function POST(request) {
       .from("applications")
       .select("id, interview_slot_id")
       .eq("interview_slot_id", slot.id);
+    const occupiedInviteeResult = await admin
+      .from("interview_special_invitees")
+      .select("id, interview_slot_id")
+      .eq("interview_slot_id", slot.id);
+    const occupiedInvitees = occupiedInviteeResult.error ? [] : occupiedInviteeResult.data;
     const selectedSet = new Set(uniqueIds);
     const occupiedIds = new Set([
       ...(occupiedAllocations || []).map((row) => row.application_id),
       ...(occupiedApps || []).map((row) => row.id),
     ]);
-    const booked = [...occupiedIds].filter((id) => !selectedSet.has(id)).length;
+    const bookedApplicants = [...occupiedIds].filter((id) => !selectedSet.has(id)).length;
+    const bookedInvitees = (occupiedInvitees || []).length;
+    const booked = bookedApplicants + bookedInvitees;
     const sequential = planBatchAssignments({
       selectedIds: uniqueIds,
       slot,

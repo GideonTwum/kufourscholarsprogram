@@ -13,9 +13,12 @@ import { INTERVIEW_ALLOCATION_TABLE } from "@/lib/director-interview-allocation"
 import { INTERVIEW_SLOTS_TABLE } from "@/lib/director-interview-batches";
 import {
   applyPublishedBatchWrites,
+  applyPublishedInviteeWrites,
   compactInvitationPreview,
   deliverBatchInvitations,
+  deliverInviteeInvitations,
   loadSlotAssignees,
+  loadSlotInvitees,
   previewSlotPublication,
 } from "@/lib/director-interview-publish";
 
@@ -34,55 +37,95 @@ async function loadSchedule(admin) {
 async function publishExistingSlot(admin, { slot, confirm, gate, request }) {
   const { schedule } = await loadSchedule(admin);
   const rows = await loadSlotAssignees(admin, slot);
+  const inviteeRows = await loadSlotInvitees(admin, slot);
   const preview = previewSlotPublication({ rows, schedule, slot });
-  const compactPreview = compactInvitationPreview(preview, slot);
+  const inviteePreview = previewSlotPublication({ rows: inviteeRows, schedule, slot });
+  const compactPreview = {
+    ...compactInvitationPreview(preview, slot),
+    invitees: compactInvitationPreview(inviteePreview, slot),
+    applicant_ready_count: preview.ready_count,
+    invitee_ready_count: inviteePreview.ready_count,
+  };
   if (confirm !== true) {
     return NextResponse.json({ preview: compactPreview, notify_applicants: true });
   }
-  if (preview.blocked_count > 0) {
+  if (preview.blocked_count > 0 || inviteePreview.blocked_count > 0) {
     return NextResponse.json({ error: "incomplete_batch", preview: compactPreview }, { status: 409 });
   }
-  if (!preview.ready_count) {
+  if (!preview.ready_count && !inviteePreview.ready_count) {
     return NextResponse.json({ error: "nothing_to_publish", preview: compactPreview }, { status: 400 });
   }
   const nowIso = new Date().toISOString();
-  await applyPublishedBatchWrites(admin, {
-    slot,
-    schedule,
-    readyRows: preview.ready,
-    nowIso,
-  });
-  const delivered = await deliverBatchInvitations({
-    rows: preview.ready,
-    schedule,
-    slot,
-    sendKspEmail,
-    admin,
-    notificationsInsert: async (row) => {
-      await admin.from("notifications").insert(row);
-    },
-  });
+  if (preview.ready.length) {
+    await applyPublishedBatchWrites(admin, {
+      slot,
+      schedule,
+      readyRows: preview.ready,
+      nowIso,
+    });
+  } else {
+    await admin
+      .from(INTERVIEW_SLOTS_TABLE)
+      .update({ published_at: slot.published_at || nowIso, updated_at: nowIso })
+      .eq("id", slot.id);
+  }
+  const delivered = preview.ready.length
+    ? await deliverBatchInvitations({
+        rows: preview.ready,
+        schedule,
+        slot,
+        sendKspEmail,
+        admin,
+        notificationsInsert: async (row) => {
+          await admin.from("notifications").insert(row);
+        },
+      })
+    : { notified: 0, skippedDuplicate: [], failed: [], failed_count: 0, partial: false };
+  let inviteeDelivered = { notified: 0, skippedDuplicate: [], failed: [], failed_count: 0, partial: false };
+  if (inviteePreview.ready.length) {
+    const { issuedTokens } = await applyPublishedInviteeWrites(admin, {
+      slot,
+      readyRows: inviteePreview.ready,
+      nowIso,
+    });
+    inviteeDelivered = await deliverInviteeInvitations({
+      rows: inviteePreview.ready,
+      schedule,
+      slot,
+      sendKspEmail,
+      admin,
+      issuedTokens,
+      siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "",
+    });
+  }
+  const notified = delivered.notified + inviteeDelivered.notified;
+  const failed = [...(delivered.failed || []), ...(inviteeDelivered.failed || [])];
+  const skipped = delivered.skippedDuplicate.length + inviteeDelivered.skippedDuplicate.length;
   await recordDirectorAudit({
     actor: gate.profile,
     action: "interview.batch_published",
     entityType: "interview_slot",
     entityId: slot.id,
     metadata: {
-      notified: delivered.notified,
-      skipped_duplicate: delivered.skippedDuplicate.length,
-      failed: delivered.failed_count,
+      notified,
+      applicants_notified: delivered.notified,
+      invitees_notified: inviteeDelivered.notified,
+      skipped_duplicate: skipped,
+      failed: failed.length,
       event: "interview_batch_assigned",
     },
     request,
   });
   return NextResponse.json({
-    success: delivered.failed_count === 0,
+    success: failed.length === 0,
     slot_id: slot.id,
-    notified: delivered.notified,
-    skipped_duplicate: delivered.skippedDuplicate.length,
-    failed: delivered.failed,
-    failed_count: delivered.failed_count,
-    partial: delivered.partial,
+    notified,
+    applicants_notified: delivered.notified,
+    invitees_notified: inviteeDelivered.notified,
+    skipped_duplicate: skipped,
+    failed,
+    failed_count: failed.length,
+    partial: notified > 0 && failed.length > 0,
     notify_applicants: true,
   });
 }

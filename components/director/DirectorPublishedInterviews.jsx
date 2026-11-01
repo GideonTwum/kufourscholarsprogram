@@ -26,6 +26,14 @@ import {
   assignmentRowState,
   summarizeAssignmentCounts,
 } from "@/lib/director-interview-assignment";
+import {
+  UNIVERSITY_INVITEE_LABEL,
+  applicantSelectionKey,
+  inviteeSelectionKey,
+  parseSelectionKeys,
+  planCombinedBatchOccupancy,
+  summarizeInviteeCounts,
+} from "@/lib/director-interview-invitees";
 
 function applicantLabel(app) {
   return app.applicant_name || app.full_name || app.profiles?.full_name || "Unknown";
@@ -51,6 +59,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
   const [queueUnscheduled, setQueueUnscheduled] = useState([]);
   const [readyToShortlist, setReadyToShortlist] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [invitees, setInvitees] = useState([]);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -78,6 +87,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
       return false;
     }
     setApplications(data.applications || []);
+    setInvitees(data.invitees || []);
     setSlots(data.slots || []);
     setQueueUnscheduled(data.queue?.shortlisted || data.queue?.unscheduled || []);
     setReadyToShortlist(data.queue?.ready_to_shortlist || []);
@@ -102,23 +112,46 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
   }, []);
 
   const selectablePool = useMemo(() => {
-    let list = queueUnscheduled.map((app) => ({ ...app, location_confirmation: app.location_confirmation || null }));
-    if (region) list = filterByDirectorStudyRegion(list, region);
-    if (loc) list = filterByDirectorLocationConfirmation(list, loc);
-    if (assignmentFilter === "unassigned") list = list.filter((app) => !app.assigned_slot_id);
-    if (assignmentFilter === "assigned") list = list.filter((app) => app.assigned_slot_id);
+    let applicants = queueUnscheduled.map((app) => ({
+      ...app,
+      location_confirmation: app.location_confirmation || null,
+      source_kind: "applicant",
+      selection_key: applicantSelectionKey(app.id),
+    }));
+    if (region) applicants = filterByDirectorStudyRegion(applicants, region);
+    if (loc) applicants = filterByDirectorLocationConfirmation(applicants, loc);
+    let inviteeRows = invitees.map((row) => ({
+      ...row,
+      source_kind: "invitee",
+      selection_key: inviteeSelectionKey(row.id),
+    }));
+    if (assignmentFilter === "unassigned") {
+      applicants = applicants.filter((app) => !app.assigned_slot_id);
+      inviteeRows = inviteeRows.filter((row) => !row.assigned_slot_id);
+    }
+    if (assignmentFilter === "assigned") {
+      applicants = applicants.filter((app) => app.assigned_slot_id);
+      inviteeRows = inviteeRows.filter((row) => row.assigned_slot_id);
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((app) => {
-      const hay = `${applicantLabel(app)} ${applicantEmail(app)} ${app.university || ""} ${app.study_region || ""} ${app.assigned_batch_name || ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [queueUnscheduled, region, loc, assignmentFilter, search]);
+    if (q) {
+      applicants = applicants.filter((app) => {
+        const hay = `${applicantLabel(app)} ${applicantEmail(app)} ${app.university || ""} ${app.study_region || ""} ${app.assigned_batch_name || ""}`.toLowerCase();
+        return hay.includes(q);
+      });
+      inviteeRows = inviteeRows.filter((row) => {
+        const hay = `${row.full_name || ""} ${row.email || ""} ${row.university || ""} ${row.assigned_batch_name || ""}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    return [...applicants, ...inviteeRows];
+  }, [queueUnscheduled, invitees, region, loc, assignmentFilter, search]);
 
   const assignmentCounts = useMemo(
     () => summarizeAssignmentCounts(queueUnscheduled),
     [queueUnscheduled]
   );
+  const inviteeCounts = useMemo(() => summarizeInviteeCounts(invitees), [invitees]);
 
   const draftSlots = useMemo(
     () => (slots || []).filter((s) => (s.status || "scheduled") === "scheduled" && !s.published),
@@ -133,13 +166,21 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
     [slots]
   );
 
-  function toggleSelect(id) {
-    const app = queueUnscheduled.find((row) => row.id === id);
-    if (!assignmentRowState(app, targetBatchId).selectable) return;
+  function findPoolRow(key) {
+    return (
+      selectablePool.find((row) => row.selection_key === key) ||
+      invitees.find((row) => inviteeSelectionKey(row.id) === key) ||
+      queueUnscheduled.find((row) => applicantSelectionKey(row.id) === key)
+    );
+  }
+
+  function toggleSelect(key) {
+    const row = findPoolRow(key);
+    if (!assignmentRowState(row, targetBatchId).selectable) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -195,12 +236,12 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
       const first = data.conflicts?.[0];
       return first?.assigned_batch_label
         ? `Some applicants are already assigned to ${first.assigned_batch_label}. Remove or move them first.`
-        : "Some applicants are already assigned to another batch.";
+        : "Some people are already assigned to another batch.";
     }
     if (data.error === "already_on_published_batch" || data.error === "published_locked") {
       return "Published assignments cannot be moved here. Use Applicant Responses to reschedule.";
     }
-    return data.error || "Could not assign applicants";
+    return data.error || "Could not assign people to this batch";
   }
 
   async function assignSelected() {
@@ -210,42 +251,85 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
       return;
     }
     const target = draftSlots.find((slot) => slot.id === slotId);
-    const assignableIds = Array.from(selectedIds).filter((id) => {
-      const app = queueUnscheduled.find((row) => row.id === id);
-      return assignmentRowState(app, slotId).selectable;
+    const assignableKeys = Array.from(selectedIds).filter((key) => {
+      const row = findPoolRow(key) || selectablePool.find((item) => item.selection_key === key);
+      return assignmentRowState(row, slotId).selectable;
     });
-    if (assignableIds.length === 0) {
-      setError("Select at least one unassigned applicant.");
+    const parsed = parseSelectionKeys(assignableKeys);
+    if (!parsed.application_ids.length && !parsed.invitee_ids.length) {
+      setError("Select at least one unassigned applicant or university invitee.");
+      return;
+    }
+    const occupancy = planCombinedBatchOccupancy({
+      slot: target,
+      bookedApplicants: target?.applicant_booked || 0,
+      bookedInvitees: target?.invitee_booked || 0,
+      selectedApplicantIds: parsed.application_ids,
+      selectedInviteeIds: parsed.invitee_ids,
+    });
+    if (!occupancy.ok) {
+      setError(assignmentErrorMessage(occupancy));
       return;
     }
     setSaving(true);
     setError(null);
     setSuccess(null);
-    const { ok, data } = await fetchJson("/api/director/interview-allocations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "allocate_batch",
-        interview_slot_id: slotId,
-        application_ids: assignableIds,
-        interview_format: target?.meeting_link ? "virtual" : "in_person",
-        confirm: true,
-      }),
-    });
+    let applicantCount = 0;
+    let inviteeCount = 0;
+    if (parsed.application_ids.length) {
+      const { ok, data } = await fetchJson("/api/director/interview-allocations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "allocate_batch",
+          interview_slot_id: slotId,
+          application_ids: parsed.application_ids,
+          interview_format: target?.meeting_link ? "virtual" : "in_person",
+          confirm: true,
+        }),
+      });
+      if (!ok) {
+        await loadData();
+        setSaving(false);
+        setError(assignmentErrorMessage(data));
+        return;
+      }
+      applicantCount = data.updated || 0;
+    }
+    if (parsed.invitee_ids.length) {
+      const { ok, data } = await fetchJson("/api/director/interview-invitees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "allocate_batch",
+          interview_slot_id: slotId,
+          invitee_ids: parsed.invitee_ids,
+          interview_format: target?.meeting_link ? "virtual" : "in_person",
+          confirm: true,
+        }),
+      });
+      if (!ok) {
+        await loadData();
+        setSaving(false);
+        setError(assignmentErrorMessage(data));
+        return;
+      }
+      inviteeCount = data.updated || 0;
+    }
     await loadData();
     setSaving(false);
-    if (!ok) {
-      setError(assignmentErrorMessage(data));
-      return;
-    }
-    const count = data.updated || 0;
+    const count = applicantCount + inviteeCount;
     if (!count) {
-      setError("No applicants were assigned. Refresh and try again.");
+      setError("No people were assigned. Refresh and try again.");
       return;
     }
     setSelectedIds(new Set());
-    const batchName = data.batch_name || target?.batch_name || "the selected batch";
-    setSuccess(`${count} applicant${count === 1 ? "" : "s"} assigned to ${batchName}.`);
+    const batchName = target?.batch_name || "the selected batch";
+    setSuccess(
+      `${count} ${count === 1 ? "person" : "people"} assigned to ${batchName} (${applicantCount} applicant${
+        applicantCount === 1 ? "" : "s"
+      } · ${inviteeCount} invitee${inviteeCount === 1 ? "" : "s"}). No invitations were sent.`
+    );
   }
 
   async function moveApplicant(app) {
@@ -259,9 +343,10 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
     const toLabel = [target.batch_name, target.interview_date, target.interview_time]
       .filter(Boolean)
       .join(" · ");
+    const name = applicantLabel(app);
     if (
       !window.confirm(
-        `Move ${applicantLabel(app)} from ${fromLabel} to ${toLabel}? This does not send an invitation.`
+        `Move ${name} from ${fromLabel} to ${toLabel}? This does not send an invitation.`
       )
     ) {
       return;
@@ -269,17 +354,30 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
     setSaving(true);
     setError(null);
     setSuccess(null);
-    const { ok, data } = await fetchJson("/api/director/interview-allocations", {
+    const endpoint =
+      app.source_kind === "invitee" ? "/api/director/interview-invitees" : "/api/director/interview-allocations";
+    const payload =
+      app.source_kind === "invitee"
+        ? {
+            action: "allocate_batch",
+            interview_slot_id: slotId,
+            invitee_ids: [app.id],
+            interview_format: target.meeting_link ? "virtual" : "in_person",
+            allow_move: true,
+            confirm: true,
+          }
+        : {
+            action: "allocate_batch",
+            interview_slot_id: slotId,
+            application_ids: [app.id],
+            interview_format: target.meeting_link ? "virtual" : "in_person",
+            allow_move: true,
+            confirm: true,
+          };
+    const { ok, data } = await fetchJson(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "allocate_batch",
-        interview_slot_id: slotId,
-        application_ids: [app.id],
-        interview_format: target.meeting_link ? "virtual" : "in_person",
-        allow_move: true,
-        confirm: true,
-      }),
+      body: JSON.stringify(payload),
     });
     await loadData();
     setSaving(false);
@@ -289,37 +387,44 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
     }
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.delete(app.id);
+      next.delete(app.selection_key || applicantSelectionKey(app.id));
+      next.delete(inviteeSelectionKey(app.id));
       return next;
     });
-    setSuccess(`${applicantLabel(app)} moved from ${fromLabel} to ${toLabel}.`);
+    setSuccess(`${name} moved from ${fromLabel} to ${toLabel}.`);
   }
 
-  async function removeApplicant(applicationId) {
+  async function removeApplicant(applicationId, sourceKind = "applicant") {
     setSaving(true);
     setError(null);
-    const { ok, data } = await fetchJson("/api/director/interview-allocations", {
+    const endpoint =
+      sourceKind === "invitee" ? "/api/director/interview-invitees" : "/api/director/interview-allocations";
+    const payload =
+      sourceKind === "invitee"
+        ? { action: "unallocate", invitee_ids: [applicationId], confirm: true }
+        : { action: "unallocate", application_ids: [applicationId], confirm: true };
+    const { ok, data } = await fetchJson(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "unallocate",
-        application_ids: [applicationId],
-        confirm: true,
-      }),
+      body: JSON.stringify(payload),
     });
     await loadData();
     setSaving(false);
     if (!ok) {
-      setError(data.error || "Could not remove applicant");
+      setError(data.error || "Could not remove from the draft batch");
       return;
     }
-    setSuccess("Applicant removed from the draft batch.");
+    setSuccess(
+      sourceKind === "invitee"
+        ? "University invitee removed from the draft batch."
+        : "Applicant removed from the draft batch."
+    );
   }
 
   async function publishBatch(slotId) {
     if (
       !window.confirm(
-        "Publish this batch and email assigned applicants? Draft edits after this will not unsend invitations."
+        "Publish this batch and email assigned applicants and university invitees? Draft edits after this will not unsend invitations. Already-sent invitations are not resent."
       )
     ) {
       return;
@@ -337,9 +442,11 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
       setSaving(false);
       return;
     }
-    if (preview.preview?.blocked_count) {
+    const blockedCount =
+      (preview.preview?.blocked_count || 0) + (preview.preview?.invitees?.blocked_count || 0);
+    if (blockedCount) {
       setError(
-        `Cannot publish yet: ${preview.preview.blocked_count} applicant(s) are missing venue, meeting link, or email.`
+        `Cannot publish yet: ${blockedCount} person(s) are missing venue, meeting link, or email.`
       );
       setSaving(false);
       return;
@@ -519,7 +626,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
                     className={inputClass}
                   />
                 </Field>
-                <Field label="Maximum applicants">
+                <Field label="Maximum people (applicants + invitees)">
                   <input
                     required
                     type="number"
@@ -607,11 +714,13 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 font-bold text-gray-900">
-                  <Users size={18} /> Shortlisted applicants
+                  <Users size={18} /> Shortlisted applicants and university invitees
                 </h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  {assignmentCounts.total} eligible · {assignmentCounts.assigned} Assigned ·{" "}
-                  {assignmentCounts.unassigned} Not Assigned. {selectedIds.size} selected.
+                  {assignmentCounts.total} applicants · {assignmentCounts.assigned} assigned ·{" "}
+                  {assignmentCounts.unassigned} not assigned. {inviteeCounts.total} university invitees ·{" "}
+                  {inviteeCounts.assigned} assigned · {inviteeCounts.unassigned} not assigned.{" "}
+                  {selectedIds.size} selected.
                 </p>
               </div>
             </div>
@@ -658,7 +767,9 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
                   {draftSlots.map((slot) => (
                     <option key={slot.id} value={slot.id}>
                       {slot.batch_name} · {slot.interview_date} {slot.interview_time}
-                      {slot.capacity ? ` · ${slot.booked || 0}/${slot.capacity}` : ""}
+                      {slot.capacity
+                        ? ` · ${slot.booked || 0}/${slot.capacity} (${slot.applicant_booked || 0} applicants · ${slot.invitee_booked || 0} invitees)`
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -674,7 +785,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
             </div>
             {selectablePool.length === 0 ? (
               <p className="mt-6 rounded-lg border border-dashed border-gray-200 py-10 text-center text-sm text-gray-500">
-                No shortlisted applicants waiting for a batch.
+                No shortlisted applicants or university invitees waiting for a batch.
                 {readyToShortlist.length
                   ? ` ${readyToShortlist.length} Stage 2 approved applicant(s) still need to be shortlisted from their application.`
                   : ""}
@@ -691,42 +802,48 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
                         : "border-gray-100 bg-white hover:bg-gray-50";
                   return (
                     <label
-                      key={app.id}
+                      key={app.selection_key || app.id}
                       className={`flex min-w-0 items-start gap-3 rounded-lg border p-3 ${rowClass} ${
                         row.selectable ? "cursor-pointer" : "cursor-default"
                       }`}
                     >
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(app.id)}
+                        checked={selectedIds.has(app.selection_key)}
                         disabled={!row.selectable}
-                        onChange={() => toggleSelect(app.id)}
+                        onChange={() => toggleSelect(app.selection_key)}
                         className="mt-1"
                         title={row.reason || undefined}
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-medium text-gray-900">{applicantLabel(app)}</p>
-                          <button
-                            type="button"
-                            className="text-xs font-medium text-royal"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setLocationForm({
-                                id: app.id,
-                                name: applicantLabel(app),
-                                assigned_batch_label: app.assigned_batch_label,
-                                assignment_status_label: row.status_label,
-                                confirmed_region: app.location_confirmed ? app.study_region || "" : "",
-                                confirmed_town: app.location_confirmed ? app.study_town || "" : "",
-                                study_institution: app.location_confirmed
-                                  ? app.study_institution || ""
-                                  : app.university || "",
-                              });
-                            }}
-                          >
-                            Confirm study location
-                          </button>
+                          {app.source_kind === "invitee" ? (
+                            <span className="text-xs font-medium uppercase tracking-wide text-royal">
+                              {UNIVERSITY_INVITEE_LABEL}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="text-xs font-medium text-royal"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setLocationForm({
+                                  id: app.id,
+                                  name: applicantLabel(app),
+                                  assigned_batch_label: app.assigned_batch_label,
+                                  assignment_status_label: row.status_label,
+                                  confirmed_region: app.location_confirmed ? app.study_region || "" : "",
+                                  confirmed_town: app.location_confirmed ? app.study_town || "" : "",
+                                  study_institution: app.location_confirmed
+                                    ? app.study_institution || ""
+                                    : app.university || "",
+                                });
+                              }}
+                            >
+                              Confirm study location
+                            </button>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500">
                           {applicantEmail(app)} · {app.university || "No university"}
@@ -749,10 +866,17 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
                         {row.reason && !row.selectable ? (
                           <p className="mt-1 text-xs text-gray-500">{row.reason}</p>
                         ) : null}
-                        <p className="mt-1 text-xs text-gray-600">
-                          Study location: {app.study_region || STUDY_LOCATION_UNCONFIRMED_LABEL}
-                          {app.location_confirmed ? ` · ${app.study_town} · ${app.study_institution}` : ""}
-                        </p>
+                        {app.source_kind === "invitee" ? (
+                          <p className="mt-1 text-xs text-gray-600">
+                            {app.programme_of_study || "Programme not recorded"}
+                            {app.nationality ? ` · ${app.nationality}` : ""}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-xs text-gray-600">
+                            Study location: {app.study_region || STUDY_LOCATION_UNCONFIRMED_LABEL}
+                            {app.location_confirmed ? ` · ${app.study_town} · ${app.study_institution}` : ""}
+                          </p>
+                        )}
                         {row.can_move ? (
                           <button
                             type="button"
@@ -783,7 +907,8 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
             onCancel={cancelBatch}
             onDelete={deleteBatch}
             onRemove={removeApplicant}
-            empty="No draft batches yet. Create a batch, then assign applicants."
+            invitees={invitees}
+            empty="No draft batches yet. Create a batch, then assign applicants and university invitees."
           />
         </>
       ) : (
@@ -792,6 +917,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
             title="Published invitations"
             slots={publishedSlots}
             applications={applications}
+            invitees={invitees}
             saving={saving}
             onPublish={publishBatch}
             onComplete={completeBatch}
@@ -802,6 +928,7 @@ export default function DirectorPublishedInterviews({ mode = "manage", initialFi
             title="Completed interviews"
             slots={completedSlots}
             applications={applications}
+            invitees={invitees}
             saving={saving}
             empty="No completed interview batches yet."
           />
@@ -900,6 +1027,7 @@ function BatchList({
   title,
   slots,
   applications,
+  invitees = [],
   saving,
   onPublish,
   onComplete,
@@ -922,12 +1050,20 @@ function BatchList({
         <div className="space-y-4">
           {slots.map((slot) => {
             const assignedIds = new Set(slot.assigned_ids || []);
+            const assignedInviteeIds = new Set(slot.assigned_invitee_ids || []);
             const assignedApps = applications.filter(
               (a) =>
                 a.assigned_slot_id === slot.id ||
                 a.interview_slot_id === slot.id ||
                 assignedIds.has(a.id)
             );
+            const assignedInvitees = invitees.filter(
+              (row) =>
+                row.assigned_slot_id === slot.id ||
+                row.interview_slot_id === slot.id ||
+                assignedInviteeIds.has(row.id)
+            );
+            const occupantCount = assignedApps.length + assignedInvitees.length;
             const status = slot.status || "scheduled";
             const draft = !slot.published;
             const statusTone = draft ? "bg-amber-50 text-amber-800" : "bg-indigo-50 text-indigo-700";
@@ -954,8 +1090,12 @@ function BatchList({
                     </span>
                     <span className="flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700">
                       <Users size={12} />
-                      {slot.booked ?? assignedApps.length}
+                      {slot.booked ?? occupantCount}
                       {slot.capacity ? ` / ${slot.capacity}` : ""}
+                    </span>
+                    <span className="rounded-full bg-gray-50 px-3 py-1 text-xs text-gray-600">
+                      {slot.applicant_booked ?? assignedApps.length} applicants ·{" "}
+                      {slot.invitee_booked ?? assignedInvitees.length} invitees
                     </span>
                   </div>
                 </div>
@@ -977,7 +1117,7 @@ function BatchList({
                         <button
                           type="button"
                           disabled={saving}
-                          onClick={() => onRemove(app.id)}
+                          onClick={() => onRemove(app.id, "applicant")}
                           className="ml-1 text-gray-400 hover:text-red-600"
                         >
                           Remove
@@ -985,8 +1125,32 @@ function BatchList({
                       ) : null}
                     </span>
                   ))}
-                  {assignedApps.length === 0 ? (
-                    <span className="text-xs text-gray-400">No applicants assigned yet</span>
+                  {assignedInvitees.map((row) => (
+                    <span
+                      key={`invitee-${row.id}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs text-indigo-800"
+                    >
+                      <CheckCircle2 size={12} className="text-indigo-700" />
+                      <span>{row.full_name}</span>
+                      <span className="uppercase tracking-wide">{UNIVERSITY_INVITEE_LABEL}</span>
+                      <span>
+                        Assigned to This Batch
+                        {row.assigned_batch_label ? ` · ${row.assigned_batch_label}` : ""}
+                      </span>
+                      {draft && onRemove ? (
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => onRemove(row.id, "invitee")}
+                          className="ml-1 text-gray-400 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </span>
+                  ))}
+                  {occupantCount === 0 ? (
+                    <span className="text-xs text-gray-400">No people assigned yet</span>
                   ) : null}
                 </div>
                 {!draft && slot.invitation_delivery ? (
@@ -1005,7 +1169,7 @@ function BatchList({
                     {(draft || slot.invitation_delivery?.failed > 0) && onPublish ? (
                       <button
                         type="button"
-                        disabled={saving || assignedApps.length === 0}
+                        disabled={saving || occupantCount === 0}
                         onClick={() => onPublish(slot.id)}
                         className="rounded-lg bg-royal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                       >
@@ -1032,7 +1196,7 @@ function BatchList({
                         Cancel batch
                       </button>
                     ) : null}
-                    {assignedApps.length === 0 && onDelete ? (
+                    {occupantCount === 0 && onDelete ? (
                       <button
                         type="button"
                         disabled={saving}

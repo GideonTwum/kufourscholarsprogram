@@ -16,6 +16,8 @@ import {
   classifyInterviewRequestQueryError,
   fetchDirectorInterviewRequests,
 } from "@/lib/director-interview-requests";
+import { fetchInterviewInvitees, UNIVERSITY_INVITEE_LABEL } from "@/lib/director-interview-invitees";
+import { INTERVIEW_SLOTS_TABLE } from "@/lib/director-interview-batches";
 
 export async function GET() {
   const gate = await requireActiveDirector();
@@ -74,12 +76,13 @@ export async function GET() {
     const applicationIds = [...new Set((data || []).map((row) => row.application_id).filter(Boolean))];
     const confirmationsById = await fetchInterviewLocationConfirmationsMap(adminGate.admin, applicationIds);
     const confirmations = confirmationsById.__error ? {} : confirmationsById;
-    return NextResponse.json({
-      requests: (data || []).map((row) => {
+    const applicantRequests = (data || []).map((row) => {
         const wrapped = { location_confirmation: confirmations[row.application_id] || null };
         const confirmed = hasLocationConfirmation(wrapped);
         return {
           ...row,
+          source_kind: "applicant",
+          reviewable: true,
           full_name: row.applications?.full_name || "Unknown",
           current_appointment:
             appointmentById[row.current_interview_slot_id] ||
@@ -96,7 +99,50 @@ export async function GET() {
           new_interview_date: row.new_interview_date || null,
           new_interview_time: row.new_interview_time || null,
         };
-      }),
+      });
+    const { data: inviteeSlots } = await adminGate.admin
+      .from(INTERVIEW_SLOTS_TABLE)
+      .select("id, batch_name, interview_date, interview_time, end_time, published_at, invitation_sent_at, status");
+    const inviteeSlotsById = Object.fromEntries((inviteeSlots || []).map((slot) => [slot.id, slot]));
+    const loadedInvitees = await fetchInterviewInvitees(adminGate.admin, { slotsById: inviteeSlotsById });
+    const inviteeRequests = (loadedInvitees.invitees || [])
+      .filter((row) =>
+        ["virtual_requested", "reschedule_requested", "unable_to_attend", "attendance_confirmed"].includes(
+          row.response_status
+        )
+      )
+      .map((row) => ({
+        id: `invitee:${row.id}`,
+        source_kind: "invitee",
+        source_label: UNIVERSITY_INVITEE_LABEL,
+        reviewable: false,
+        full_name: row.full_name,
+        request_type:
+          row.response_status === "attendance_confirmed"
+            ? "attendance_confirmed"
+            : row.response_status === "virtual_requested"
+              ? "virtual"
+              : row.response_status === "unable_to_attend"
+                ? "unable_to_attend"
+                : "reschedule",
+        status: row.response_status === "attendance_confirmed" ? "confirmed" : "pending",
+        reason: row.response_reason || "",
+        current_appointment: row.assigned_slot_id
+          ? {
+              id: row.assigned_slot_id,
+              date: row.assigned_batch_date,
+              start_time: String(row.assigned_batch_time || "").split("–")[0] || null,
+              end_time: String(row.assigned_batch_time || "").split("–")[1] || null,
+              batch_name: row.assigned_batch_name,
+            }
+          : null,
+        study_region: row.university,
+        study_town: row.nationality || "—",
+        study_institution: row.university,
+        created_at: row.updated_at || row.created_at || null,
+      }));
+    return NextResponse.json({
+      requests: [...inviteeRequests, ...applicantRequests],
     });
   } catch (error) {
     return NextResponse.json(
