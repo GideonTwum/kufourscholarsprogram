@@ -73,12 +73,19 @@ export async function POST(request) {
   const offset = Math.max(0, Number(body.offset) || 0);
   const preview = resolved.sendable.slice(offset, offset + COMMUNICATION_PREVIEW_LIMIT).map((r) => ({
     application_id: r.application_id,
+    invitee_id: r.invitee_id || null,
     full_name: r.full_name,
     university: r.university,
     status: r.status,
     email: r.email,
     workflow_label: r.workflow_label,
+    source_kind: r.source_kind || "applicant",
+    source_label: r.source_label || "Applicant",
+    assigned_batch_label: r.assigned_batch_label || null,
   }));
+
+  const recipientWord = resolved.sendable.length === 1 ? "recipient" : "recipients";
+  const excludedWord = resolved.excluded.length === 1 ? "recipient" : "recipients";
 
   return NextResponse.json({
     ok: true,
@@ -87,14 +94,18 @@ export async function POST(request) {
     recipient_count: resolved.sendable.length,
     excluded_count: resolved.excluded.length,
     total_matched: resolved.totalMatched,
+    applicant_count: resolved.applicant_count ?? null,
+    invitee_count: resolved.invitee_count ?? null,
     preview,
     preview_offset: offset,
     preview_limit: COMMUNICATION_PREVIEW_LIMIT,
     has_more: offset + COMMUNICATION_PREVIEW_LIMIT < resolved.sendable.length,
-    message: `${resolved.sendable.length} applicant${resolved.sendable.length === 1 ? "" : "s"} will receive this message.`,
+    mutates_applications: false,
+    mutates_interview_assignments: false,
+    message: `${resolved.sendable.length} ${recipientWord} will receive this message.`,
     exclusion_message:
       resolved.excluded.length > 0
-        ? `${resolved.excluded.length} applicant${resolved.excluded.length === 1 ? "" : "s"} excluded because no valid email address was available.`
+        ? `${resolved.excluded.length} ${excludedWord} excluded because no valid email address was available.`
         : null,
   });
 }

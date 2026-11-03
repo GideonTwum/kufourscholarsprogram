@@ -32,6 +32,8 @@ test("audiences are allowlisted and labeled", () => {
     "interview_panel",
     "interview_review_pending",
     "called_for_interview",
+    "university_special_invitees",
+    "all_interview_participants",
     "accepted",
     "rejected",
     "individual",
@@ -42,6 +44,8 @@ test("audiences are allowlisted and labeled", () => {
   assert.equal(isValidCommunicationAudience("approved"), false);
   assert.equal(isValidCommunicationAudience("draft"), false);
   assert.ok(COMMUNICATION_AUDIENCES.includes("assessed"));
+  assert.ok(COMMUNICATION_AUDIENCES.includes("university_special_invitees"));
+  assert.ok(COMMUNICATION_AUDIENCES.includes("all_interview_participants"));
 });
 
 test("filterClassifiedByAudience uses workflow classifier + pending/status semantics", () => {
@@ -81,6 +85,26 @@ test("dedupe prefers user_id and avoids duplicate emails", () => {
   assert.equal(deduped.length, 2);
   assert.equal(deduped[0].application_id, "1");
   assert.equal(deduped[1].application_id, "3");
+});
+
+test("dedupe collapses applicant and invitee sharing one email", () => {
+  const rows = [
+    {
+      user_id: null,
+      email: "shared@example.com",
+      invitee_id: "inv-1",
+      source_kind: "invitee",
+    },
+    {
+      user_id: "u9",
+      email: "shared@example.com",
+      application_id: "app-9",
+      source_kind: "applicant",
+    },
+  ];
+  const deduped = dedupeCommunicationRecipients(rows);
+  assert.equal(deduped.length, 1);
+  assert.equal(deduped[0].invitee_id, "inv-1");
 });
 
 test("partitionRecipients excludes invalid emails", () => {

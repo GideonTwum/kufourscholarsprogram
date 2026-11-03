@@ -868,16 +868,26 @@ export default function CommunicationsClient() {
                     <tr>
                       <th className="py-2 pr-3">Name</th>
                       <th className="py-2 pr-3">Institution</th>
-                      <th className="py-2 pr-3">Status</th>
+                      <th className="py-2 pr-3">Type</th>
+                      <th className="py-2 pr-3">Status / Batch</th>
                       <th className="py-2">Email</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(preview.preview || []).map((r) => (
-                      <tr key={r.application_id} className="border-b border-gray-50">
+                      <tr
+                        key={r.invitee_id || r.application_id || r.email}
+                        className="border-b border-gray-50"
+                      >
                         <td className="py-2 pr-3">{r.full_name}</td>
                         <td className="py-2 pr-3 text-gray-600">{r.university || "—"}</td>
-                        <td className="py-2 pr-3 text-gray-600">{r.status?.replace(/_/g, " ")}</td>
+                        <td className="py-2 pr-3 text-gray-600">
+                          {r.source_label || (r.source_kind === "invitee" ? "University Invitee" : "Applicant")}
+                        </td>
+                        <td className="py-2 pr-3 text-gray-600">
+                          {r.assigned_batch_label ||
+                            (r.status ? String(r.status).replace(/_/g, " ") : "—")}
+                        </td>
                         <td className="py-2 text-gray-600">{r.email}</td>
                       </tr>
                     ))}
@@ -887,7 +897,7 @@ export default function CommunicationsClient() {
               {preview.has_more ? (
                 <p className="mt-2 text-xs text-gray-500">
                   Showing first {preview.preview_limit} of {preview.recipient_count}. All matching
-                  applicants will be included when you send.
+                  recipients will be included when you send.
                 </p>
               ) : null}
             </div>
@@ -969,16 +979,16 @@ export default function CommunicationsClient() {
             ) : (
               <>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Send to {preview?.recipient_count ?? 0} applicants?
+                  Send to {preview?.recipient_count ?? 0} recipients?
                 </h3>
                 <p className="mt-2 text-sm text-gray-600">
-                  Each applicant will receive a separate, private email.
+                  Each recipient will receive a separate, private email.
                 </p>
                 <dl className="mt-4 space-y-3 text-sm text-gray-700">
                   <div>
                     <dt className="text-gray-500">Recipients</dt>
                     <dd className="font-medium">
-                      {preview?.recipient_count ?? 0} applicant
+                      {preview?.recipient_count ?? 0} recipient
                       {(preview?.recipient_count ?? 0) === 1 ? "" : "s"}
                     </dd>
                   </div>
@@ -1019,7 +1029,7 @@ export default function CommunicationsClient() {
                     className="inline-flex items-center gap-2 rounded-lg bg-royal px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                   >
                     {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                    Send to {preview?.recipient_count ?? 0} Applicants
+                    Send to {preview?.recipient_count ?? 0} Recipients
                   </button>
                 </div>
               </>

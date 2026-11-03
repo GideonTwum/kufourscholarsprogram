@@ -48,14 +48,14 @@ test("bulk confirmation shows count, private delivery, and concise interruption 
   const bulkBlock = confirmSection.slice(bulkStart);
 
   assert.match(bulkBlock, /Send to \{preview\?\.recipient_count/);
-  assert.match(bulkBlock, /Each applicant will receive a separate, private email\./);
+  assert.match(bulkBlock, /Each recipient will receive a separate, private email\./);
   assert.match(bulkBlock, />Recipients</);
   assert.match(bulkBlock, />Subject</);
   assert.match(
     bulkBlock,
     /Emails are sent in small batches\.\s*Keep this page open while sending\.\s*If sending is\s*interrupted, you can continue from History\./
   );
-  assert.match(bulkBlock, /Send to \{preview\?\.recipient_count \?\? 0\} Applicants/);
+  assert.match(bulkBlock, /Send to \{preview\?\.recipient_count \?\? 0\} Recipients/);
 
   assert.doesNotMatch(bulkBlock, /batches of 15/);
   assert.doesNotMatch(bulkBlock, /batch size\s*=\s*15/i);

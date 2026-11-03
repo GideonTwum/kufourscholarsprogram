@@ -113,6 +113,9 @@ test("interview audiences: pipeline vs shortlisted vs called", () => {
   assert.match(COMMUNICATION_AUDIENCE_HINTS.interview_panel, /not for/i);
   assert.ok(isValidCommunicationAudience("interview_review_pending"));
   assert.ok(isValidCommunicationAudience("called_for_interview"));
+  assert.ok(isValidCommunicationAudience("university_special_invitees"));
+  assert.ok(isValidCommunicationAudience("all_interview_participants"));
+  assert.match(COMMUNICATION_AUDIENCE_HINTS.called_for_interview, /Does not include university special invitees/i);
 });
 
 test("personalization never yields Dear , or Dear undefined,", () => {

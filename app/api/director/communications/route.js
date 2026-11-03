@@ -150,7 +150,7 @@ export async function POST(request) {
   if (resolved.sendable.length === 0) {
     return NextResponse.json(
       {
-        error: "No applicants with valid email addresses match this audience.",
+        error: "No recipients with valid email addresses match this audience.",
         excluded_count: resolved.excluded.length,
       },
       { status: 400 }
@@ -191,12 +191,12 @@ export async function POST(request) {
 
   const recipientRows = resolved.sendable.map((r) => ({
     communication_id: created.id,
-    application_id: r.application_id,
-    user_id: r.user_id,
+    application_id: r.application_id || null,
+    user_id: r.user_id || null,
     email: r.email,
     full_name_snapshot: r.full_name,
     university_snapshot: r.university || null,
-    status_snapshot: r.status || null,
+    status_snapshot: r.status || r.source_label || null,
     delivery_status: "pending",
   }));
 
@@ -225,6 +225,8 @@ export async function POST(request) {
       recipient_count: resolved.sendable.length,
       excluded_count: resolved.excluded.length,
       subject,
+      mutates_applications: false,
+      mutates_interview_assignments: false,
     },
     request,
     critical: false,
