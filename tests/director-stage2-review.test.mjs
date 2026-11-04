@@ -165,9 +165,11 @@ test("9. Existing approval workflows continue to function", () => {
 
 test("10. Empty filter results display an appropriate message", () => {
   const list = readFileSync(resolve("components/director/DirectorApplicationsList.jsx"), "utf8");
-  assert.match(list, /No Stage 2 approved applications in this view/);
-  assert.match(list, /No Stage 2 applications pending review in this view/);
-  assert.match(list, /No Stage 2 rejected applications in this view/);
+  assert.match(list, /directorApplicationsEmptyMessage/);
+  const filters = readFileSync(resolve("lib/director-application-filters.js"), "utf8");
+  assert.match(filters, /No Stage 2 approved applications match the selected filters/);
+  assert.match(filters, /No Stage 2 applications pending review match the selected filters/);
+  assert.match(filters, /No Stage 2 rejected applications match the selected filters/);
   assert.equal(filterByDirectorStage2Review(rows([awaitingS2]), "approved").length, 0);
 });
 

@@ -24,6 +24,12 @@ import {
   buildDirectorApplicationsListHref,
 } from "@/lib/director-applications-return";
 import {
+  DIRECTOR_APPLICATIONS_CLEAR_ALL_HREF,
+  directorApplicationsEmptyMessage,
+  findDirectorApplicationFilterConflicts,
+  hasActiveDirectorApplicationFilters,
+} from "@/lib/director-application-filters";
+import {
   DIRECTOR_STAGE2_REVIEW_BADGE,
   classifyDirectorStage2Review,
 } from "@/lib/director-stage2-review";
@@ -202,28 +208,17 @@ export default function DirectorApplicationsList({
 
   const clearSearch = () => setSearchQuery("");
 
-  const emptyMessage = () => {
-    if (hasSearch) return "No applications match your search in this filtered view.";
-    if (workflowFilter === "unassigned" && assessorFilter) {
-      return "No applications match Unassigned and the selected Assessor (an application cannot be both).";
-    }
-    if (assessorFilter) return "No applications currently assigned to this assessor in this view.";
-    if (stageFilter === "stage_1") return "No Stage 1 applications in this view.";
-    if (stageFilter === "stage_2") return "No Stage 2 applications in this view.";
-    if (stageFilter === "interview") return "No Interview-stage applications in this view.";
-    if (stage2Filter === "all") return "No Stage 2 applicants in this view.";
-    if (stage2Filter === "approved") return "No Stage 2 approved applications in this view.";
-    if (stage2Filter === "pending") return "No Stage 2 applications pending review in this view.";
-    if (stage2Filter === "rejected") return "No Stage 2 rejected applications in this view.";
-    if (workflowFilter === "unassigned") return "No unassigned applications.";
-    if (workflowFilter === "assigned") return "No applications awaiting assessor review.";
-    if (workflowFilter === "assessed") return "No assessed applications awaiting Director action.";
-    if (workflowFilter === "interview_panel") return "No interview / panel applications.";
-    if (statusFilter === "pending") return "No pending applications.";
-    if (statusFilter === "accepted") return "No accepted applications yet.";
-    if (statusFilter === "rejected") return "No rejected applications.";
-    return "No applications found.";
+  const activeFilters = {
+    status: statusFilter,
+    workflow: workflowFilter,
+    stage: stageFilter,
+    stage2: stage2Filter,
+    assessor: assessorFilter,
+    q: searchQuery,
   };
+  const filterConflicts = findDirectorApplicationFilterConflicts(activeFilters);
+  const emptyMessage = () =>
+    directorApplicationsEmptyMessage(activeFilters, { hasSearch });
 
   return (
     <div>
@@ -269,16 +264,32 @@ export default function DirectorApplicationsList({
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white p-12 text-center">
           <FileText size={32} className="mx-auto text-gray-300" />
-          <p className="mt-3 text-sm text-gray-400">{emptyMessage()}</p>
-          {hasSearch ? (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Clear search
-            </button>
+          <p className="mt-3 text-sm text-gray-600">{emptyMessage()}</p>
+          {filterConflicts.length > 0 ? (
+            <p className="mx-auto mt-2 max-w-xl text-xs text-amber-800">
+              The selected filters cannot match any applications when combined. Stage chip counts
+              still show the full population.
+            </p>
           ) : null}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {hasSearch ? (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Clear search
+              </button>
+            ) : null}
+            {hasActiveDirectorApplicationFilters(activeFilters) ? (
+              <Link
+                href={DIRECTOR_APPLICATIONS_CLEAR_ALL_HREF}
+                className="inline-flex items-center gap-2 rounded-lg bg-royal px-3 py-2 text-sm font-semibold text-white hover:bg-royal/90"
+              >
+                Clear All Filters
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

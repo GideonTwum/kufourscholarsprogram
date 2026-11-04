@@ -33,6 +33,12 @@ import {
 import { loadDirectorAssignmentWorkflowMeta } from "@/lib/director-assignment-workflow-meta";
 import { buildDirectorApplicationsListHref } from "@/lib/director-applications-return";
 import {
+  DIRECTOR_APPLICATIONS_CLEAR_ALL_HREF,
+  describeActiveDirectorApplicationFilters,
+  hasActiveDirectorApplicationFilters,
+  mergeDirectorApplicationFilters,
+} from "@/lib/director-application-filters";
+import {
   DIRECTOR_STAGE2_REVIEW_FILTERS,
   filterByDirectorStage2Review,
   normalizeDirectorStage2ReviewParam,
@@ -41,6 +47,11 @@ import {
 
 function hrefForFilters(filters) {
   return buildDirectorApplicationsListHref(filters);
+}
+
+/** Chip click: apply patch and clear only incompatible partners. */
+function hrefForFilterChange(current, patch) {
+  return hrefForFilters(mergeDirectorApplicationFilters(current, patch));
 }
 
 async function fetchWithAdmin(statusFilter) {
@@ -259,8 +270,9 @@ export default async function DirectorApplicationsPage({ searchParams }) {
           application is in assessor processing.{" "}
           <span className="font-medium text-gray-600">Assessor</span> shows applications with a
           current active assignment to that person.{" "}
-          <span className="font-medium text-gray-600">Stage 2 Review</span> is the Director
-          Stage 2 approval decision, not video upload alone. These filters combine.
+          <span className="font-medium text-gray-600">          Stage 2 Review</span> is the Director
+          Stage 2 approval decision, not video upload alone. These filters combine. Stage and
+          workflow chip counts show the full submitted population and are not narrowed by Status.
         </p>
       </div>
 
@@ -274,6 +286,31 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         </div>
       )}
 
+      {hasActiveDirectorApplicationFilters(listFilters) ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+          <span className="text-xs font-medium text-gray-600">Active filters:</span>
+          {describeActiveDirectorApplicationFilters(listFilters, {
+            assessorName: assessorSummary?.name,
+          }).map((item) => (
+            <span
+              key={item.key}
+              className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
+            >
+              {item.label}: {item.value}
+            </span>
+          ))}
+          <span className="text-xs text-gray-500">
+            Showing {listItems.length} application{listItems.length === 1 ? "" : "s"}
+          </span>
+          <Link
+            href={DIRECTOR_APPLICATIONS_CLEAR_ALL_HREF}
+            className="ml-auto rounded-full bg-royal px-3 py-1 text-xs font-semibold text-white hover:bg-royal/90"
+          >
+            Clear All Filters
+          </Link>
+        </div>
+      ) : null}
+
       {/* Application Stage — recruitment location from applications.status */}
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
@@ -283,7 +320,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_APPLICATION_STAGE_FILTERS.map(({ key, label }) => (
           <Link
             key={key}
-            href={hrefForFilters({ ...listFilters, stage: key })}
+            href={hrefForFilterChange(listFilters, { stage: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               stageFilter === key
                 ? "bg-royal text-white"
@@ -303,7 +340,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_STAGE2_REVIEW_FILTERS.map(({ key, label }) => (
           <Link
             key={key}
-            href={hrefForFilters({ ...listFilters, stage2: key })}
+            href={hrefForFilterChange(listFilters, { stage2: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               stage2Filter === key
                 ? "bg-royal text-white"
@@ -315,7 +352,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         ))}
         {stage2Filter ? (
           <Link
-            href={hrefForFilters({ ...listFilters, stage2: "" })}
+            href={hrefForFilterChange(listFilters, { stage2: "" })}
             className="rounded-full px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
           >
             Clear Stage 2 Review
@@ -331,7 +368,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_WORKFLOW_FILTERS.map(({ key, label }) => (
           <Link
             key={key}
-            href={hrefForFilters({ ...listFilters, workflow: key })}
+            href={hrefForFilterChange(listFilters, { workflow: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               workflowFilter === key
                 ? "bg-royal text-white"
@@ -351,7 +388,7 @@ export default async function DirectorApplicationsPage({ searchParams }) {
         {DIRECTOR_PRIMARY_FILTERS.map(({ key, label }) => (
           <Link
             key={key || "all-status"}
-            href={hrefForFilters({ ...listFilters, status: key })}
+            href={hrefForFilterChange(listFilters, { status: key })}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === key
                 ? "bg-royal text-white"
