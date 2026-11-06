@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 import ExcelJS from "exceljs";
 
 import {
+  DIRECTOR_EXPORT_APPLICATION_SELECT,
   applyDirectorApplicationsListFilters,
+  applicantExportColumns,
   buildApplicantExportRecord,
   buildApplicantExportWorkbook,
   buildInviteeExportWorkbook,
@@ -88,7 +90,16 @@ test("Rejected exports only exact rejected statuses", () => {
   );
   const record = buildApplicantExportRecord(selected.rows[0], {});
   assert.equal(record.rejection_reason, "Incomplete documents");
-  assert.equal(record.decision_date, "2026-10-02");
+  assert.equal("decision_date" in record, false);
+  assert.equal(DIRECTOR_EXPORT_APPLICATION_SELECT.includes("rejected_at"), false);
+  assert.equal(
+    applicantExportColumns("rejected").some((column) => column.header === "Rejection reason"),
+    true
+  );
+  assert.equal(
+    applicantExportColumns("rejected").some((column) => column.header === "Decision date"),
+    false
+  );
 });
 
 test("All Submitted excludes drafts and keeps every other operational status", () => {
@@ -275,7 +286,8 @@ test("export dialog previews the category count and disables a second download",
   assert.match(dialogSource, /Export to Excel/);
   assert.match(dialogSource, /preview: true/);
   assert.match(dialogSource, /Counting records/);
-  assert.match(dialogSource, /No records match this export/);
+  assert.match(dialogSource, /No matching applicants/);
+  assert.match(dialogSource, /Retry/);
   assert.match(dialogSource, /disabled=\{downloading \|\| loadingPreview \|\| !preview \|\| preview\.count < 1\}/);
   assert.match(dialogSource, /DIRECTOR_EXPORT_TYPES/);
   assert.match(dialogSource, /called_for_interview/);

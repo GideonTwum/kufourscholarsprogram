@@ -15,6 +15,7 @@ import {
 } from "@/lib/director-application-export";
 import {
   applyDirectorOperationalScope,
+  chunkIdsForInFilter,
   fetchAllApplicationPages,
 } from "@/lib/director-application-scope";
 import { classifyDirectorApplications } from "@/lib/director-application-workflow";
@@ -24,6 +25,7 @@ import { INTERVIEW_SLOTS_TABLE } from "@/lib/director-interview-batches";
 import { fetchInterviewInvitees } from "@/lib/director-interview-invitees";
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const EXPORT_PAGE_OPTS = Object.freeze({ pageSize: 1000, maxRows: 100000, errorOnCeiling: true });
 
 function exportFilters(body) {
   const filters = body?.filters && typeof body.filters === "object" ? body.filters : {};
@@ -44,7 +46,7 @@ async function loadOperationalApplications(admin) {
       .select(DIRECTOR_EXPORT_APPLICATION_SELECT)
       .order("full_name", { ascending: true, nullsFirst: false });
     return applyDirectorOperationalScope(query);
-  });
+  }, EXPORT_PAGE_OPTS);
   if (error) return { applications: [], error };
   return { applications: data || [], error: null };
 }
@@ -55,7 +57,7 @@ async function loadAllocationsByApplication(admin) {
       .from(INTERVIEW_ALLOCATION_TABLE)
       .select("application_id, interview_slot_id")
       .order("application_id", { ascending: true })
-  );
+  , EXPORT_PAGE_OPTS);
   if (error) return {};
   const map = {};
   for (const row of data || []) {
@@ -65,14 +67,18 @@ async function loadAllocationsByApplication(admin) {
 }
 
 async function loadSlotsById(admin, ids) {
-  const unique = [...new Set((ids || []).filter(Boolean))];
-  if (!unique.length) return {};
-  const { data, error } = await admin
-    .from(INTERVIEW_SLOTS_TABLE)
-    .select("id, batch_name, interview_date, interview_time, end_time, status")
-    .in("id", unique.slice(0, 1000));
-  if (error) return {};
-  return Object.fromEntries((data || []).map((slot) => [slot.id, slot]));
+  const chunks = chunkIdsForInFilter(ids, 100);
+  if (!chunks.length) return {};
+  const slots = [];
+  for (const chunk of chunks) {
+    const { data, error } = await admin
+      .from(INTERVIEW_SLOTS_TABLE)
+      .select("id, batch_name, interview_date, interview_time, end_time, status")
+      .in("id", chunk);
+    if (error) return {};
+    slots.push(...(data || []));
+  }
+  return Object.fromEntries(slots.map((slot) => [slot.id, slot]));
 }
 
 export async function POST(request) {
@@ -111,19 +117,12 @@ export async function POST(request) {
     if (loaded.unavailable) {
       return NextResponse.json(
         {
-          error:
-            "University special invitee storage is not available until the interview_special_invitees migration is applied.",
+          error: "University special invitees are not available yet.",
         },
         { status: 503 }
       );
     }
     const invitees = selectInviteesForExport(loaded.invitees || []);
-    if (!preview && invitees.length === 0) {
-      return NextResponse.json(
-        { error: "No records match this export.", count: 0, label, filename },
-        { status: 409 }
-      );
-    }
     if (preview) {
       return NextResponse.json({
         ok: true,
@@ -161,12 +160,6 @@ export async function POST(request) {
     return NextResponse.json({ error: selected.error || "Invalid export type." }, { status: 400 });
   }
 
-  if (!preview && selected.rows.length === 0) {
-    return NextResponse.json(
-      { error: "No records match this export.", count: 0, label, filename },
-      { status: 409 }
-    );
-  }
   if (preview) {
     return NextResponse.json({
       ok: true,

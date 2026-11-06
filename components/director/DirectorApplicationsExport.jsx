@@ -12,6 +12,19 @@ const OPTIONS = DIRECTOR_EXPORT_TYPES.map((type) => ({
   label: DIRECTOR_EXPORT_LABELS[type],
 }));
 
+const SAFE_EXPORT_ERRORS = new Set([
+  "Could not load applications.",
+  "Could not load university special invitees.",
+  "University special invitees are not available yet.",
+  "Invalid export type.",
+  "Export failed.",
+  "Could not prepare this export.",
+]);
+
+function safeExportError(message, fallback) {
+  return SAFE_EXPORT_ERRORS.has(message) ? message : fallback;
+}
+
 export default function DirectorApplicationsExport({ filters = {} }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("called_for_interview");
@@ -32,7 +45,7 @@ export default function DirectorApplicationsExport({ filters = {} }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Could not prepare this export.");
+        setError(safeExportError(data.error, "Could not prepare this export."));
         return;
       }
       setPreview(data);
@@ -67,7 +80,7 @@ export default function DirectorApplicationsExport({ filters = {} }) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Export failed.");
+        setError(safeExportError(data.error, "Export failed."));
         return;
       }
       const blob = await res.blob();
@@ -135,13 +148,26 @@ export default function DirectorApplicationsExport({ filters = {} }) {
                   <Loader2 size={16} className="animate-spin" /> Counting records…
                 </p>
               ) : error ? (
-                <p className="text-red-700">{error}</p>
+                <div className="space-y-2">
+                  <p className="text-red-700" role="alert">
+                    {error}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => loadPreview(type)}
+                    className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-800"
+                  >
+                    Retry
+                  </button>
+                </div>
               ) : preview ? (
                 <p className="text-gray-700">
                   <span className="font-semibold">{preview.label}</span>
                   {" — "}
                   {preview.count === 0
-                    ? "No records match this export."
+                    ? type === "university_special_invitees"
+                      ? "No matching invitees"
+                      : "No matching applicants"
                     : `${preview.count} record${preview.count === 1 ? "" : "s"} will be downloaded.`}
                 </p>
               ) : null}
