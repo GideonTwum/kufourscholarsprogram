@@ -6,6 +6,7 @@ import { isDirectorRole } from "@/lib/roles";
 import { Filter } from "lucide-react";
 import DirectorWorkflowGuide from "../components/DirectorWorkflowGuide";
 import DirectorApplicationsList from "@/components/director/DirectorApplicationsList";
+import DirectorApplicationsExport from "@/components/director/DirectorApplicationsExport";
 import DirectorAssessorFilter from "@/components/director/DirectorAssessorFilter";
 import DirectorAssessorSummary from "@/components/director/DirectorAssessorSummary";
 import {
@@ -258,22 +259,25 @@ export default async function DirectorApplicationsPage({ searchParams }) {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Review submitted applications (drafts in progress are not listed here).
-        </p>
-        <p className="mt-2 text-xs text-gray-500">
-          <span className="font-medium text-gray-600">Application Stage</span> is where the
-          applicant is in recruitment.{" "}
-          <span className="font-medium text-gray-600">Assessment Workflow</span> is where the
-          application is in assessor processing.{" "}
-          <span className="font-medium text-gray-600">Assessor</span> shows applications with a
-          current active assignment to that person.{" "}
-          <span className="font-medium text-gray-600">          Stage 2 Review</span> is the Director
-          Stage 2 approval decision, not video upload alone. These filters combine. Stage and
-          workflow chip counts show the full submitted population and are not narrowed by Status.
-        </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Review submitted applications (drafts in progress are not listed here).
+          </p>
+          <p className="mt-2 text-xs text-gray-500">
+            <span className="font-medium text-gray-600">Application Stage</span> is where the
+            applicant is in recruitment.{" "}
+            <span className="font-medium text-gray-600">Assessment Workflow</span> is where the
+            application is in assessor processing.{" "}
+            <span className="font-medium text-gray-600">Assessor</span> shows applications with a
+            current active assignment to that person.{" "}
+            <span className="font-medium text-gray-600">Stage 2 Review</span> is the Director
+            Stage 2 approval decision, not video upload alone. These filters combine. Stage and
+            workflow chip counts show the full submitted population and are not narrowed by Status.
+          </p>
+        </div>
+        <DirectorApplicationsExport filters={listFilters} />
       </div>
 
       <DirectorWorkflowGuide compact />
