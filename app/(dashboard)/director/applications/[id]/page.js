@@ -30,6 +30,7 @@ import DirectorStageActionBar from "../../components/DirectorStageActionBar";
 import DirectorAssessorAssignmentPanel from "@/components/director/DirectorAssessorAssignmentPanel";
 import DirectorEditApplicantDetails from "@/components/director/DirectorEditApplicantDetails";
 import DirectorCopyApplicantDetails from "@/components/director/DirectorCopyApplicantDetails";
+import DirectorRestoreRejectedApplication from "@/components/director/DirectorRestoreRejectedApplication";
 import DirectorProfileChanges from "@/components/director/DirectorProfileChanges";
 
 const statusFlow = [
@@ -606,6 +607,25 @@ export default function ApplicationReviewPage() {
             {application.rejection_reason ? (
               <p className="mt-2 text-left text-red-900">{application.rejection_reason}</p>
             ) : null}
+            <DirectorRestoreRejectedApplication
+              application={application}
+              onRestored={(data) => {
+                const restored = data?.application || {};
+                setApplication((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        status: restored.status || data?.restored_status || prev.status,
+                        rejection_reason: null,
+                        updated_at: restored.updated_at || prev.updated_at,
+                      }
+                    : prev
+                );
+                setActionMessage(
+                  `Application restored to pending review (${data?.restored_status || "updated"}). No interview assignment or notification was created.`
+                );
+              }}
+            />
           </div>
         )}
       </div>
