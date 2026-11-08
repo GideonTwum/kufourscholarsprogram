@@ -29,6 +29,7 @@ import { evaluatorDisplayName } from "@/lib/staff-lifecycle";
 import DirectorStageActionBar from "../../components/DirectorStageActionBar";
 import DirectorAssessorAssignmentPanel from "@/components/director/DirectorAssessorAssignmentPanel";
 import DirectorEditApplicantDetails from "@/components/director/DirectorEditApplicantDetails";
+import DirectorCopyApplicantDetails from "@/components/director/DirectorCopyApplicantDetails";
 import DirectorProfileChanges from "@/components/director/DirectorProfileChanges";
 
 const statusFlow = [
@@ -555,6 +556,10 @@ export default function ApplicationReviewPage() {
                 }
                 setActionMessage("Applicant details updated.");
               }}
+            />
+            <DirectorCopyApplicantDetails
+              application={application}
+              email={profile?.email || ""}
             />
             {application.status !== "draft" ? (
               <Link
