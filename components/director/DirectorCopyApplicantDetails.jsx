@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  DIRECTOR_COPY_CONTACT_FIELDS,
   DIRECTOR_COPY_FIELD_KEYS,
   DIRECTOR_COPY_FIELD_META,
   buildDirectorCopyValues,
@@ -158,7 +157,6 @@ export default function DirectorCopyApplicantDetails({ application, email = "" }
               <legend className="sr-only">Fields to include</legend>
               {DIRECTOR_COPY_FIELD_KEYS.map((key) => {
                 const meta = DIRECTOR_COPY_FIELD_META[key];
-                const isContact = DIRECTOR_COPY_CONTACT_FIELDS.includes(key);
                 return (
                   <label key={key} className="flex items-start gap-2 text-sm text-gray-800">
                     <input
@@ -169,7 +167,7 @@ export default function DirectorCopyApplicantDetails({ application, email = "" }
                     />
                     <span>
                       <span className="font-medium">{meta.label}</span>
-                      {isContact ? (
+                      {meta.optional ? (
                         <span className="ml-1 text-xs font-normal text-gray-500">(optional)</span>
                       ) : null}
                       {!available[key] ? (
