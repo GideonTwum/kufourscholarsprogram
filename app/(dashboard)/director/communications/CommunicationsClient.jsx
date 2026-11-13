@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   X,
+  Paperclip,
 } from "lucide-react";
 import {
   COMMUNICATION_AUDIENCES,
@@ -24,6 +25,17 @@ import {
   getCommunicationTemplate,
   buildPersonalizedEmail,
 } from "@/lib/director-communications";
+import {
+  DIRECTOR_COMM_ATTACHMENT_MAX_BYTES,
+  DIRECTOR_COMM_ATTACHMENT_MAX_COUNT,
+  DIRECTOR_COMM_ATTACHMENT_MAX_TOTAL_BYTES,
+  DIRECTOR_COMM_VIDEO_EXTENSIONS,
+  fileExtensionFromName,
+  formatAttachmentBytes,
+  sanitizeAttachmentFilename,
+  validateDirectorCommunicationAttachment,
+  validateDirectorCommunicationAttachments,
+} from "@/lib/director-communication-attachments";
 
 const BULK_AUDIENCES = COMMUNICATION_AUDIENCES.filter((a) => a !== "individual");
 
@@ -80,6 +92,8 @@ export default function CommunicationsClient() {
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [sendProgress, setSendProgress] = useState(null);
   const [resumingId, setResumingId] = useState("");
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentError, setAttachmentError] = useState("");
 
   useEffect(() => {
     if (applicantId) {
@@ -317,7 +331,58 @@ export default function CommunicationsClient() {
   const isIndividualConfirm =
     audience === "individual" && (preview?.recipient_count === 1 || Boolean(selectedApplicant));
 
+  const attachmentTotalBytes = useMemo(
+    () => attachments.reduce((sum, row) => sum + (row.file?.size || 0), 0),
+    [attachments]
+  );
+
+  function addAttachments(fileList) {
+    setAttachmentError("");
+    const incoming = Array.from(fileList || []);
+    if (!incoming.length) return;
+    const next = [...attachments];
+    for (const file of incoming) {
+      const checked = validateDirectorCommunicationAttachment(file);
+      if (!checked.ok) {
+        setAttachmentError(checked.error);
+        continue;
+      }
+      if (next.some((row) => row.file.name === file.name && row.file.size === file.size)) {
+        continue;
+      }
+      next.push({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
+        file,
+        filename: checked.filename,
+        label: checked.label,
+        contentType: checked.contentType,
+      });
+    }
+    const validated = validateDirectorCommunicationAttachments(next.map((row) => ({ file: row.file })));
+    if (!validated.ok) {
+      setAttachmentError(validated.error);
+      return;
+    }
+    setAttachments(next.slice(0, DIRECTOR_COMM_ATTACHMENT_MAX_COUNT));
+  }
+
+  function removeAttachment(id) {
+    setAttachmentError("");
+    setAttachments((current) => current.filter((row) => row.id !== id));
+  }
+
   async function confirmAndSend() {
+    if (sending) return;
+    if (attachments.length > 0) {
+      const validated = validateDirectorCommunicationAttachments(
+        attachments.map((row) => ({ file: row.file }))
+      );
+      if (!validated.ok) {
+        setError(validated.error);
+        setAttachmentError(validated.error);
+        return;
+      }
+    }
     setSending(true);
     setError("");
     setSuccess("");
@@ -327,18 +392,38 @@ export default function CommunicationsClient() {
     setIdempotencyKey(key);
     const individualName = selectedApplicant?.full_name || null;
     try {
-      const res = await fetch("/api/director/communications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          audience,
-          application_id: audience === "individual" ? applicationId : undefined,
-          subject,
-          body,
-          confirm: true,
-          idempotency_key: key,
-        }),
-      });
+      let res;
+      if (attachments.length > 0) {
+        const formData = new FormData();
+        formData.set("audience", audience);
+        if (audience === "individual" && applicationId) {
+          formData.set("application_id", applicationId);
+        }
+        formData.set("subject", subject);
+        formData.set("body", body);
+        formData.set("confirm", "true");
+        formData.set("idempotency_key", key);
+        for (const row of attachments) {
+          formData.append("attachments", row.file, row.filename || row.file.name);
+        }
+        res = await fetch("/api/director/communications", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        res = await fetch("/api/director/communications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            audience,
+            application_id: audience === "individual" ? applicationId : undefined,
+            subject,
+            body,
+            confirm: true,
+            idempotency_key: key,
+          }),
+        });
+      }
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Send failed.");
@@ -354,6 +439,8 @@ export default function CommunicationsClient() {
 
       setConfirmOpen(false);
       setIdempotencyKey("");
+      setAttachments([]);
+      setAttachmentError("");
       const successful = finalResult.successful_count ?? 0;
       const failed = finalResult.failed_count ?? 0;
       const total = Math.max(successful + failed, preview?.recipient_count || 0);
@@ -825,6 +912,76 @@ export default function CommunicationsClient() {
               </p>
             </div>
 
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium text-gray-700" htmlFor="comm-attachments">
+                  Attach Files
+                </label>
+                <p className="text-xs text-gray-500">
+                  Up to {DIRECTOR_COMM_ATTACHMENT_MAX_COUNT} files ·{" "}
+                  {formatAttachmentBytes(DIRECTOR_COMM_ATTACHMENT_MAX_BYTES)} each ·{" "}
+                  {formatAttachmentBytes(DIRECTOR_COMM_ATTACHMENT_MAX_TOTAL_BYTES)} total
+                </p>
+              </div>
+              <input
+                id="comm-attachments"
+                type="file"
+                multiple
+                className="mt-2 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-royal/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-royal hover:file:bg-royal/15"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.txt,application/pdf,image/*"
+                disabled={sending}
+                onChange={(event) => {
+                  addAttachments(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                PDF, Word, Excel, PowerPoint, images, and text are supported. Video files (
+                {DIRECTOR_COMM_VIDEO_EXTENSIONS.map((ext) => `.${ext}`).join(", ")}) should be shared
+                with a secure link in the message instead of as attachments.
+              </p>
+              {attachmentError ? (
+                <p className="mt-2 text-sm text-red-700" role="alert">
+                  {attachmentError}
+                </p>
+              ) : null}
+              {attachments.length > 0 ? (
+                <ul className="mt-3 space-y-2">
+                  {attachments.map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-gray-900">
+                          <Paperclip size={14} className="mr-1 inline" />
+                          {row.filename || sanitizeAttachmentFilename(row.file.name)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {row.label || fileExtensionFromName(row.file.name).toUpperCase()} ·{" "}
+                          {formatAttachmentBytes(row.file.size)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={sending}
+                        onClick={() => removeAttachment(row.id)}
+                        className="shrink-0 rounded-md p-1 text-gray-400 hover:bg-white hover:text-gray-700"
+                        aria-label={`Remove ${row.filename || row.file.name}`}
+                      >
+                        <X size={16} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {attachments.length > 0 ? (
+                <p className="mt-2 text-xs font-medium text-gray-600">
+                  Total attachment size: {formatAttachmentBytes(attachmentTotalBytes)}
+                </p>
+              ) : null}
+            </div>
+
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -916,6 +1073,20 @@ export default function CommunicationsClient() {
             <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-sm text-gray-800">
               {sampleEmail.text}
             </pre>
+            {attachments.length > 0 ? (
+              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                <p className="font-medium text-gray-800">Attachments ({attachments.length})</p>
+                <ul className="mt-1 space-y-1 text-gray-600">
+                  {attachments.map((row) => (
+                    <li key={row.id}>
+                      {row.filename || row.file.name} · {formatAttachmentBytes(row.file.size)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-gray-500">No attachments.</p>
+            )}
             <button
               type="button"
               onClick={() => setEmailPreviewOpen(false)}
@@ -952,6 +1123,21 @@ export default function CommunicationsClient() {
                 <div className="mt-4 text-sm">
                   <p className="text-gray-500">Subject</p>
                   <p className="font-medium break-words text-gray-900">{subject}</p>
+                </div>
+                <div className="mt-3 text-sm">
+                  <p className="text-gray-500">Attachments</p>
+                  {attachments.length > 0 && (
+                    <ul className="mt-1 space-y-1 text-gray-800">
+                      {attachments.map((row) => (
+                        <li key={row.id}>
+                          {row.filename || row.file.name} · {formatAttachmentBytes(row.file.size)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {attachments.length === 0 && (
+                    <p className="font-medium text-gray-900">None</p>
+                  )}
                 </div>
                 {sending && sendProgress && !sendProgress.done ? (
                   <p className="mt-3 text-sm text-blue-700">Sending email...</p>
@@ -996,7 +1182,22 @@ export default function CommunicationsClient() {
                     <dt className="text-gray-500">Subject</dt>
                     <dd className="font-medium break-words">{subject}</dd>
                   </div>
+                  <div>
+                    <dt className="text-gray-500">Attachments</dt>
+                    <dd className="font-medium">
+                      {attachments.length > 0
+                        ? `${attachments.length} file${attachments.length === 1 ? "" : "s"} · ${formatAttachmentBytes(attachmentTotalBytes)}`
+                        : "None"}
+                    </dd>
+                  </div>
                 </dl>
+                {attachments.length > 0 && (preview?.recipient_count || 0) > 25 ? (
+                  <p className="mt-3 text-xs text-amber-800">
+                    Attachments are included on each private email via secure temporary links. Large
+                    audiences take longer because Resend does not support attachments on its batch
+                    endpoint.
+                  </p>
+                ) : null}
                 <p className="mt-4 text-sm text-gray-600">
                   Emails are sent in small batches. Keep this page open while sending. If sending is
                   interrupted, you can continue from History.

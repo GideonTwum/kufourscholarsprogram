@@ -4,6 +4,38 @@ import { requireActiveDirector } from "@/lib/director-auth";
 import { recordDirectorAudit } from "@/lib/audit/director-audit";
 import { COMMUNICATION_AUDIENCE_LABELS, COMMUNICATION_BATCH_SIZE } from "@/lib/director-communications";
 import { processCommunicationBatch } from "@/lib/director-communications-send";
+import {
+  collectAttachmentFilesFromFormData,
+  persistCommunicationAttachmentMetadata,
+  storeDirectorCommunicationAttachments,
+} from "@/lib/director-communication-attachment-store";
+import {
+  summarizeAttachmentDescriptors,
+  validateDirectorCommunicationAttachments,
+} from "@/lib/director-communication-attachments";
+
+async function parseCommunicationRequest(request) {
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    const confirmRaw = formData.get("confirm");
+    const body = {
+      confirm: confirmRaw === true || confirmRaw === "true" || confirmRaw === "1",
+      audience: formData.get("audience"),
+      application_id: formData.get("application_id"),
+      subject: formData.get("subject"),
+      body: formData.get("body"),
+      idempotency_key: formData.get("idempotency_key"),
+      emails: formData.get("emails"),
+      recipients: formData.get("recipients"),
+      to: formData.get("to"),
+      recipient_emails: formData.get("recipient_emails"),
+    };
+    return { body, files: collectAttachmentFilesFromFormData(formData) };
+  }
+  const body = await request.json();
+  return { body, files: [] };
+}
 
 /**
  * GET — list recent communications.
@@ -54,10 +86,11 @@ export async function POST(request) {
   if (gate.error) return gate.error;
 
   let body;
+  let files = [];
   try {
-    body = await request.json();
+    ({ body, files } = await parseCommunicationRequest(request));
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
   if (body.confirm !== true) {
@@ -114,6 +147,13 @@ export async function POST(request) {
     typeof body.idempotency_key === "string" && body.idempotency_key.trim()
       ? body.idempotency_key.trim().slice(0, 120)
       : null;
+
+  if (files.length > 0) {
+    const precheck = validateDirectorCommunicationAttachments(files.map((file) => ({ file })));
+    if (!precheck.ok) {
+      return NextResponse.json({ error: precheck.error, code: precheck.code || null }, { status: 400 });
+    }
+  }
 
   let admin;
   try {
@@ -189,6 +229,37 @@ export async function POST(request) {
     );
   }
 
+  let attachmentDescriptors = [];
+  if (files.length > 0) {
+    const stored = await storeDirectorCommunicationAttachments(admin, {
+      directorId: gate.user.id,
+      communicationId: created.id,
+      files,
+    });
+    if (!stored.ok) {
+      await admin
+        .from("director_communications")
+        .update({ status: "failed", completed_at: new Date().toISOString() })
+        .eq("id", created.id);
+      return NextResponse.json(
+        { error: stored.error, code: stored.code || null },
+        { status: stored.code === "storage_unavailable" || stored.code === "schema_unavailable" ? 503 : 400 }
+      );
+    }
+    const saved = await persistCommunicationAttachmentMetadata(admin, created.id, stored.attachments);
+    if (!saved.ok) {
+      await admin
+        .from("director_communications")
+        .update({ status: "failed", completed_at: new Date().toISOString() })
+        .eq("id", created.id);
+      return NextResponse.json(
+        { error: saved.error, code: saved.code || null },
+        { status: saved.code === "schema_unavailable" ? 503 : 500 }
+      );
+    }
+    attachmentDescriptors = stored.attachments;
+  }
+
   const recipientRows = resolved.sendable.map((r) => ({
     communication_id: created.id,
     application_id: r.application_id || null,
@@ -225,6 +296,8 @@ export async function POST(request) {
       recipient_count: resolved.sendable.length,
       excluded_count: resolved.excluded.length,
       subject,
+      attachment_count: attachmentDescriptors.length,
+      attachments: summarizeAttachmentDescriptors(attachmentDescriptors),
       mutates_applications: false,
       mutates_interview_assignments: false,
     },
@@ -233,6 +306,20 @@ export async function POST(request) {
   });
 
   const batch = await processCommunicationBatch(admin, created.id, gate.user.id);
+  if (!batch.ok) {
+    await admin
+      .from("director_communications")
+      .update({ status: "failed", completed_at: new Date().toISOString() })
+      .eq("id", created.id);
+    return NextResponse.json(
+      {
+        error: batch.error || "Could not send this communication.",
+        communication_id: created.id,
+        status: "failed",
+      },
+      { status: 500 }
+    );
+  }
 
   if (batch.done) {
     await recordDirectorAudit({
@@ -244,6 +331,7 @@ export async function POST(request) {
         status: batch.status,
         successful_count: batch.successful_count,
         failed_count: batch.failed_count,
+        attachment_count: attachmentDescriptors.length,
       },
       request,
       critical: false,
@@ -257,6 +345,8 @@ export async function POST(request) {
     audience_label: COMMUNICATION_AUDIENCE_LABELS[audience],
     recipient_count: resolved.sendable.length,
     excluded_count: resolved.excluded.length,
+    attachment_count: attachmentDescriptors.length,
+    attachments: summarizeAttachmentDescriptors(attachmentDescriptors),
     status: batch.status,
     successful_count: batch.successful_count,
     failed_count: batch.failed_count,

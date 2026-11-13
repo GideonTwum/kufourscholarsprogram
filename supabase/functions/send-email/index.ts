@@ -1,5 +1,13 @@
 const RESEND_API = "https://api.resend.com/emails";
 
+type Attachment = {
+  filename?: string;
+  path?: string;
+  content?: string;
+  content_type?: string;
+  contentType?: string;
+};
+
 type Body = {
   to: string | string[];
   subject: string;
@@ -7,6 +15,7 @@ type Body = {
   text?: string;
   template?: string;
   meta?: Record<string, string>;
+  attachments?: Attachment[];
 };
 
 Deno.serve(async (req: Request) => {
@@ -59,7 +68,7 @@ Deno.serve(async (req: Request) => {
   }
   const from = fromResolved.from;
 
-  const { to, subject, html, text, template, meta = {} } = body;
+  const { to, subject, html, text, template, meta = {}, attachments } = body;
   const recipients = Array.isArray(to) ? to : to ? [to] : [];
   if (recipients.length === 0 || !subject) {
     return new Response(JSON.stringify({ error: "Missing to or subject" }), { status: 400 });
@@ -132,19 +141,33 @@ ${reason}
     return new Response(JSON.stringify({ error: "No content" }), { status: 400 });
   }
 
+  const emailPayload: Record<string, unknown> = {
+    from,
+    to: recipients,
+    subject,
+    html: finalHtml ?? `<pre>${escapeHtml(finalText ?? "")}</pre>`,
+    text: finalText ?? "",
+  };
+  if (Array.isArray(attachments) && attachments.length > 0) {
+    emailPayload.attachments = attachments.map((item) => {
+      const next: Record<string, string> = {
+        filename: String(item.filename || "attachment"),
+      };
+      if (item.path) next.path = String(item.path);
+      if (item.content) next.content = String(item.content);
+      const contentType = item.content_type || item.contentType;
+      if (contentType) next.content_type = String(contentType);
+      return next;
+    });
+  }
+
   const res = await fetch(RESEND_API, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from,
-      to: recipients,
-      subject,
-      html: finalHtml ?? `<pre>${escapeHtml(finalText ?? "")}</pre>`,
-      text: finalText ?? "",
-    }),
+    body: JSON.stringify(emailPayload),
   });
 
   const json = await res.json().catch(() => ({}));
